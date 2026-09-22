@@ -1,4 +1,4 @@
-# Escenario 4 · contra la PC, de a dos u online
+# Escenario 4 · tutorial, contra la PC, de a dos u online
 
 El minijuego del escenario 4 de
 [agustint96.github.io](https://github.com/agustint96/agustint96.github.io),
@@ -11,10 +11,14 @@ persona en el mismo teclado o en otra PC por internet.
 Al arrancar se elige con el teclado. Durante el juego, el botón **MENU**
 (arriba a la izquierda) o **Escape** vuelven a esta elección.
 
-- **1 · contra la PC**: vos con WASD o flechas (Shift acelera, Espacio aleja
+- **1 · tutorial**: el juego del sitio con una sola nave, sin las navecitas de
+  la intro ni del final: las instrucciones, una lluvia de piedras de borde
+  blanco, si te pegan se reinicia, la cuenta de 10 a 1 y la nave se tiñe del
+  todo. Al completar los 10 agujeros, GANASTE y de vuelta al menú.
+- **2 · contra la PC**: vos con WASD o flechas (Shift acelera, Espacio aleja
   la cámara), con el tutorial de siempre. La nave de la PC se ve
   semitransparente.
-- **2 · dos jugadores**: sin tutorial, y la cámara muestra el mapa entero para
+- **3 · dos jugadores**: sin tutorial, y la cámara muestra el mapa entero para
   que nadie quede fuera de pantalla.
   - Con un **joystick** conectado: el jugador 1 tiene todo el teclado (como en
     el sitio) y el jugador 2 el joystick (stick o cruceta, RB acelera).
@@ -23,7 +27,7 @@ Al arrancar se elige con el teclado. Durante el juego, el botón **MENU**
   La pantalla de elección muestra cuál de los dos va a ser. Si el navegador
   no ve el joystick, apretá cualquier botón del joystick (los navegadores no
   lo muestran hasta que se toca).
-- **3 · online**: busca a alguien que también esté buscando y juegan cada uno
+- **4 · online**: busca a alguien que también esté buscando y juegan cada uno
   en su PC, con los controles de siempre y la cámara siguiendo a tu nave.
   MENU o Escape cancelan la búsqueda o te sacan de la partida; salir cuenta
   como irse: al rival le aparece EL RIVAL SE FUE y vuelve a su elección.

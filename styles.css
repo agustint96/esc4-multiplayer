@@ -769,7 +769,7 @@ html.escenas-listas .salmon-scene {
    dibuja esc4-game.js). Va en la caja y no en los sprites: sus filtros los
    escriben script.js y las reglas de arriba, y el drop-shadow en la caja
    sigue la forma de la nave entera, fuego incluido. */
-.starry-cohete-pair.in-game {
+.starry-cohete-pair.in-game.multijugador {
   filter: drop-shadow(0 0 5px rgba(90, 169, 255, 0.95))
     drop-shadow(0 0 14px rgba(90, 169, 255, 0.55));
 }

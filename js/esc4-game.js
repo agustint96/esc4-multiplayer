@@ -664,11 +664,16 @@
   let invulJugador = 0; // segundos que le quedan parpadeando (invulnerable)
   let reaparecer = null; // centro de la caja de la nave (pantalla) donde la golpearon
   let fin = null; // { t, ganador: "vos" | "pc" | "abandono" } alguien llegó a 10 (o se fue el rival online)
+  // "tutorial": el juego del sitio sin segunda nave y sin las navecitas de la
+  // intro ni del final: las instrucciones, una lluvia, el choque reinicia, la
+  // cuenta de 10 a 1 y la nave se tiñe del todo; al llegar a 10, GANASTE y al
+  // menú (ver esTutorial() en cada lugar donde se aparta del resto).
   // "pc": la segunda nave la maneja la PC; "dos": la maneja una persona, con el
   // joystick si hay uno o si no con las flechas y Shift derecho (ver
   // actualizarControles); "online": la maneja otra persona desde su PC (ver
   // "Online" más abajo). null mientras se elige, al arrancar.
   let modo = null;
+  const esTutorial = () => modo === "tutorial";
   const teclasJ2 = { up: false, down: false, left: false, right: false, boost: false };
   const TECLAS_J2 = {
     ArrowUp: "up",
@@ -680,9 +685,9 @@
   document.addEventListener("keydown", (ev) => {
     if (TECLAS_J2[ev.code]) teclasJ2[TECLAS_J2[ev.code]] = true;
     if (activo && !modo) {
-      if (ev.code === "Digit1" || ev.code === "Numpad1") elegirModo("pc");
-      else if (ev.code === "Digit2" || ev.code === "Numpad2") elegirModo("dos");
-      else if (ev.code === "Digit3" || ev.code === "Numpad3") elegirModo("online");
+      const MODOS = { 1: "tutorial", 2: "pc", 3: "dos", 4: "online" };
+      const n = /^(?:Digit|Numpad)([1-4])$/.exec(ev.code);
+      if (n) elegirModo(MODOS[n[1]]);
     } else if (activo && modo && ev.code === "Escape") {
       salirAlMenu();
     }
@@ -709,6 +714,8 @@
     window.dosJugadores = m === "dos";
     actualizarControles();
     if (menuEl) menuEl.hidden = false;
+    // Con dos naves la del jugador lleva su halo azul (ver styles.css).
+    ship.classList.toggle("multijugador", m !== "tutorial");
     if (m === "online") {
       // La elección queda en pantalla con el estado hasta que aparece un rival.
       conectarOnline();
@@ -1952,7 +1959,12 @@
   // segundero: tus goles en blanco (se tiñen como siempre) y los de la PC en
   // rojo. Spaceport no tiene tildes: "GANO".
   function mostrarTiempo() {
-    const texto = fin
+    // En el tutorial, el segundero del sitio (y GANASTE al completar los 10).
+    const texto = esTutorial()
+      ? fin
+        ? "GANASTE"
+        : tiempo.toFixed(1)
+      : fin
       ? fin.ganador === "abandono"
         ? "EL RIVAL SE FUE"
         : fin.ganador === "vos"
@@ -2305,15 +2317,31 @@
       if (window.shipPlace) window.shipPlace(salida.x, salida.y, true);
       cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
       cumulosTomados++;
-      // En el de salida las estrellas del cierre forman el número de goles:
-      // contra la PC se cuentan para arriba, 1 en el primero ... 10 en el último.
-      crearNumeroEstrellas(salida.x, salida.y, cumulosTomados);
-      sonarCruce();
-      decirGol(cumulosTomados);
-      mostrarTiempo();
-      actualizarColor();
-      if (enLinea()) avisarGolAnfitrion(entrado, salida);
-      if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
+      if (esTutorial()) {
+        // Como en el sitio: en el de salida las estrellas forman el número del
+        // pasaje, 10 en el primero ... 1 en el último (como la voz), y la nave
+        // se pinta 1/10 por pasaje. Con el último, en vez del final de las
+        // navecitas, GANASTE (con la nota) y después al menú.
+        crearNumeroEstrellas(
+          salida.x,
+          salida.y,
+          CUMULOS_PARA_COLOR - cumulosTomados + 1,
+        );
+        sonarCruce();
+        sonarConteo(cumulosTomados - 1);
+        colorObjetivo = Math.min(1, cumulosTomados / CUMULOS_PARA_COLOR);
+        if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
+      } else {
+        // En el de salida las estrellas del cierre forman el número de goles:
+        // con dos naves se cuentan para arriba, 1 en el primero ... 10 en el último.
+        crearNumeroEstrellas(salida.x, salida.y, cumulosTomados);
+        sonarCruce();
+        decirGol(cumulosTomados);
+        mostrarTiempo();
+        actualizarColor();
+        if (enLinea()) avisarGolAnfitrion(entrado, salida);
+        if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
+      }
     }
     for (const p of particulas) {
       p.t += dt;
@@ -2333,10 +2361,12 @@
     if (!ganado) tiempo += dt; // al ganar el segundero queda parado
     if (!ganado) actualizarVoces();
 
-    if (!rival && !ganado) crearRival(circulos);
+    if (!rival && !ganado && !esTutorial()) crearRival(circulos);
 
+    // En el tutorial es una sola lluvia, como en el sitio.
     const intervalo =
-      Math.max(SPAWN_MIN, SPAWN_INICIAL - tiempo * SPAWN_RAMPA) * LLUVIA_MENOS;
+      Math.max(SPAWN_MIN, SPAWN_INICIAL - tiempo * SPAWN_RAMPA) *
+      (esTutorial() ? 1 : LLUVIA_MENOS);
     if (tiempo > gracia && !ganado) {
       // Cada nave tiene su lluvia; la de la golpeada se corta mientras está
       // fuera de juego y mientras parpadea (las que ya venían siguen cayendo).
@@ -2387,7 +2417,11 @@
     actualizarRival(dt, circulos);
 
     // Durante el final (ya completó el color) no se choca: el nivel está ganado.
-    if (!ganado) {
+    if (!ganado && esTutorial()) {
+      // Como en el sitio: la piedra golpea, la nave cae y la partida reinicia.
+      const golpe = piedraQueToca(poligonos, circulos);
+      if (golpe) chocar(golpe.p, golpe.c);
+    } else if (!ganado) {
       // Cualquier piedra golpea a cualquier nave, sea de la lluvia que sea.
       if (stunJugador <= 0 && invulJugador <= 0) {
         const golpe =
@@ -2465,6 +2499,20 @@
       y: p.vy * 0.7,
       giro: lado * GOLPE_GIRO * (0.7 + Math.random() * 0.6),
     };
+  }
+
+  // El choque del juego del sitio (tutorial): todo se frena, la nave cae
+  // golpeada y a los DURACION_CHOQUE segundos arranca otra partida (ver el
+  // "if (choque)" del cuadro).
+  function chocar(p, tocado) {
+    choque = true;
+    tChoque = 0;
+    golpeadora = p;
+    frenarMusica();
+    cortarVoz();
+    vozPendiente = null;
+    sonarPerder();
+    naveCae = caidaPorGolpe(p, tocado);
   }
 
   function golpearJugador(p, tocado) {
@@ -3474,7 +3522,8 @@
       POLIGONO_COLOR_FIN,
       Math.max(0, Math.min(1, colorNave)),
     );
-    dibujarPoligonos(poligonos, BORDE_JUGADOR);
+    // En el tutorial, con el borde blanco del sitio (no hay otra lluvia).
+    dibujarPoligonos(poligonos, esTutorial() ? "#fff" : BORDE_JUGADOR);
     dibujarPoligonos(poligonosRival, BORDE_RIVAL);
     dibujarRival();
     dibujarFinal();
@@ -3536,10 +3585,10 @@
         !final.salio &&
         final.t - FINAL_NAVE_DUR > FINAL_FUERA + FINAL_COLA
       ) {
-        // Terminó la animación: le ganaste a la PC. Acá no hay escenario
-        // principal al que volver, así que arranca otra partida.
+        // Terminó la animación del final. Ya no se usa (acá no está el final de
+        // las navecitas, ver terminarPartida), pero si llegara: al menú.
         final.salio = true;
-        reiniciar(true);
+        salirAlMenu();
       }
     }
     if (choque) {
@@ -3628,7 +3677,7 @@
           // Si se fue el rival online, de vuelta a la elección; si no, otra
           // partida (online, con el mismo rival).
           if (fin.t >= FIN_DURA) {
-            if (fin.ganador === "abandono") location.reload();
+            if (fin.ganador === "abandono" || esTutorial()) salirAlMenu();
             else reiniciar(true);
           }
         } else {
