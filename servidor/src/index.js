@@ -7,15 +7,23 @@
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
-    if (url.pathname === "/buscar") {
-      if (req.headers.get("Upgrade") !== "websocket")
+    if (url.pathname === "/buscar" || url.pathname === "/donde") {
+      if (url.pathname === "/buscar" && req.headers.get("Upgrade") !== "websocket")
         return new Response("Se esperaba un WebSocket", { status: 426 });
-      const sala = env.SALA.get(env.SALA.idFromName("global"));
-      return sala.fetch(req);
+      return sala(env).fetch(req);
     }
     return new Response("Emparejador del escenario 4", { status: 200 });
   },
 };
+
+// La sala, en Sudamérica: los mensajes de cada pareja pasan por ella, así que
+// conviene que esté cerca de los que juegan. Cloudflare usa la sugerencia de
+// lugar solo al crear el Durable Object (después queda donde nació), por eso
+// tiene un nombre nuevo: la de nombre "global" ya existía en otro lado.
+function sala(env) {
+  const id = env.SALA.idFromName("sudamerica");
+  return env.SALA.get(id, { locationHint: "sam" });
+}
 
 export class Emparejador {
   constructor() {
@@ -23,7 +31,14 @@ export class Emparejador {
     this.pareja = new Map(); // cada socket -> el de su rival
   }
 
-  async fetch() {
+  async fetch(req) {
+    // /donde: en qué centro de datos de Cloudflare quedó la sala (el "colo"
+    // de la traza es el de donde corre este código, no el del que pregunta).
+    if (new URL(req.url).pathname === "/donde") {
+      const traza = await (await fetch("https://cloudflare.com/cdn-cgi/trace")).text();
+      const colo = (traza.match(/^colo=(.*)$/m) || [])[1] || "?";
+      return new Response("La sala está en " + colo + "\n");
+    }
     const [cliente, servidor] = Object.values(new WebSocketPair());
     servidor.accept();
     this.entrar(servidor);
