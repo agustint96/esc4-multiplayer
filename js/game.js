@@ -34,7 +34,6 @@ window.Game = (function () {
   });
   const imgFondo = new Image();
   imgFondo.src = "assets/fondo-estrellado.webp";
-  let patronFondo = null;
 
   const MAPA_TECLAS = {
     ArrowUp: "up", w: "up", W: "up",
@@ -350,11 +349,19 @@ window.Game = (function () {
   }
 
   function dibujarFondo() {
-    if (!patronFondo && imgFondo.complete && imgFondo.naturalWidth) {
-      patronFondo = ctx.createPattern(imgFondo, "repeat");
-    }
-    ctx.fillStyle = patronFondo || "#0d1b2e";
+    ctx.fillStyle = "#0d1b2e";
     ctx.fillRect(0, 0, ancho, alto);
+
+    // Como el fondo-estrellado.webp es una foto (no una textura para
+    // mosaico), se dibuja completa y centrada tipo "cover" en vez de
+    // repetida — repetida a tamaño original solo mostraba un recorte sin
+    // estrellas, como un manchón azul plano.
+    if (imgFondo.complete && imgFondo.naturalWidth) {
+      const escala = Math.max(ancho / imgFondo.naturalWidth, alto / imgFondo.naturalHeight);
+      const w = imgFondo.naturalWidth * escala;
+      const h = imgFondo.naturalHeight * escala;
+      ctx.drawImage(imgFondo, (ancho - w) / 2, (alto - h) / 2, w, h);
+    }
   }
 
   function dibujarPuntaje() {
