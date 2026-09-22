@@ -702,6 +702,22 @@ html.escenas-listas .salmon-scene {
 .game-modo[hidden] {
   display: none;
 }
+/* Online, buscando rival: solo queda el estado ("buscando rival"...). */
+.game-modo.buscando > :not(.game-modo-estado) {
+  display: none;
+}
+.game-modo-estado {
+  margin: 0;
+  font-family: Spaceport, ui-monospace, Consolas, monospace;
+  letter-spacing: 0.2em;
+  line-height: 2.4;
+  text-align: center;
+  color: #fff;
+}
+.game-modo-estado small {
+  font-size: 0.8em;
+  color: rgba(255, 255, 255, 0.55);
+}
 .game-modo-controles {
   margin: 1em 0 0;
   font-family: Spaceport, ui-monospace, Consolas, monospace;

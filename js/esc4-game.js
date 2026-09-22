@@ -663,10 +663,11 @@
   let stunJugador = 0; // segundos que le quedan fuera de juego a la nave del jugador
   let invulJugador = 0; // segundos que le quedan parpadeando (invulnerable)
   let reaparecer = null; // centro de la caja de la nave (pantalla) donde la golpearon
-  let fin = null; // { t, ganador: "vos" | "pc" } alguien llegó a 10
+  let fin = null; // { t, ganador: "vos" | "pc" | "abandono" } alguien llegó a 10 (o se fue el rival online)
   // "pc": la segunda nave la maneja la PC; "dos": la maneja una persona, con el
   // joystick si hay uno o si no con las flechas y Shift derecho (ver
-  // actualizarControles). null mientras se elige, al arrancar.
+  // actualizarControles); "online": la maneja otra persona desde su PC (ver
+  // "Online" más abajo). null mientras se elige, al arrancar.
   let modo = null;
   const teclasJ2 = { up: false, down: false, left: false, right: false, boost: false };
   const TECLAS_J2 = {
@@ -681,6 +682,11 @@
     if (activo && !modo) {
       if (ev.code === "Digit1" || ev.code === "Numpad1") elegirModo("pc");
       else if (ev.code === "Digit2" || ev.code === "Numpad2") elegirModo("dos");
+      else if (ev.code === "Digit3" || ev.code === "Numpad3") elegirModo("online");
+    } else if (activo && modo === "online" && ev.code === "Escape") {
+      // Cancelar la búsqueda o irse de la partida: se vuelve a la elección
+      // (al rival le llega que se fue).
+      location.reload();
     }
   });
   document.addEventListener("keyup", (ev) => {
@@ -694,8 +700,13 @@
   function elegirModo(m) {
     modo = m;
     window.dosJugadores = m === "dos";
-    if (modoEl) modoEl.hidden = true;
     actualizarControles();
+    if (m === "online") {
+      // La elección queda en pantalla con el estado hasta que aparece un rival.
+      conectarOnline();
+      return;
+    }
+    if (modoEl) modoEl.hidden = true;
   }
 
   // Con dos jugadores, quién usa qué (lo lee script.js cada cuadro):
@@ -904,6 +915,7 @@
     invulJugador = 0;
     reaparecer = null;
     fin = null;
+    reclamados.clear();
     ship.classList.remove("fuera-de-juego", "invulnerable");
     // Con intro el segundero queda oculto y parado hasta que se van las naves y
     // terminan las instrucciones.
@@ -1933,13 +1945,19 @@
   // rojo. Spaceport no tiene tildes: "GANO".
   function mostrarTiempo() {
     const texto = fin
-      ? fin.ganador === "vos"
-        ? modo === "dos"
-          ? "GANO J1"
-          : "GANASTE"
-        : '<span class="marcador-rival">' +
-          (modo === "dos" ? "GANO J2" : "GANO LA PC") +
-          "</span>"
+      ? fin.ganador === "abandono"
+        ? "EL RIVAL SE FUE"
+        : fin.ganador === "vos"
+          ? modo === "dos"
+            ? "GANO J1"
+            : "GANASTE"
+          : '<span class="marcador-rival">' +
+            (modo === "dos"
+              ? "GANO J2"
+              : enLinea()
+                ? "GANO EL RIVAL"
+                : "GANO LA PC") +
+            "</span>"
       : cumulosTomados +
         '<span class="marcador-separador"></span><span class="marcador-rival">' +
         golesRival +
@@ -1994,7 +2012,11 @@
   // Un agujero de gusano nuevo en un punto al azar de lo que se ve, lejos de la
   // nave y (si se pasa) del otro agujero del par.
   function crearCumulo(objetivo, otro) {
-    const v = vista();
+    // Online, en cualquier lugar de la pantalla y no solo donde mira el
+    // anfitrión (que es quien los crea): si no, siempre le quedarían cerca a él.
+    const v = enLinea()
+      ? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }
+      : vista();
     const margen = 90;
     for (let intento = 0; intento < 20; intento++) {
       const x = v.x + margen + Math.random() * Math.max(1, v.w - margen * 2);
@@ -2007,6 +2029,7 @@
       if (otro && Math.hypot(x - otro.x, y - otro.y) < CUMULO_DISTANCIA_PAR)
         continue;
       return {
+        id: ++idCumulo, // online, para que el invitado diga a cuál entró
         x,
         y,
         t: 0,
@@ -2227,7 +2250,9 @@
   // si no entran. Al entrar en uno la nave sale por el otro y gana color.
   function actualizarCumulos(dt, circulos) {
     acumCumulo += dt;
-    if (cumulos.length === 0 && !ganado && acumCumulo >= proxCumulo) {
+    // Online los crea solo el anfitrión: el invitado los recibe.
+    const creaAgujeros = !enLinea() || soyAnfitrion();
+    if (creaAgujeros && cumulos.length === 0 && !ganado && acumCumulo >= proxCumulo) {
       acumCumulo = 0;
       proxCumulo =
         CUMULO_INTERVALO[0] +
@@ -2240,14 +2265,24 @@
     }
     cumulos = cumulos.filter((c) => c.t < CUMULO_VIDA);
     // Fuera de juego (golpeada) la nave no puede entrar a un agujero.
-    const entrado =
+    let entrado =
       stunJugador <= 0 &&
       cumulos.find((c) =>
         circulos.some(
           (n) => Math.hypot(n.x - c.x, n.y - c.y) < n.r + CUMULO_RADIO,
         ),
       );
-    if (!entrado && rival && rival.stun <= 0) {
+    if (entrado && enLinea() && !soyAnfitrion()) {
+      // Invitado: no decide el gol, avisa que entró (una vez por agujero) y
+      // espera que el anfitrión lo confirme (ver recibirGol).
+      if (!reclamados.has(entrado.id)) {
+        reclamados.add(entrado.id);
+        enviarOnline({ tipo: "entre", id: entrado.id });
+      }
+      entrado = null;
+    }
+    // Online los goles del rival los avisa él (ver golInvitado).
+    if (!entrado && !enLinea() && rival && rival.stun <= 0) {
       const circ = circulosRival();
       const deRival = cumulos.find((c) =>
         circ.some((n) => Math.hypot(n.x - c.x, n.y - c.y) < n.r + CUMULO_RADIO),
@@ -2269,6 +2304,7 @@
       decirGol(cumulosTomados);
       mostrarTiempo();
       actualizarColor();
+      if (enLinea()) avisarGolAnfitrion(entrado, salida);
       if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
     }
     for (const p of particulas) {
@@ -2303,7 +2339,8 @@
           poligonos.push(crearPoligono(circulos[1]));
         }
       }
-      if (rival && rival.stun <= 0 && rival.invul <= 0) {
+      // Online la lluvia del rival la maneja su PC y llega por la red.
+      if (!enLinea() && rival && rival.stun <= 0 && rival.invul <= 0) {
         acumSpawnRival += dt;
         if (acumSpawnRival >= intervalo) {
           acumSpawnRival = 0;
@@ -2328,14 +2365,16 @@
     const focoJugador = stunJugador > 0 || invulJugador > 0 ? null : circulos[1];
     const focoRival = rival && rival.stun <= 0 && rival.invul <= 0 ? rival : null;
     moverPoligonos(poligonos, focoJugador, busqueda, dt);
-    moverPoligonos(poligonosRival, focoRival, BUSQUEDA_BASE, dt);
+    if (enLinea()) moverRemotas(poligonosRival, dt);
+    else moverPoligonos(poligonosRival, focoRival, BUSQUEDA_BASE, dt);
     // Se descartan los que ya salieron por abajo, compactando el mismo array.
     // Nunca antes de haber pasado la nave, aunque esté más abajo de lo que se ve
     // (la nave puede salirse un poco de la pantalla): así no se puede esconder
     // ahí y pasarse el minutero sin chocar.
     const suelo = circulos.reduce((m, c) => Math.max(m, c.y + c.r), abajo);
     descartarPasados(poligonos, suelo);
-    descartarPasados(poligonosRival, rival ? Math.max(abajo, rival.y + 80) : abajo);
+    if (!enLinea())
+      descartarPasados(poligonosRival, rival ? Math.max(abajo, rival.y + 80) : abajo);
 
     actualizarRival(dt, circulos);
 
@@ -2348,7 +2387,8 @@
           piedraQueToca(poligonosRival, circulos);
         if (golpe) golpearJugador(golpe.p, golpe.c);
       }
-      if (rival && rival.stun <= 0 && rival.invul <= 0) {
+      // Online a la nave del rival la golpea (o no) su PC: llega en su estado.
+      if (!enLinea() && rival && rival.stun <= 0 && rival.invul <= 0) {
         const circ = circulosRival();
         const golpe =
           piedraQueToca(poligonos, circ) || piedraQueToca(poligonosRival, circ);
@@ -2574,6 +2614,10 @@
 
   function actualizarRival(dt, circulos) {
     if (!rival) return;
+    if (enLinea()) {
+      actualizarRivalOnline(dt);
+      return;
+    }
 
     const antesX = rival.x;
     const antesY = rival.y;
@@ -2730,6 +2774,12 @@
     const empuje = REPELER_FUERZA * k * k * dt * 60; // px por cuadro de 60 Hz
     const nx = dx / dist;
     const ny = dy / dist;
+    // La velocidad de la nave del jugador está en px de pantalla por cuadro,
+    // que para ella es lo mismo que px del mundo (la cámara está anclada ahí).
+    if (window.shipPush) window.shipPush(-nx * empuje, -ny * empuje);
+    // Online a la nave del rival la empuja su propia PC (hace esta misma
+    // cuenta del otro lado).
+    if (enLinea()) return;
     rival.vx += nx * empuje;
     rival.vy += ny * empuje;
     // Si igual se llegaron a encimar (venían las dos a toda velocidad de frente),
@@ -2739,9 +2789,6 @@
       rival.x += nx * (minimo - dist);
       rival.y += ny * (minimo - dist);
     }
-    // La velocidad de la nave del jugador está en px de pantalla por cuadro,
-    // que para ella es lo mismo que px del mundo (la cámara está anclada ahí).
-    if (window.shipPush) window.shipPush(-nx * empuje, -ny * empuje);
   }
 
   function golRival(entrado) {
@@ -2788,8 +2835,306 @@
     mostrarTiempo();
   }
 
+  // --- Online -----------------------------------------------------------------
+  // Contra otra persona en otra PC, a través del emparejador (servidor/ en este
+  // repo, un Worker de Cloudflare): junta de a dos a los que buscan y reenvía
+  // lo que manda cada uno. Cada PC maneja su nave y su lluvia, y le manda al
+  // otro ENVIO_CADA segundos dónde está, sus piedras y si está golpeada; cada
+  // una se fija sola si a su nave la golpea una piedra (suya o del otro). Los
+  // agujeros y los goles los decide el anfitrión (el que estaba esperando):
+  // el invitado solo avisa "entré a este" y espera que se lo confirme.
+  //
+  // Las pantallas pueden ser de distinto tamaño: las posiciones viajan como
+  // fracción de la pantalla (0 a 1), así los dos ven lo mismo en su lugar.
+  // ?servidor=ws://127.0.0.1:8787/buscar para probar con `wrangler dev`.
+  const SERVIDOR =
+    new URLSearchParams(location.search).get("servidor") ||
+    "wss://esc4-emparejador.agustintardella7.workers.dev/buscar";
+  const ENVIO_CADA = 0.05; // 20 veces por segundo
+  let red = null; // { ws, rol: "anfitrion" | "invitado" | null, estado }
+  let acumEnvio = 0;
+  let idCumulo = 0; // para que el invitado sepa a qué agujero entró
+  const reclamados = new Set(); // agujeros a los que el invitado ya avisó que entró
+  const soyAnfitrion = () => !!red && red.rol === "anfitrion";
+  const enLinea = () => modo === "online";
+  // Buscando rival o sin conexión: la partida todavía no arranca.
+  const esperandoRival = () =>
+    enLinea() && (!red || (red.estado !== "jugando" && red.estado !== "se-fue"));
+
+  const r4 = (v) => Math.round(v * 1e4) / 1e4; // fracciones de pantalla
+  const r1 = (v) => Math.round(v * 10) / 10; // px y ángulos
+
+  function conectarOnline() {
+    red = { ws: null, rol: null, estado: "conectando" };
+    mostrarEstadoOnline();
+    let ws;
+    try {
+      ws = new WebSocket(SERVIDOR);
+    } catch (e) {
+      red.estado = "sin-conexion";
+      mostrarEstadoOnline();
+      return;
+    }
+    red.ws = ws;
+    ws.onmessage = (ev) => {
+      let m;
+      try {
+        m = JSON.parse(ev.data);
+      } catch (e) {
+        return;
+      }
+      recibirOnline(m);
+    };
+    ws.onclose = () => {
+      if (!red) return;
+      if (red.estado === "jugando") rivalSeFue();
+      else if (red.estado !== "se-fue") {
+        red.estado = "sin-conexion";
+        mostrarEstadoOnline();
+      }
+    };
+  }
+
+  function enviarOnline(m) {
+    if (red && red.ws && red.ws.readyState === 1) red.ws.send(JSON.stringify(m));
+  }
+
+  function mostrarEstadoOnline() {
+    if (!modoEl) return;
+    const el = document.getElementById("game-modo-estado");
+    if (!el) return;
+    modoEl.classList.add("buscando");
+    el.hidden = false;
+    const textos = {
+      conectando: "conectando",
+      esperando: "buscando rival<br /><small>esc para cancelar</small>",
+      "sin-conexion": "sin conexion con el servidor<br /><small>esc para volver</small>",
+    };
+    el.innerHTML = textos[red.estado] || "";
+  }
+
+  function recibirOnline(m) {
+    if (m.tipo === "esperando") {
+      red.estado = "esperando";
+      mostrarEstadoOnline();
+    } else if (m.tipo === "emparejado") {
+      red.rol = m.rol;
+      red.estado = "jugando";
+      if (modoEl) modoEl.hidden = true;
+    } else if (m.tipo === "rival-se-fue") {
+      rivalSeFue();
+    } else if (m.tipo === "estado") {
+      recibirEstadoRival(m);
+    } else if (m.tipo === "entre") {
+      if (soyAnfitrion()) golInvitado(m.id);
+    } else if (m.tipo === "gol") {
+      if (!soyAnfitrion()) recibirGol(m);
+    }
+  }
+
+  function rivalSeFue() {
+    if (!red || red.estado === "se-fue") return;
+    red.estado = "se-fue";
+    // Con el cartel un rato y después, de vuelta a la elección.
+    fin = { t: 0, ganador: "abandono" };
+    frenarMusica();
+    cumulos = [];
+    mostrarTiempo();
+  }
+
+  // Lo que se le manda al rival cada ENVIO_CADA: la nave (centro de su caja en
+  // el mundo, giro, si está golpeada o parpadeando) y las piedras propias; el
+  // anfitrión, además, los agujeros y el marcador.
+  function enviarEstado() {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const pose = window.shipPose;
+    if (!pose || !pose.listo) return;
+    const sx = pose.x + cajaNave / 2;
+    const sy = pose.y + cajaNave / 2;
+    const m = {
+      tipo: "estado",
+      x: r4((cam.ox + (sx - cam.ox) / cam.z) / W),
+      y: r4((cam.oy + (sy - cam.oy) / cam.z) / H),
+      rot: r1(pose.rot),
+      stun: r1(stunJugador * 10) / 10,
+      tc: r1(tChoque * 10) / 10,
+      inv: r1(invulJugador * 10) / 10,
+      p: poligonos.map((p) => [
+        r4(p.x / W), r4(p.y / H), r4(p.vx / W), r4(p.vy / H),
+        r1(p.ang * 100) / 100, r1(p.giro * 100) / 100, r1(p.radio),
+        p.verts.map((v) => [r1(v.x), r1(v.y)]),
+      ]),
+    };
+    if (soyAnfitrion()) {
+      m.c = cumulos.map((c) => [c.id, r4(c.x / W), r4(c.y / H), r1(c.t * 10) / 10, c.par ? c.par.id : 0]);
+      m.g = [cumulosTomados, golesRival]; // goles del anfitrión y del invitado
+    }
+    enviarOnline(m);
+  }
+
+  function recibirEstadoRival(m) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    if (!rival) crearRival(circulosNave());
+    const antes = rival.stun;
+    rival.metaX = m.x * W;
+    rival.metaY = m.y * H;
+    rival.metaRot = m.rot;
+    rival.stun = m.stun;
+    rival.t = m.tc;
+    rival.invul = m.inv;
+    // Lo acaba de golpear una piedra: el mismo ruido y las chispas de siempre.
+    if (antes <= 0 && m.stun > 0) {
+      sonarPerder();
+      chispas(rival.x, rival.y);
+    }
+    // Sus piedras, tal cual las tiene él (entre un mensaje y otro siguen
+    // cayendo acá con la velocidad que traían, ver moverRemotas).
+    poligonosRival = m.p.map(([x, y, vx, vy, ang, giro, radio, verts]) => {
+      const p = {
+        x: x * W, y: y * H, vx: vx * W, vy: vy * H, ang, giro, radio,
+        verts: verts.map(([a, b]) => ({ x: a, y: b })),
+        pts: [],
+      };
+      actualizarPuntos(p);
+      return p;
+    });
+    if (!soyAnfitrion() && m.c) {
+      // Los agujeros del anfitrión (conservando el giro de los que ya estaban,
+      // para que no salten). Si aparece uno nuevo, suena como siempre.
+      const previos = new Map(cumulos.map((c) => [c.id, c]));
+      let nuevo = false;
+      const lista = m.c.map(([id, x, y, t]) => {
+        let c = previos.get(id);
+        if (!c) {
+          c = { id, ang: Math.random() * Math.PI * 2 };
+          nuevo = true;
+        }
+        c.x = x * W;
+        c.y = y * H;
+        c.t = t;
+        c.par = null;
+        return c;
+      });
+      const porId = new Map(lista.map((c) => [c.id, c]));
+      m.c.forEach((d, i) => (lista[i].par = porId.get(d[4]) || null));
+      cumulos = lista;
+      if (nuevo) sonarPortal();
+    }
+    if (!soyAnfitrion() && m.g && !fin) {
+      cumulosTomados = m.g[1];
+      golesRival = m.g[0];
+      actualizarColor();
+    }
+  }
+
+  // Las piedras del rival entre un mensaje y otro: siguen derecho con la
+  // velocidad y el giro que traían.
+  function moverRemotas(lista, dt) {
+    for (const p of lista) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.ang += p.giro * dt;
+      actualizarPuntos(p);
+    }
+  }
+
+  // La nave del rival sigue lo último que llegó, suavizado (llega 20 veces por
+  // segundo; sin suavizar se vería a los saltos). Un salto grande es un
+  // teletransporte: ahí no se suaviza.
+  function actualizarRivalOnline(dt) {
+    if (rival.metaX == null) return;
+    const antesX = rival.x;
+    const antesY = rival.y;
+    const salto = Math.hypot(rival.metaX - rival.x, rival.metaY - rival.y);
+    const k = salto > 250 ? 1 : Math.min(1, dt * 15);
+    rival.x += (rival.metaX - rival.x) * k;
+    rival.y += (rival.metaY - rival.y) * k;
+    let d = rival.metaRot - rival.rot;
+    d = ((((d + 180) % 360) + 360) % 360) - 180;
+    rival.rot += d * Math.min(1, dt * 15);
+    const dist = Math.hypot(rival.x - antesX, rival.y - antesY) * cam.z;
+    actualizarFuegoRival(dt, dt > 0 && dist < 250 ? dist / dt : 0);
+  }
+
+  // Anfitrión: el invitado avisa que entró a un agujero. Si todavía existe (si
+  // no, ya lo tomó el anfitrión antes), es gol del invitado.
+  function golInvitado(id) {
+    if (fin || ganado) return;
+    const entrado = cumulos.find((c) => c.id === id);
+    if (!entrado) return;
+    const salida = entrado.par || entrado;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    chispas(entrado.x, entrado.y);
+    chispas(salida.x, salida.y);
+    if (rival) {
+      rival.x = rival.metaX = salida.x;
+      rival.y = rival.metaY = salida.y;
+    }
+    cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
+    golesRival++;
+    actualizarColor();
+    sonarCruce();
+    mostrarTiempo();
+    enviarOnline({
+      tipo: "gol",
+      quien: "invitado",
+      e: [r4(entrado.x / W), r4(entrado.y / H)],
+      s: [r4(salida.x / W), r4(salida.y / H)],
+      g: [cumulosTomados, golesRival],
+    });
+    if (golesRival >= CUMULOS_PARA_COLOR) terminarPartida("pc");
+  }
+
+  // Anfitrión: metió un gol él (ver actualizarCumulos): se lo cuenta al invitado.
+  function avisarGolAnfitrion(entrado, salida) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    enviarOnline({
+      tipo: "gol",
+      quien: "anfitrion",
+      e: [r4(entrado.x / W), r4(entrado.y / H)],
+      s: [r4(salida.x / W), r4(salida.y / H)],
+      g: [cumulosTomados, golesRival],
+    });
+  }
+
+  // Invitado: el anfitrión confirma un gol (de cualquiera de los dos).
+  function recibirGol(m) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const e = { x: m.e[0] * W, y: m.e[1] * H };
+    const s = { x: m.s[0] * W, y: m.s[1] * H };
+    chispas(e.x, e.y);
+    // Se cierra el par acá mismo (el próximo estado del anfitrión igual lo saca).
+    const cerca = (c, p) => Math.hypot(c.x - p.x, c.y - p.y) < 2;
+    cumulos = cumulos.filter((c) => !cerca(c, e) && !cerca(c, s));
+    cumulosTomados = m.g[1];
+    golesRival = m.g[0];
+    if (m.quien === "invitado") {
+      // Gol mío: salgo por el otro agujero, como siempre.
+      if (window.shipPlace) window.shipPlace(s.x, s.y, true);
+      crearNumeroEstrellas(s.x, s.y, cumulosTomados);
+      decirGol(cumulosTomados);
+    } else {
+      chispas(s.x, s.y);
+      if (rival) {
+        rival.x = rival.metaX = s.x;
+        rival.y = rival.metaY = s.y;
+      }
+    }
+    sonarCruce();
+    actualizarColor();
+    mostrarTiempo();
+    if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
+    else if (golesRival >= CUMULOS_PARA_COLOR) terminarPartida("pc");
+  }
+
   function dibujarRival() {
     if (!rival || ganado) return;
+    if (enLinea() && rival.metaX == null) return; // todavía no llegó dónde está
     if (rival.stun > 0 && rival.t >= DURACION_CHOQUE) return; // fuera de juego: no se ve
     if (!imgRivalTop.complete || !imgRivalTop.naturalWidth) return;
     // Las tres capas juntas (atrás, fuego, adelante), como la nave del jugador.
@@ -3148,6 +3493,13 @@
       dibujar(circulos[1]);
       return;
     }
+    if (esperandoRival()) {
+      // Online, buscando rival: igual que eligiendo, hasta que el emparejador
+      // junta a los dos.
+      if (window.shipMove) window.shipMove(0, 0);
+      dibujar(circulos[1]);
+      return;
+    }
     actualizarControles();
     // La nave va ganando color de a poco (no de golpe) hacia colorObjetivo, y
     // muy despacio: cada pasaje tarda varios segundos en terminar de teñirla.
@@ -3233,7 +3585,8 @@
         // En celulares se saltea el tutorial (ver esCelular arriba): arranca
         // el juego directo, como si ya hubiera terminado.
         // Con dos jugadores también: las instrucciones son las de uno solo.
-        if (esCelular() || modo === "dos") terminarAyuda();
+        // Online también, así los dos arrancan juntos.
+        if (esCelular() || modo === "dos" || enLinea()) terminarAyuda();
         else empezarAyuda();
       }
       if (ayuda) actualizarAyuda(dt);
@@ -3264,7 +3617,12 @@
           // Alguien llegó a 10: todo quieto con el cartel y después, otra partida.
           fin.t += dt;
           if (window.shipMove) window.shipMove(0, 0);
-          if (fin.t >= FIN_DURA) reiniciar(true);
+          // Si se fue el rival online, de vuelta a la elección; si no, otra
+          // partida (online, con el mismo rival).
+          if (fin.t >= FIN_DURA) {
+            if (fin.ganador === "abandono") location.reload();
+            else reiniciar(true);
+          }
         } else {
           actualizarInvulJugador(dt);
           if (stunJugador > 0) {
@@ -3277,6 +3635,14 @@
     }
     luzNivel += ((luz ? 1 : 0) - luzNivel) * Math.min(1, dt * 6);
     dibujar(circulos[1]); // la luz sale del cuerpo de la nave
+    // Online: lo que ve el rival de esta nave, 20 veces por segundo.
+    if (enLinea() && red && red.estado === "jugando") {
+      acumEnvio += dt;
+      if (acumEnvio >= ENVIO_CADA) {
+        acumEnvio = 0;
+        enviarEstado();
+      }
+    }
   }
 
   // Leer offsetWidth obliga al navegador a recalcular estilos y layout en el

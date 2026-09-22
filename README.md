@@ -1,10 +1,10 @@
-# Escenario 4 · contra la PC o de a dos
+# Escenario 4 · contra la PC, de a dos u online
 
 El minijuego del escenario 4 de
 [agustint96.github.io](https://github.com/agustint96/agustint96.github.io),
 tal cual (mismo `esc4-game.js`, `script.js`, `styles.css`, sprites y sonidos,
 copiados de ese repo), con una segunda nave manejada por la PC o por otra
-persona en el mismo teclado.
+persona en el mismo teclado o en otra PC por internet.
 
 ## Modos
 
@@ -22,6 +22,24 @@ Al arrancar se elige con el teclado:
   La pantalla de elección muestra cuál de los dos va a ser. Si el navegador
   no ve el joystick, apretá cualquier botón del joystick (los navegadores no
   lo muestran hasta que se toca).
+- **3 · online**: busca a alguien que también esté buscando y juegan cada uno
+  en su PC, con los controles de siempre y la cámara siguiendo a tu nave.
+  Escape cancela la búsqueda o te saca de la partida. Si el rival se va,
+  aparece un cartel y se vuelve a la elección.
+
+## Online
+
+El emparejador está en `servidor/` (un Worker de Cloudflare con un Durable
+Object): junta de a dos a los que buscan y reenvía lo que manda cada uno.
+Cada PC maneja su nave y su lluvia y le manda al otro 20 veces por segundo
+dónde está, sus piedras y si está golpeada; cada una detecta sola los golpes
+a su nave. Los agujeros y los goles los decide el anfitrión (el que estaba
+esperando). Las posiciones viajan como fracción de la pantalla, así juegan
+bien aunque los monitores sean de distinto tamaño.
+
+Para subir cambios del servidor: `cd servidor` y `npx wrangler deploy`. Para
+probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
+`?servidor=ws://127.0.0.1:8787/buscar`.
 
 ## Reglas
 
