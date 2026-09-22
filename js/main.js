@@ -1,5 +1,5 @@
 // Conecta el lobby (crear/unirse a sala) con Net y Game, y arranca el envío
-// periódico de la posición local una vez que la conexión está abierta.
+// periódico del estado local una vez que la conexión está abierta.
 (function () {
   const lobby = document.getElementById("lobby");
   const canvas = document.getElementById("juego");

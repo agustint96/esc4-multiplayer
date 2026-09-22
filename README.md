@@ -25,17 +25,18 @@ tiempo real entre dos jugadores).
 
 ## Estado actual
 
-Prototipo mínimo: lobby para crear/unirse a una sala P2P (WebRTC vía
-[PeerJS](https://peerjs.com/), sin servidor propio) y dos naves moviéndose
-sincronizadas por red. Todavía **sin piedras, sin agujeros, sin choque**.
+Prototipo: lobby para crear/unirse a una sala P2P (WebRTC vía
+[PeerJS](https://peerjs.com/), sin servidor propio), dos naves moviéndose
+sincronizadas por red y una lluvia homing por jugador. Las piedras se
+transmiten junto con el estado y cualquier impacto aplica un stun de 3
+segundos dentro de una cancha vertical. Todavía **sin agujeros y sin choque
+entre naves**.
 
 ## Próximos pasos
 
-1. Piedras: lluvia homing por jugador + colisión cruzada (cualquiera golpea
-   a cualquiera) + stun de 3s.
-2. Agujeros negros / cúmulos + marcador a 10.
-3. Choque nave-nave con rebote elástico.
-4. Pulir sincronización (interpolación/extrapolación mejor que el suavizado
+1. Agujeros negros / cúmulos + marcador a 10.
+2. Choque nave-nave con rebote elástico.
+3. Pulir sincronización (interpolación/extrapolación mejor que el suavizado
    simple actual) y manejo de desconexión.
 
 ## Cómo correrlo
