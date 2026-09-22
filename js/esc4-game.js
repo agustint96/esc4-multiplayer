@@ -943,6 +943,7 @@
     poligonosRival = [];
     estadosRival = [];
     piedrasRival.clear();
+    formasPedidas.clear();
     desfaseReloj = null;
     retrasoRed = RETRASO_MIN;
     atrasoRed = 0;
@@ -953,6 +954,7 @@
     reaparecer = null;
     fin = null;
     reclamados.clear();
+    golesPredichos.clear();
     ship.classList.remove("fuera-de-juego", "invulnerable");
     // Con intro el segundero queda oculto y parado hasta que se van las naves y
     // terminan las instrucciones.
@@ -2316,10 +2318,12 @@
       );
     if (entrado && enLinea() && !soyAnfitrion()) {
       // Invitado: no decide el gol, avisa que entró (una vez por agujero) y
-      // espera que el anfitrión lo confirme (ver recibirGol).
+      // sale por el otro sin esperar; el anfitrión después lo confirma (ver
+      // recibirGol).
       if (!reclamados.has(entrado.id)) {
         reclamados.add(entrado.id);
         enviarOnline({ tipo: "entre", id: entrado.id });
+        predecirGolPropio(entrado);
       }
       entrado = null;
     }
@@ -2930,6 +2934,48 @@
   let acumEnvio = 0;
   let idCumulo = 0; // para que el invitado sepa a qué agujero entró
   const reclamados = new Set(); // agujeros a los que el invitado ya avisó que entró
+  // El gol lo confirma el anfitrión, así que entre que el invitado entra a un
+  // agujero y le vuelve la confirmación pasa una ida y vuelta entera: el
+  // anfitrión lo siente al toque y el invitado no. Para emparejarlos, el
+  // invitado sale por el otro agujero ya mismo y cierra el par, y mientras
+  // espera la confirmación no le hace caso al anfitrión en eso (que todavía
+  // manda el par abierto y el marcador sin ese gol). Si la confirmación no
+  // llega (el anfitrión entró primero a ese mismo par), a los PREDICHO_VENCE
+  // segundos manda lo que diga él.
+  const PREDICHO_VENCE = 3; // s
+  const golesPredichos = new Map(); // id del agujero de entrada -> { t, ids: [entrada, salida] }
+
+  function vencerPredichos() {
+    const ahora = performance.now();
+    for (const [id, g] of golesPredichos)
+      if (ahora - g.t > PREDICHO_VENCE * 1000) golesPredichos.delete(id);
+  }
+
+  // Los dos agujeros de cada par ya cerrado acá, para no volver a mostrarlos.
+  function idsPredichos() {
+    const ids = new Set();
+    for (const g of golesPredichos.values()) for (const id of g.ids) ids.add(id);
+    return ids;
+  }
+
+  // Invitado: el gol que acaba de hacer, sin esperar al anfitrión. Todo lo de
+  // siempre menos terminar la partida: el final lo decide él.
+  function predecirGolPropio(entrado) {
+    const salida = entrado.par || entrado;
+    golesPredichos.set(entrado.id, {
+      t: performance.now(),
+      ids: [entrado.id, salida.id],
+    });
+    cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
+    chispas(entrado.x, entrado.y);
+    if (window.shipPlace) window.shipPlace(salida.x, salida.y, true);
+    cumulosTomados++;
+    crearNumeroEstrellas(salida.x, salida.y, cumulosTomados);
+    sonarCruce();
+    decirGol(cumulosTomados);
+    mostrarTiempo();
+    actualizarColor();
+  }
   // Para el medidor de ?perf=1 (js/perf-debug.js): por dónde llega el estado
   // del rival, cuántos llegaron y el hueco más largo entre dos (los pone en 0
   // el medidor), y la ida y vuelta de un ping.
@@ -2937,6 +2983,16 @@
     via: "-", recibidos: 0, huecoMax: 0, ultimo: 0, ping: null, retraso: 0,
   });
   let acumPing = 0;
+  // El latido mantiene despierto el WebSocket cuando la conexión directa se
+  // llevó todo el juego y por él ya no pasa nada (hay redes que cortan lo que
+  // está ocioso). Es un mensaje más: el servidor lo reenvía al rival, que lo
+  // ignora, y así cada socket tiene algo de ida (el latido propio) y de vuelta
+  // (el del rival). El silencio es cuánto se aguanta sin saber nada del rival
+  // antes de darlo por ido: con 20 estados por segundo, tanto silencio es que
+  // del otro lado ya no hay nadie.
+  const LATIDO_CADA = 20; // s
+  const SILENCIO_RIVAL = 10; // s
+  let acumLatido = 0;
   const soyAnfitrion = () => !!red && red.rol === "anfitrion";
   const enLinea = () => modo === "online";
   // Buscando rival o sin conexión: la partida todavía no arranca.
@@ -2948,6 +3004,8 @@
 
   function conectarOnline() {
     red = { ws: null, rol: null, estado: "conectando" };
+    infoRed.ultimo = 0; // el silencio se cuenta desde el primer estado que llegue
+    acumLatido = 0;
     mostrarEstadoOnline();
     let ws;
     try {
@@ -2970,13 +3028,23 @@
     };
     ws.onclose = () => {
       if (!red) return;
-      if (red.estado === "jugando") rivalSeFue();
-      else if (red.estado !== "se-fue") {
+      if (red.estado === "jugando") {
+        // Con la conexión directa andando, el servidor ya cumplió (los
+        // presentó) y este socket no lleva nada: que se caiga (hay redes que
+        // cortan lo que está ocioso) no quiere decir que el rival se haya ido.
+        // Eso se nota porque deja de llegar su estado (ver vigilarRival).
+        if (!directoVivo()) rivalSeFue();
+      } else if (red.estado !== "se-fue") {
         red.estado = "sin-conexion";
         mostrarEstadoOnline();
       }
     };
   }
+
+  // La conexión directa está lista (el canal de eventos es el que no pierde
+  // nada; el de estado se abre junto con él).
+  const directoVivo = () =>
+    !!red && !!red.canales && red.canales.eventos.readyState === "open";
 
   // Si ya está la conexión directa (ver conectarDirecto) va por ahí: el estado
   // por el canal que no reenvía lo perdido (uno perdido ya no sirve, llega
@@ -3036,8 +3104,12 @@
       if (ev.candidate) enviarPorServidor({ tipo: "rtc", ice: ev.candidate });
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed")
+      if (pc.connectionState !== "failed" && pc.connectionState !== "closed") return;
+      // Si el servidor sigue ahí, se vuelve a pasar todo por él (ver
+      // enviarOnline); si tampoco está, no queda camino: el rival se fue.
+      if (red && red.ws && red.ws.readyState === 1)
         console.info("[online] sin conexión directa: sigue por el servidor");
+      else if (red && red.estado === "jugando") rivalSeFue();
     };
     if (soyAnfitrion()) {
       pc.createOffer()
@@ -3097,12 +3169,19 @@
       conectarDirecto();
     } else if (m.tipo === "rtc") {
       recibirRtc(m);
+    } else if (m.tipo === "latido") {
+      // El latido del rival (ver LATIDO_CADA): no hay nada que hacer, con que
+      // haya pasado algo por el socket alcanza.
     } else if (m.tipo === "ping") {
       enviarOnline({ tipo: "pong", t: m.t });
     } else if (m.tipo === "pong") {
       infoRed.ping = performance.now() - m.t;
     } else if (m.tipo === "rival-se-fue") {
       rivalSeFue();
+    } else if (m.tipo === "formas") {
+      recibirFormas(m);
+    } else if (m.tipo === "formas?") {
+      reenviarFormas(m.ids);
     } else if (m.tipo === "estado") {
       recibirEstadoRival(m);
     } else if (m.tipo === "entre") {
@@ -3110,6 +3189,17 @@
     } else if (m.tipo === "gol") {
       if (!soyAnfitrion()) recibirGol(m);
     }
+  }
+
+  // Que se fuera el rival lo avisa el servidor, pero si este ya no está (se
+  // cayó el socket y la partida sigue por la conexión directa) no hay quien
+  // avise: se nota porque deja de llegar el estado del rival, que llega 20
+  // veces por segundo. Con el servidor todavía ahí no se mira, así que quedarse
+  // un rato en otra pestaña no cuenta como irse.
+  function vigilarRival() {
+    if (!infoRed.ultimo || !red || red.estado !== "jugando") return;
+    if (red.ws && red.ws.readyState === 1) return;
+    if (performance.now() - infoRed.ultimo > SILENCIO_RIVAL * 1000) rivalSeFue();
   }
 
   function rivalSeFue() {
@@ -3143,15 +3233,71 @@
       inv: r1(invulJugador * 10) / 10,
       p: poligonos.map((p) => [
         p.id, r4(p.x / W), r4(p.y / H), r4(p.vx / W), r4(p.vy / H),
-        r1(p.ang * 100) / 100, r1(p.giro * 100) / 100, r1(p.radio),
-        p.verts.map((v) => [r1(v.x), r1(v.y)]),
+        r1(p.ang * 100) / 100, r1(p.giro * 100) / 100,
       ]),
     };
+    enviarFormas();
     if (soyAnfitrion()) {
       m.c = cumulos.map((c) => [c.id, r4(c.x / W), r4(c.y / H), r1(c.t * 10) / 10, c.par ? c.par.id : 0]);
       m.g = [cumulosTomados, golesRival]; // goles del anfitrión y del invitado
     }
     enviarOnline(m);
+  }
+
+  // La forma de una piedra (sus puntas y su radio) no cambia nunca, así que
+  // viaja una sola vez, apenas nace, y por el canal que no pierde nada: en el
+  // estado, veinte veces por segundo, va solo dónde está. Antes cada estado
+  // repetía las puntas de todas las piedras y el que las recibía las tiraba.
+  function enviarFormas() {
+    const nuevas = poligonos.filter((p) => !p.formaEnviada);
+    if (!nuevas.length) return;
+    for (const p of nuevas) p.formaEnviada = true;
+    enviarOnline({
+      tipo: "formas",
+      f: nuevas.map((p) => [
+        p.id, r1(p.radio), p.verts.map((v) => [r1(v.x), r1(v.y)]),
+      ]),
+    });
+  }
+
+  // Las formas de las piedras del rival. Puede llegar justo después del estado
+  // que ya las nombraba (son dos caminos distintos): esa piedra se dibuja un
+  // cuadro más tarde, cuando se sabe cómo es (ver seguirRivalOnline).
+  function recibirFormas(m) {
+    for (const [id, radio, verts] of m.f) {
+      if (piedrasRival.has(id)) continue;
+      piedrasRival.set(id, {
+        id, x: 0, y: 0, vx: 0, vy: 0, ang: 0, giro: 0, radio,
+        verts: verts.map(([a, b]) => ({ x: a, y: b })),
+        pts: [],
+      });
+    }
+  }
+
+  // Red de seguridad: si un estado nombra una piedra que no se sabe cómo es
+  // (cada uno reinicia la partida en su momento, y el que arranca antes olvida
+  // las formas que el otro ya dio por mandadas), se la pide y el otro la
+  // vuelve a mandar. No se pide la misma dos veces en un segundo: hasta que
+  // llegue la respuesta siguen entrando estados que la nombran.
+  const formasPedidas = new Map(); // id -> cuándo se pidió (ms)
+
+  function pedirFormasQueFaltan(m) {
+    const ahora = performance.now();
+    const faltan = [];
+    for (const [id] of m.p) {
+      if (piedrasRival.has(id) || ahora - (formasPedidas.get(id) || -1e9) < 1000)
+        continue;
+      formasPedidas.set(id, ahora);
+      faltan.push(id);
+    }
+    if (faltan.length) enviarOnline({ tipo: "formas?", ids: faltan });
+  }
+
+  // El rival pide formas que se le perdieron: se marcan para que salgan de
+  // nuevo con el próximo estado.
+  function reenviarFormas(ids) {
+    const pedidas = new Set(ids);
+    for (const p of poligonos) if (pedidas.has(p.id)) p.formaEnviada = false;
   }
 
   function recibirEstadoRival(m) {
@@ -3171,15 +3317,9 @@
     // unos 2 s, a 20 mensajes por segundo).
     atrasoRed = Math.max(d - desfaseReloj, atrasoRed * 0.983);
     const p = new Map();
-    for (const [id, x, y, vx, vy, ang, giro, radio, verts] of m.p) {
+    for (const [id, x, y, vx, vy, ang, giro] of m.p)
       p.set(id, [x * W, y * H, vx * W, vy * H, ang, giro]);
-      if (!piedrasRival.has(id))
-        piedrasRival.set(id, {
-          id, x: x * W, y: y * H, vx: 0, vy: 0, ang, giro, radio,
-          verts: verts.map(([a, b]) => ({ x: a, y: b })),
-          pts: [],
-        });
-    }
+    pedirFormasQueFaltan(m);
     const ultimo = estadosRival[estadosRival.length - 1];
     if (ultimo && t <= ultimo.t) return; // llegó desordenado: ya hay uno más nuevo
     estadosRival.push({
@@ -3189,9 +3329,12 @@
     if (!soyAnfitrion() && m.c) {
       // Los agujeros del anfitrión (conservando el giro de los que ya estaban,
       // para que no salten). Si aparece uno nuevo, suena como siempre.
+      vencerPredichos();
+      const ocultos = idsPredichos(); // los de un par ya cerrado acá
+      const crudos = ocultos.size ? m.c.filter(([id]) => !ocultos.has(id)) : m.c;
       const previos = new Map(cumulos.map((c) => [c.id, c]));
       let nuevo = false;
-      const lista = m.c.map(([id, x, y, t]) => {
+      const lista = crudos.map(([id, x, y, t]) => {
         let c = previos.get(id);
         if (!c) {
           c = { id, ang: Math.random() * Math.PI * 2 };
@@ -3204,12 +3347,17 @@
         return c;
       });
       const porId = new Map(lista.map((c) => [c.id, c]));
-      m.c.forEach((d, i) => (lista[i].par = porId.get(d[4]) || null));
+      crudos.forEach((d, i) => (lista[i].par = porId.get(d[4]) || null));
       cumulos = lista;
       if (nuevo) sonarPortal();
     }
     if (!soyAnfitrion() && m.g && !fin) {
-      cumulosTomados = m.g[1];
+      vencerPredichos();
+      // Con un gol adelantado sin confirmar, el marcador del anfitrión todavía
+      // no lo tiene: no se baja el número que ya se mostró.
+      cumulosTomados = golesPredichos.size
+        ? Math.max(m.g[1], cumulosTomados)
+        : m.g[1];
       golesRival = m.g[0];
       actualizarColor();
     }
@@ -3329,6 +3477,7 @@
     enviarOnline({
       tipo: "gol",
       quien: "invitado",
+      id: entrado.id,
       e: [r4(entrado.x / W), r4(entrado.y / H)],
       s: [r4(salida.x / W), r4(salida.y / H)],
       g: [cumulosTomados, golesRival],
@@ -3343,6 +3492,7 @@
     enviarOnline({
       tipo: "gol",
       quien: "anfitrion",
+      id: entrado.id,
       e: [r4(entrado.x / W), r4(entrado.y / H)],
       s: [r4(salida.x / W), r4(salida.y / H)],
       g: [cumulosTomados, golesRival],
@@ -3355,21 +3505,27 @@
     const H = window.innerHeight;
     const e = { x: m.e[0] * W, y: m.e[1] * H };
     const s = { x: m.s[0] * W, y: m.s[1] * H };
-    chispas(e.x, e.y);
+    // Si es el gol que ya se adelantó (ver predecirGolPropio), esto solo lo
+    // confirma: la nave ya salió y el par ya se cerró, no se hace de nuevo.
+    const adelantado = m.quien === "invitado" && golesPredichos.delete(m.id);
+    if (!adelantado) chispas(e.x, e.y);
     // Se cierra el par acá mismo (el próximo estado del anfitrión igual lo saca).
     const cerca = (c, p) => Math.hypot(c.x - p.x, c.y - p.y) < 2;
     cumulos = cumulos.filter((c) => !cerca(c, e) && !cerca(c, s));
     cumulosTomados = m.g[1];
     golesRival = m.g[0];
-    if (m.quien === "invitado") {
+    if (adelantado) {
+      // Nada que mostrar: ya se mostró al entrar.
+    } else if (m.quien === "invitado") {
       // Gol mío: salgo por el otro agujero, como siempre.
       if (window.shipPlace) window.shipPlace(s.x, s.y, true);
       crearNumeroEstrellas(s.x, s.y, cumulosTomados);
       decirGol(cumulosTomados);
+      sonarCruce();
     } else {
       chispas(s.x, s.y);
+      sonarCruce();
     }
-    sonarCruce();
     actualizarColor();
     mostrarTiempo();
     if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
@@ -3894,6 +4050,12 @@
         acumPing = 0;
         enviarOnline({ tipo: "ping", t: performance.now() });
       }
+      acumLatido += dt;
+      if (acumLatido >= LATIDO_CADA) {
+        acumLatido = 0;
+        enviarPorServidor({ tipo: "latido" });
+      }
+      vigilarRival();
     }
   }
 

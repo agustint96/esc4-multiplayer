@@ -38,17 +38,29 @@ El emparejador está en `servidor/` (un Worker de Cloudflare con un Durable
 Object): junta de a dos a los que buscan y reenvía lo que manda cada uno.
 Cada PC maneja su nave y su lluvia y le manda al otro 20 veces por segundo
 dónde está, sus piedras y si está golpeada; cada una detecta sola los golpes
-a su nave. Los agujeros y los goles los decide el anfitrión (el que estaba
-esperando). Las posiciones viajan como fracción de la pantalla, así juegan
-bien aunque los monitores sean de distinto tamaño.
+a su nave. La forma de cada piedra (sus puntas) no cambia nunca, así que viaja
+una sola vez apenas nace, por el camino que no pierde nada, y en el estado va
+solo dónde está; si a alguno igual le falta una, la pide. Las posiciones
+viajan como fracción de la pantalla, así juegan bien aunque los monitores sean
+de distinto tamaño.
+
+Los agujeros y los goles los decide el anfitrión (el que estaba esperando),
+pero el invitado no espera la ida y vuelta para salir por el otro agujero: lo
+hace en el momento y el anfitrión se lo confirma después. Si el anfitrión no
+lo confirma (llegó él primero a ese par), a los pocos segundos el marcador y
+los agujeros vuelven a ser los suyos.
 
 Una vez emparejados, el servidor solo los presenta: el juego va directo de
 una PC a la otra (WebRTC), porque la sala quedó lejos, en Miami (se le pide
 Sudamérica, pero Cloudflare no tiene Durable Objects ahí). Si la conexión
 directa no se logra (hay redes que no la dejan), todo sigue pasando por el
-servidor. En la consola del navegador (F12) aparece "[online] conexión directa
-con el rival" cuando se logra. Para ver en qué centro de datos de Cloudflare
-está la sala: `https://esc4-emparejador.agustintardella7.workers.dev/donde`.
+servidor. Con la conexión directa andando, por el servidor ya no pasa nada:
+para que no lo corten por quedarse callado, cada uno le manda un latido cada
+20 segundos, y si aun así se cae, la partida sigue igual (que se haya ido el
+rival se nota porque deja de llegar su nave, no porque se cayó el socket).
+En la consola del navegador (F12) aparece "[online] conexión directa con el
+rival" cuando se logra. Para ver en qué centro de datos de Cloudflare está
+la sala: `https://esc4-emparejador.agustintardella7.workers.dev/donde`.
 
 Para subir cambios del servidor: `cd servidor` y `npx wrangler deploy`. Para
 probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
