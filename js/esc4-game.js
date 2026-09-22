@@ -456,11 +456,14 @@
   const RIVAL_PELIGRO = 170; // px del mundo: desde acá una piedra la espanta
   const RIVAL_GIRO = 6; // 1/s: qué tan rápido gira hacia donde va
   const FIN_DURA = 4; // segundos con el cartel del ganador
-  // Repulsión entre naves: empiezan a empujarse a REPELER_ALCANCE veces la suma
-  // de los radios de sus cuerpos, y pegadas el empujón es REPELER_FUERZA px por
-  // cuadro² (más que el motor, RIVAL_EMPUJE).
-  const REPELER_ALCANCE = 3.5;
-  const REPELER_FUERZA = 2.4;
+  // Repulsión entre naves, medida en largos de nave (el dibujo, no la hitbox,
+  // que es bastante más chica): empiezan a empujarse con los centros a
+  // REPELER_ALCANCE largos, y nunca quedan a menos de REPELER_MINIMO. El empujón
+  // crece al acercarse hasta REPELER_FUERZA px por cuadro² (más que el motor,
+  // RIVAL_EMPUJE, así que no se pueden encimar a propósito).
+  const REPELER_ALCANCE = 2.2;
+  const REPELER_MINIMO = 0.9;
+  const REPELER_FUERZA = 1.5;
   // Al volver después de un golpe, la nave reaparece en el medio abajo (como al
   // reiniciar en el juego original) y parpadea INVULNERABLE segundos: en ese
   // rato no la golpea nada ni rebota con la otra nave.
@@ -2620,7 +2623,8 @@
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const dist = Math.hypot(dx, dy) || 1;
-    const alcance = (a.r + b.r) * REPELER_ALCANCE;
+    const largoNave = cajaNave * escalaNaveMundo();
+    const alcance = largoNave * REPELER_ALCANCE;
     if (dist >= alcance) return;
     const k = (alcance - dist) / alcance; // 0 en el borde del alcance .. 1 pegadas
     const empuje = REPELER_FUERZA * k * k * dt * 60; // px por cuadro de 60 Hz
@@ -2630,7 +2634,7 @@
     rival.vy += ny * empuje;
     // Si igual se llegaron a encimar (venían las dos a toda velocidad de frente),
     // se corre la PC lo que falta: nunca quedan una encima de la otra.
-    const minimo = a.r + b.r;
+    const minimo = largoNave * REPELER_MINIMO;
     if (dist < minimo) {
       rival.x += nx * (minimo - dist);
       rival.y += ny * (minimo - dist);
