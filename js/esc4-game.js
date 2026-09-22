@@ -3641,9 +3641,9 @@
         if (window.shipLightSet) window.shipLightSet(true);
         // En celulares se saltea el tutorial (ver esCelular arriba): arranca
         // el juego directo, como si ya hubiera terminado.
-        // Con dos jugadores también: las instrucciones son las de uno solo.
-        // Online también, así los dos arrancan juntos.
-        if (esCelular() || modo === "dos" || enLinea()) terminarAyuda();
+        // Las instrucciones son solo del tutorial: contra la PC, con dos
+        // jugadores y online arranca el juego directo.
+        if (esCelular() || !esTutorial()) terminarAyuda();
         else empezarAyuda();
       }
       if (ayuda) actualizarAyuda(dt);

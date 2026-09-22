@@ -16,7 +16,7 @@ Al arrancar se elige con el teclado. Durante el juego, el botón **MENU**
   blanco, si te pegan se reinicia, la cuenta de 10 a 1 y la nave se tiñe del
   todo. Al completar los 10 agujeros, GANASTE y de vuelta al menú.
 - **2 · contra la PC**: vos con WASD o flechas (Shift acelera, Espacio aleja
-  la cámara), con el tutorial de siempre. La nave de la PC se ve
+  la cámara), sin tutorial: arranca el juego directo. La nave de la PC se ve
   semitransparente.
 - **3 · dos jugadores**: sin tutorial, y la cámara muestra el mapa entero para
   que nadie quede fuera de pantalla.
