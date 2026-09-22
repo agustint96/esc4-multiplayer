@@ -8,7 +8,7 @@ copiados de ese repo), con una segunda nave manejada por la PC.
 ## Reglas
 
 - Tu nave lleva un halo **azul** y la de la PC uno **rojo**; las dos tienen
-  su fuego.
+  su fuego. La de la PC se ve semitransparente, para no confundirlas.
 - Cada nave tiene su lluvia de piedras que la persigue: borde **azul** las
   tuyas, borde **rojo** las de la PC. Caen la mitad de seguido que en el
   juego original (son dos lluvias).

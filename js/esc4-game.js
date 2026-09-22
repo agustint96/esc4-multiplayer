@@ -474,6 +474,8 @@
   // Tope de color de la partida: el que en el juego original se tiene al pasar
   // el agujero 7 de 10.
   const COLOR_MAXIMO = 0.7;
+  // La nave de la PC se ve semitransparente, para no confundirla con la tuya.
+  const RIVAL_OPACIDAD = 0.55;
   // Halo de la PC (el del jugador es CSS, .starry-cohete-pair.in-game).
   const HALO_RIVAL = "drop-shadow(0 0 5px rgba(255, 90, 90, 0.95)) drop-shadow(0 0 14px rgba(255, 90, 90, 0.55))";
 
@@ -2706,7 +2708,9 @@
     ctx.scale(k, k);
     // Recién vuelta de un golpe parpadea (igual que la del jugador, ver
     // .invulnerable en styles.css).
-    if (rival.invul > 0) ctx.globalAlpha = parpadeo(rival.invul);
+    // Siempre más transparente que la del jugador, para no confundirlas.
+    ctx.globalAlpha =
+      RIVAL_OPACIDAD * (rival.invul > 0 ? parpadeo(rival.invul) : 1);
     // Igual que la nave del jugador en el juego: en blanco y negro, con el
     // levantado de brillo de la luz prendida (#nave-gris-luz), y se va tiñendo
     // con sus goles. Encima, su halo rojo.
