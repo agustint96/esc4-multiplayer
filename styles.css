@@ -1,0 +1,1819 @@
+:root {
+  --navy: #0d1b2e;
+  --navy-mid: #1a2d4a;
+  --blue: #2f4467;
+  --accent: #f19280;
+  --accent2: #7eb8c9;
+  --white: #f0ece4;
+  --muted: rgba(240, 236, 228, 0.55);
+  --card-bg: rgba(47, 68, 103, 0.28);
+  --card-border: rgba(126, 184, 201, 0.18);
+}
+@font-face {
+  font-family: Spaceport;
+  src: url("fonts/Spaceport_2006.otf");
+  font-display: swap;
+}
+/* DM Mono y JetBrains Mono, alojadas acá (antes venían de Google Fonts: un CSS
+   externo que bloqueaba el render + dos conexiones extra en cada carga, sobre
+   todo en una recarga sin caché). Mismos subconjuntos (unicode-range) que
+   servía Google: latin para todo y cirílico para el "БОТА НЕТ!" de la escena
+   de espacio. JetBrains Mono es una fuente variable: un archivo cubre 400-500. */
+@font-face {
+  font-family: "DM Mono";
+  font-weight: 300;
+  font-display: swap;
+  src: url("fonts/dm-mono-300-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "DM Mono";
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/dm-mono-400-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+*,
+::after,
+::before {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.starry-cohete-pair,
+.starry-cohete-pair img {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  outline: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.contact-row-val,
+.hero-cta,
+.nav-links a,
+.nav-logo,
+.project-link,
+[role="button"],
+a,
+button {
+  cursor: pointer;
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+li,
+p,
+span {
+  user-select: text;
+  -webkit-user-select: none;
+}
+.starry-cohete-pair {
+  cursor: pointer !important;
+}
+html {
+  height: 100%;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+body {
+  min-height: 100vh;
+  min-height: 100dvh; /* en celulares 100vh incluye la barra del navegador y sobra alto */
+  display: flex;
+  flex-direction: column;
+  background-color: var(--navy);
+  background-image: url("parallax/fondo-estrellado.webp");
+  background-size: cover;
+  background-attachment: fixed;
+  font-family: "DM Mono", monospace;
+  color: var(--white);
+}
+@supports (-webkit-touch-callout: none) {
+  body {
+    background-attachment: scroll;
+  }
+}
+/* Envuelve nav + footer + parallax (todo menos la nave, que sigue mobile
+   siempre) para poder ocultarlos como bloque cuando entra la escena de
+   espacio (.space-scene). Replica el flex column del body para que
+   .starry-bg (flex:1) siga repartiendo el alto igual que antes de existir
+   este wrapper. */
+.site-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100vh;
+  min-height: 100dvh; /* en celulares 100vh incluye la barra del navegador y sobra alto */
+  transition: opacity 0.5s ease;
+}
+.site-content.space-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+/* Con el escenario principal oculto ningún hijo debe recibir el mouse: parallax
+   2 tiene pointer-events:auto propio (para el sonido del bajo), que le gana a
+   la herencia de arriba, y un click justo donde está (ej. en el escenario 4) le
+   arrastraba la imagen. */
+.site-content.space-hidden * {
+  pointer-events: none !important;
+}
+/* El <main> es sólo un landmark de accesibilidad (nav queda afuera, ver
+   index.html): no debe alterar el flex column de .site-content, así que
+   sus hijos (.starry-bg, .parallax-footer) siguen siendo los flex items
+   directos como si el wrapper no existiera. */
+#main-content {
+  display: contents;
+}
+nav {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: auto;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 30px;
+  padding: 20px 48px;
+  transition:
+    background 0.3s,
+    backdrop-filter 0.3s,
+    padding 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+nav.scrolled {
+  backdrop-filter: blur(2px);
+}
+nav.nav-compact {
+  padding-top: 28px;
+  padding-bottom: 28px;
+}
+.nav-links {
+  display: flex;
+  gap: 36px;
+  list-style: none;
+}
+.nav-links a {
+  font-family: "DM Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+  display: inline-flex;
+}
+.nav-links a svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  pointer-events: none;
+}
+.nav-links a:hover,
+.nav-links a:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+/* Botón de encendido -> Consola SQL (sisop.html). Va adentro del nav (antes
+   de los links), como un ícono aparte a la cabeza del grupo: se distingue
+   por ser el único ícono en medio de texto, y un brillo sutil tipo led en
+   espera lo hace notar sin gritar — no hace falta pasar el mouse para
+   verlo. */
+.power-btn {
+  display: inline-flex;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.power-btn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  pointer-events: none;
+  animation: powerStandby 2.8s ease-in-out infinite;
+}
+@keyframes powerStandby {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(241, 146, 128, 0));
+    opacity: 0.72;
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(241, 146, 128, 0.6));
+    opacity: 1;
+  }
+}
+.power-btn:hover,
+.power-btn:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+.power-btn:hover svg,
+.power-btn:focus-visible svg {
+  animation-play-state: paused;
+  filter: drop-shadow(0 0 6px rgba(241, 146, 128, 0.75));
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .power-btn svg {
+    animation: none;
+  }
+}
+
+/* Ícono de CV: en vez de descargar directo, abre un menú chico para elegir
+   idioma (ver el IIFE "CV: elegir idioma" en script.js). Mismo look que el
+   resto de nav-links, el menú reusa --card-bg/--card-border ya definidos
+   para las tarjetas del portfolio. */
+.cv-picker {
+  position: relative;
+}
+.cv-btn {
+  display: inline-flex;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.cv-btn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  pointer-events: none;
+}
+.cv-btn:hover,
+.cv-btn:focus-visible,
+.cv-btn[aria-expanded="true"] {
+  color: var(--accent);
+  outline: none;
+}
+.cv-menu {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  list-style: none;
+  min-width: 120px;
+  background: transparent;
+  border: 1px solid var(--muted);
+  padding: 6px;
+  backdrop-filter: blur(3px) url(#cv-menu-glass);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 210;
+}
+.cv-menu[hidden] {
+  display: none;
+}
+.cv-menu a {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  padding: 6px 10px;
+  font-family: "DM Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition:
+    color 0.2s,
+    background 0.2s;
+}
+.cv-menu-label {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cv-menu a svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.cv-menu a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle 0.6px, var(--accent) 90%, transparent 100%),
+    radial-gradient(circle 0.6px, var(--accent) 90%, transparent 100%),
+    radial-gradient(circle 0.6px, var(--accent) 90%, transparent 100%),
+    radial-gradient(circle 0.6px, var(--accent) 90%, transparent 100%),
+    radial-gradient(circle 0.6px, var(--accent) 90%, transparent 100%),
+    radial-gradient(circle 0.6px, var(--accent) 90%, transparent 100%);
+  background-size:
+    17px 9px,
+    23px 13px,
+    13px 7px,
+    29px 11px,
+    19px 15px,
+    11px 8px;
+  background-position:
+    2px 1px,
+    9px 8px,
+    5px 5px,
+    14px 3px,
+    3px 10px,
+    8px 6px;
+  background-repeat: repeat;
+  filter: url(#cv-menu-glass);
+  opacity: 0;
+  animation: cvMenuParticles 0.9s linear infinite;
+  animation-play-state: paused;
+  transition: opacity 0.2s;
+}
+.cv-menu a::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: rgba(241, 146, 128, 0.15);
+  backdrop-filter: blur(8px) url(#cv-menu-glass);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.cv-menu a:hover,
+.cv-menu a:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+.cv-menu a:hover::before,
+.cv-menu a:focus-visible::before {
+  opacity: 1;
+}
+.cv-menu a:hover::after,
+.cv-menu a:focus-visible::after {
+  opacity: 0.9;
+  animation-play-state: running;
+}
+@keyframes cvMenuParticles {
+  from {
+    background-position:
+      2px 1px,
+      9px 8px,
+      5px 5px,
+      14px 3px,
+      3px 10px,
+      8px 6px;
+  }
+  to {
+    background-position:
+      -32px 1px,
+      -37px 8px,
+      -21px 5px,
+      -30px 3px,
+      -35px 10px,
+      -14px 6px;
+  }
+}
+
+/* Encendido: parpadeo estilo monitor CRT antes de entrar a la consola */
+.crt-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: #000;
+  pointer-events: none;
+}
+.crt-screen.flare {
+  animation:
+    crt-flare 0.46s steps(1, end) forwards,
+    crt-hold 1.9s linear 0.46s infinite;
+}
+/* Parpadeo sutil mientras carga el "sistema operativo" (deja ver apenas el fondo) */
+@keyframes crt-hold {
+  0%,
+  46%,
+  52%,
+  74%,
+  78%,
+  100% {
+    opacity: 1;
+  }
+  48% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.97;
+  }
+  76% {
+    opacity: 0.94;
+  }
+}
+@keyframes crt-flare {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+    background: #000;
+  }
+  18% {
+    background: #262626;
+  }
+  24% {
+    background: #000;
+  }
+  36% {
+    background: #3d3d3d;
+  }
+  42% {
+    background: #0a0a0a;
+  }
+  54% {
+    background: #2a2a2a;
+  }
+  60% {
+    background: #000;
+  }
+  100% {
+    opacity: 1;
+    background: #000;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .crt-screen {
+    display: none !important;
+  }
+}
+
+.starry-bg {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 300px;
+  overflow: hidden;
+}
+#star-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* "Segunda pantalla": cuando la nave toca el borde superior del viewport
+   (solo desktop), .site-content se oculta y esta escena aparece encima
+   tapando todo (nav, footer, parallax) — mismo fondo starry azul que la
+   pantalla principal, pero a pantalla completa y sin el parallax; la nave
+   reaparece chica por abajo y sigue siendo mobile (z-index por encima de
+   esta escena). Transición disparada por clase (script.js hace el toggle
+   al tocar el borde). */
+.space-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  overflow: hidden;
+  background-color: var(--navy);
+  /* Oscurece la textura estrellada para que se sienta más "espacio
+     profundo" que la pantalla principal, que usa la misma imagen sin
+     oscurecer -y todavía más hacia arriba, como si esa zona quedara más
+     lejos/perdida- y le suma un brillo muy difuso asomando desde el
+     borde inferior. */
+  background-image:
+    radial-gradient(
+      ellipse 90% 55% at 50% 100%,
+      rgba(126, 184, 201, 0.22),
+      rgba(126, 184, 201, 0) 70%
+    ),
+    linear-gradient(rgba(0, 0, 0, 0.52), rgba(0, 0, 0, 0.44)),
+    url("parallax/fondo-estrellado.webp");
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transform: scale(1);
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  will-change: opacity, transform;
+}
+.space-scene.space-visible {
+  opacity: 1;
+  /* El zoom en sí (CAMERA_ZOOM, o 1 si se mantiene M apretada para ver el
+     mapa completo) y el transform-origin que lo ancla sobre la nave se
+     actualizan cuadro a cuadro desde el tick de vuelo en script.js, no acá. */
+}
+/* Segunda capa del mismo "mapa" de la escena de espacio profundo, separada
+   de #space-scene sólo por una razón: el z-index. #space-scene entero
+   compite como una sola unidad (250) contra el de la nave principal (253),
+   así que cualquier hijo suyo -sin importar su propio z-index interno-
+   siempre queda detrás de la nave. Para que el astronauta y el planeta
+   puedan quedar DELANTE de la nave (mientras el fondo/nave-bora en
+   #space-scene siguen detrás), necesitan vivir en un contenedor hermano
+   con su propio z-index más alto (260). script.js les aplica exactamente
+   el mismo transform (scale + transform-origin) que a #space-scene cuadro
+   a cuadro, así ambas capas se mueven/escalan como una sola cámara aunque
+   sean dos elementos distintos. */
+.space-scene-front {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(1);
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  will-change: opacity, transform;
+}
+.space-scene-front.space-visible {
+  opacity: 1;
+}
+/* Con el escenario oculto (opacity: 0) sus flotados infinitos -piedras, planetas,
+   astronauta, nave-bora- no tienen por qué correr: se pausan y retoman al
+   entrar. */
+.space-scene:not(.space-visible) *,
+.space-scene-front:not(.space-visible) * {
+  animation-play-state: paused;
+}
+/* Escenario 3: se entra por el borde inferior del escenario principal (ver
+   edges.bottom de scenes.main, script.js) -lo opuesto a la escena de
+   espacio, que se entra por arriba-. Mismo patrón que .space-scene (fixed,
+   z-index 250, fade por opacity): FONDO.webp (paisaje salmón con dos soles,
+   opaca) de fondo -la nave (z-index 253, .in-salmon) pasa por delante-. */
+.salmon-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  overflow: hidden;
+  background-color: var(--accent);
+  /* La imagen (95 KB) no se baja en la carga: el escenario está oculto. La pide
+     el script del final de index.html (html.escenas-listas) cuando el navegador
+     ya está desocupado; hasta entonces se ve el salmón liso de arriba. */
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  will-change: opacity;
+}
+html.escenas-listas .salmon-scene {
+  background-image: url("parallax/esc3/FONDO.webp");
+}
+.salmon-scene.salmon-visible {
+  opacity: 1;
+}
+/* "Fondo 2" del escenario 3: mismo trato que .space-scene-front (z-index
+   260, por encima de la nave). Contiene la silueta de cerro en primer
+   plano (FONDO2.webp, transparente arriba del cerro) apoyada abajo -ver
+   .salmon-fondo2-; la nave pasa por detrás. */
+.salmon-scene-front {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  will-change: opacity;
+}
+.salmon-scene-front.salmon-visible {
+  opacity: 1;
+}
+.salmon-fondo2 {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: auto;
+  display: block;
+}
+/* Escenario 4 (juego): se entra por el borde izquierdo del escenario
+   principal (ver edges.left de scenes.main, script.js). Mismo patrón que
+   .salmon-scene (fixed, z-index 250, fade por opacity); la nave (z-index 253,
+   .in-game) pasa por delante de los polígonos. Los polígonos los dibuja
+   js/esc4-game.js en #game-canvas. */
+.game-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  overflow: hidden;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  will-change: opacity;
+}
+.game-scene.game-visible {
+  opacity: 1;
+}
+/* Fondo starry azul del escenario 4. En la intro está a pleno (game-intro): al
+   ponerse la clase es instantáneo (transition: none) y cuando esc4-game.js se
+   la saca (ya se fueron las navecitas) se funde a negro con la transición de
+   abajo. Después vuelve de a poco: --fondo-color (0 a 1) lo va subiendo
+   esc4-game.js a medida que la nave se colorea, así todo el escenario pasa de
+   blanco y negro al azul starry. El cambio de valor va por escalones y esta
+   misma transición los suaviza (solo cambia el opacity: no repinta nada). */
+.game-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: var(--navy);
+  background-image: url("parallax/fondo-estrellado.webp");
+  background-size: cover;
+  background-position: center;
+  opacity: var(--fondo-color, 0);
+  /* Zoom del final (victoria): lo mueve esc4-game.js cada cuadro. */
+  transform: scale(var(--fondo-zoom, 1));
+  transform-origin: var(--fondo-origen, 50% 50%);
+  pointer-events: none;
+  transition: opacity 1s ease;
+  will-change: opacity, transform;
+}
+.game-scene.game-intro::before {
+  opacity: 1;
+  transition: none;
+}
+.game-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+}
+.game-cuadrado {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40vmin;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+}
+.game-timer {
+  font-family: Spaceport, ui-monospace, Consolas, monospace;
+  font-size: clamp(1rem, 4.5vmin, 2.75rem);
+  color: #fff; /* esc4-game.js lo va llevando al salmón (--accent) al colorearse la nave */
+  transition: color 1s ease;
+  font-variant-numeric: tabular-nums;
+}
+/* Contra la PC el segundero es el marcador: tus goles y los de la PC (rojo,
+   el mismo del borde de sus piedras en esc4-game.js). */
+.marcador-rival {
+  color: #ff5a5a;
+}
+.marcador-separador {
+  display: inline-block;
+  width: 1.4em;
+}
+/* La nave golpeada, después de caer, queda fuera de juego unos segundos. Va
+   por visibility: la opacidad la escribe script.js en cada cuadro. */
+.starry-cohete-pair.fuera-de-juego {
+  visibility: hidden;
+}
+/* Instrucciones del arranque del escenario 4. Los pasos van uno encima del otro
+   y esc4-game.js les pone .visible de a uno (se funden). Spaceport no tiene
+   tildes, comas ni paréntesis: los textos van sin ellos. */
+.game-ayuda {
+  position: absolute;
+  top: 70%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  width: min(92vw, 46rem);
+  transform: translateX(-50%);
+  font-size: clamp(0.7rem, 1.7vmin, 1rem);
+  pointer-events: none;
+}
+/* Cada versión (teclado / joystick) es una grilla con sus tres pasos encima
+   uno del otro; esc4-game.js muestra una sola (la otra queda con hidden). */
+.game-ayuda-modo {
+  display: grid;
+}
+.game-ayuda-modo[hidden] {
+  display: none;
+}
+.game-ayuda-paso {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9em 1.3em;
+  margin: 0;
+  font-family: Spaceport, ui-monospace, Consolas, monospace;
+  letter-spacing: 0.2em;
+  text-align: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.game-ayuda-paso.visible {
+  opacity: 1;
+}
+/* Las flechas en "T" invertida: arriba en el medio, las otras tres abajo. */
+.game-teclas {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 0.3em;
+}
+.game-tecla {
+  display: grid;
+  place-items: center;
+  min-width: 2.4em;
+  height: 2.4em;
+  border: 2px solid #fff;
+  border-radius: 0.35em;
+  font: inherit;
+  letter-spacing: 0.1em;
+  color: #fff;
+  transition:
+    background-color 0.08s,
+    color 0.08s,
+    transform 0.08s;
+}
+/* Mientras la tecla está apretada (de verdad, en el teclado). */
+.game-tecla.pulsada {
+  background: #fff;
+  color: #000;
+  transform: translateY(0.1em) scale(0.94);
+}
+.game-tecla svg {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+}
+.game-tecla--arriba {
+  grid-column: 2;
+  grid-row: 1;
+}
+.game-tecla--izquierda {
+  grid-column: 1;
+  grid-row: 2;
+}
+.game-tecla--abajo {
+  grid-column: 2;
+  grid-row: 2;
+}
+.game-tecla--derecha {
+  grid-column: 3;
+  grid-row: 2;
+}
+.game-tecla--izquierda svg {
+  transform: rotate(-90deg);
+}
+.game-tecla--abajo svg {
+  transform: rotate(180deg);
+}
+.game-tecla--derecha svg {
+  transform: rotate(90deg);
+}
+.game-tecla--shift,
+.game-tecla--boton {
+  padding: 0 0.8em;
+}
+/* Barra espaciadora: la tecla ancha, con el corchete de siempre dibujado. */
+.game-tecla--espacio {
+  min-width: 8em;
+}
+.game-tecla--espacio svg {
+  width: 4em;
+  height: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Stick del joystick: la base con la palanca adentro y, alrededor, una flecha
+   por dirección. */
+.game-stick {
+  display: grid;
+  grid-template-columns: 1.3em 2.6em 1.3em;
+  grid-template-rows: 1.3em 2.6em 1.3em;
+  place-items: center;
+}
+.game-stick-base {
+  position: relative;
+  grid-area: 2 / 2;
+  width: 100%;
+  height: 100%;
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+/* La palanca sigue al stick: esc4-game.js le pone el desplazamiento. */
+.game-stick-palanca {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.2em;
+  height: 1.2em;
+  margin: -0.6em 0 0 -0.6em;
+  border-radius: 50%;
+  background: #fff;
+}
+.game-stick-flecha {
+  display: grid;
+  place-items: center;
+  opacity: 0.35;
+  transition: opacity 0.08s;
+}
+.game-stick-flecha.pulsada {
+  opacity: 1;
+}
+.game-stick-flecha svg {
+  width: 1em;
+  height: 1em;
+  fill: #fff;
+}
+.game-stick-flecha--arriba {
+  grid-area: 1 / 2;
+}
+.game-stick-flecha--izquierda {
+  grid-area: 2 / 1;
+}
+.game-stick-flecha--abajo {
+  grid-area: 3 / 2;
+}
+.game-stick-flecha--derecha {
+  grid-area: 2 / 3;
+}
+.game-stick-flecha--izquierda svg {
+  transform: rotate(-90deg);
+}
+.game-stick-flecha--abajo svg {
+  transform: rotate(180deg);
+}
+.game-stick-flecha--derecha svg {
+  transform: rotate(90deg);
+}
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+#space-scene-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.space-planet {
+  position: absolute;
+  top: 8%;
+  right: 8%;
+  width: 220px;
+  max-width: 26vw;
+  height: auto;
+  /* "Apagado" por defecto -antes arrancaba con más brillo/opacidad, ahora
+     necesita quedar bien oscuro en reposo para que prenderse al interactuar
+     se note como un foquito de verdad-. Estos mismos valores son el 0%/100%
+     de planetBulbBlow abajo, para que no haya salto al entrar/salir de la
+     animación. */
+  opacity: 0.5;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(126, 184, 201, 0.12)) brightness(0.65);
+  animation: floatPlanet 11s ease-in-out infinite;
+}
+@keyframes floatPlanet {
+  0%,
+  100% {
+    transform: translateY(-10px);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+}
+/* Al interactuar (click, o E/botón A, ver triggerAction en script.js): NO
+   prende de golpe -primero parpadea un par de veces como si le costara
+   arrancar (0%-17% de los 3s totales), recién ahí se queda prendida fija
+   ~2s (17%-83%), vuelve a parpadear como si se fuera a fundir (83%-100%) y
+   se apaga, volviendo sola al apagado -nunca se queda prendida-. Se agrega
+   como una segunda animación (no reemplaza floatPlanet, que sigue el
+   flotado normal en paralelo) mientras dura .bulb-blow, ver script.js. */
+@keyframes planetBulbBlow {
+  0%,
+  10%,
+  84%,
+  96%,
+  100% {
+    opacity: 0.5;
+    filter: drop-shadow(0 0 8px rgba(126, 184, 201, 0.12)) brightness(0.65);
+  }
+  5%,
+  15%,
+  90% {
+    /* Blips del parpadeo -al arrancar y al fundirse-, entre el apagado de
+       arriba y el prendido fijo de abajo. */
+    opacity: 1;
+    filter: drop-shadow(0 0 70px rgba(255, 244, 214, 0.9)) brightness(1.9);
+  }
+  17%,
+  83% {
+    /* Prendida fija: estos dos puntos (0.51s y 2.49s de los 3s totales)
+       quedan ~2s completos en este brillo antes de volver a parpadear. */
+    opacity: 1;
+    filter: drop-shadow(0 0 65px rgba(255, 244, 214, 0.95)) brightness(1.7);
+  }
+}
+.space-planet.bulb-blow {
+  animation:
+    floatPlanet 11s ease-in-out infinite,
+    planetBulbBlow 3s ease-in-out;
+}
+@media (max-width: 900px) {
+  .space-planet {
+    width: 150px;
+  }
+}
+.space-rock {
+  position: absolute;
+  bottom: 16%;
+  right: 16%;
+  width: 140px;
+  max-width: 18vw;
+  height: auto;
+  opacity: 0.9;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.4));
+  /* --hit-x/--hit-y: empujón por colisión con la nave (ver script.js, física
+     de resorte simple) sumado al flotado normal, no lo reemplaza. */
+  animation: floatRock 13s ease-in-out infinite;
+}
+@keyframes floatRock {
+  0%,
+  100% {
+    transform: translate(var(--hit-x, 0px), calc(-14px + var(--hit-y, 0px)))
+      rotate(-6deg);
+  }
+  50% {
+    transform: translate(var(--hit-x, 0px), calc(10px + var(--hit-y, 0px)))
+      rotate(6deg);
+  }
+}
+@media (max-width: 900px) {
+  .space-rock {
+    width: 90px;
+  }
+}
+/* Piedra naranja: mismo tamaño/física que .space-rock (ver makeSpaceDrifter
+   en script.js), ubicada cerca de ella pero no pegada. El contenedor es el
+   que recibe --hit-x/--hit-y y la animación de flotado (mismas keyframes,
+   floatRock); adentro, los tres sprites se superponen en el mismo lugar y
+   sólo se cruza la opacidad entre ellos: .is-moving prende/apaga entre
+   "quieta" y "moviéndose", y dentro de "moviéndose" .frame-alt alterna entre
+   los dos cuadros (piedra_naranja_2/3) cada 2 segundos -todo controlado
+   desde script.js mirando la velocidad actual del drifter. */
+.space-rock-orange {
+  position: absolute;
+  bottom: 24%;
+  right: 26%;
+  width: 120px;
+  max-width: 15vw;
+  /* Los PNG son 1000x1000: aspect-ratio le da altura real al contenedor
+     -si no, al tener sólo hijos position:absolute (fuera del flujo), su
+     height:auto colapsaría a 0 y arruinaría el cálculo de colisión. */
+  aspect-ratio: 1 / 1;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.4));
+  animation: floatRock 10s ease-in-out infinite;
+}
+.space-rock-orange-sprite {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.9;
+  transition: opacity 0.25s ease;
+}
+.space-rock-orange-move,
+.space-rock-orange-move-alt {
+  opacity: 0;
+}
+.space-rock-orange.is-moving .space-rock-orange-rest {
+  opacity: 0;
+}
+.space-rock-orange.is-moving:not(.frame-alt) .space-rock-orange-move {
+  opacity: 0.9;
+}
+.space-rock-orange.is-moving.frame-alt .space-rock-orange-move-alt {
+  opacity: 0.9;
+}
+@media (max-width: 900px) {
+  .space-rock-orange {
+    width: 78px;
+  }
+}
+/* Planeta violeta: 100px arriba de la piedra naranja (mismo anclaje
+   bottom/right, sólo corrido hacia arriba), muy transparente (10% de
+   opacidad, apenas se ve) y sólo con el flotado suave de floatPlanet
+   -a propósito no pasa por makeSpaceDrifter en script.js, así que no tiene
+   física de choque ni se corre de su lugar-. La nave pasa por delante sola:
+   #space-scene tiene z-index 250 y .starry-cohete-pair.in-space 253. */
+.space-planet-violeta {
+  position: absolute;
+  bottom: calc(24% + 100px);
+  right: 26%;
+  width: 140px;
+  max-width: 18vw;
+  height: auto;
+  opacity: 0.1;
+  pointer-events: none;
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.3));
+  animation: floatPlanet 13s ease-in-out infinite;
+}
+@media (max-width: 900px) {
+  .space-planet-violeta {
+    width: 95px;
+  }
+}
+/* Piedra 2: misma física/flotado que .space-rock (ver makeSpaceDrifter en
+   script.js), ubicada del lado del astronauta para repartir el "debris" por
+   la escena en vez de amontonarlo del lado de la nave. */
+.space-rock-2 {
+  position: absolute;
+  top: 74%;
+  left: 61%;
+  width: 130px;
+  max-width: 13vw;
+  height: auto;
+  opacity: 0.9;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.4));
+  animation: floatRock 15s ease-in-out infinite;
+}
+@media (max-width: 900px) {
+  .space-rock-2 {
+    width: 65px;
+  }
+}
+/* Texto de arranque tipo BIOS: sólo el texto (sin pantalla negra propia)
+   flotando sobre el fondo estrellado de la escena de espacio profundo,
+   centrado y compacto -cada bloque (título, CPU, memoria, IDE) es un
+   hijo propio, separados por "gap" fijo en vez de space-between, para
+   que no se estiren a lo largo de toda la altura disponible-. */
+.space-bios {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.4em;
+  width: min(720px, 92vw);
+  font-family: "JetBrains Mono", "DM Mono", monospace;
+  font-size: clamp(0.95rem, 2.2vh, 1.4rem);
+  line-height: 1.5;
+  color: #d7ded2;
+  text-shadow:
+    0 0 6px rgba(215, 222, 210, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+}
+@media (max-width: 900px) {
+  .space-bios {
+    width: 94vw;
+    font-size: clamp(0.75rem, 2vh, 1.05rem);
+  }
+}
+/* Cada carácter del texto BIOS es su propio <span> (ver script.js) para
+   poder moverlo individualmente con el "campo de repulsión" de la nave.
+   inline-block es necesario para que el transform (translate) tenga
+   efecto -en un span inline normal el navegador lo ignora-. white-space:
+   pre evita que un espacio, al quedar solo dentro de su propio inline-block
+   (en vez de ser texto plano entre otros elementos), colapse a ancho 0 -sin
+   esto, las palabras quedaban todas pegadas-. */
+.space-bios .bios-letter {
+  display: inline-block;
+  white-space: pre;
+}
+.space-empty-notice {
+  position: absolute;
+  /* En píxeles, no en % -a diferencia de los otros elementos del escenario,
+     acá se pidió explícitamente así: #space-scene siempre arranca en (0,0)
+     en la esquina superior izquierda de la pantalla sin importar el
+     viewport, entonces top/left en px es una distancia fija y directa
+     -mover el número mueve el texto esa cantidad de píxeles, sin el lío de
+     "distancia al borde" ni nada relativo al tamaño de pantalla-. Es un
+     objeto más flotando en el espacio (como .space-rock/.space-planet), no
+     algo pegado al astronauta. */
+  top: 460px;
+  left: 10px;
+  margin: 0;
+  color: #3032363c;
+  /* DM Mono no tiene glifos cirílicos (sólo latin/latin-ext); JetBrains
+     Mono sí, y visualmente es una monoespaciada muy parecida -mismo look
+     que el resto de la UI (nav, menú CV) sin que el texto en ruso caiga a
+     una fuente del sistema sin relación. */
+  font-family: "JetBrains Mono", "DM Mono", monospace;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+  transform: rotate(-10deg);
+}
+/* Astronauta flotando en el espacio profundo, a un costado del mapa (no
+   pegado a una esquina de la pantalla). Vive adentro de #space-scene-front
+   junto con el planeta -ver el comentario largo ahí sobre por qué esa capa
+   existe separada de #space-scene- así queda siempre delante de la nave
+   principal en vez de detrás. El zoom/paneo de cámara lo alcanza heredando
+   el transform del contenedor (mismo scale/transform-origin que script.js
+   le aplica a #space-scene cuadro a cuadro). La visibilidad la controla
+   script.js con la misma clase "space-visible". */
+.space-astronaut {
+  position: absolute;
+  right: 78%;
+  bottom: 5%;
+  /* Un poco más grande que el alto de parallax 2.png (280px, ver
+     #group-256 .gl img). */
+  height: 340px;
+  max-height: 40vh;
+  width: auto;
+  max-width: 46vw;
+  pointer-events: none;
+  opacity: 0;
+  filter: drop-shadow(0 12px 26px rgba(0, 0, 0, 0.4));
+  transition: opacity 0.5s ease;
+  animation: floatAstronaut 9s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.space-astronaut.space-visible {
+  opacity: 1;
+}
+@keyframes floatAstronaut {
+  0%,
+  100% {
+    transform: translateY(-16px) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(16px) rotate(4deg);
+  }
+}
+@media (max-width: 900px) {
+  .space-astronaut {
+    height: 230px;
+  }
+}
+@media (max-width: 600px) {
+  .space-astronaut {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .space-scene,
+  .space-scene-front {
+    display: none;
+  }
+}
+/* Nave "Boga net" (referencia: cartel soviético) flotando arriba de la
+   escena de espacio profundo, unida por un cordón/cable largo y ondulado
+   -todo un mismo sprite- cuya punta cae siempre detrás del astronauta:
+   right/bottom se calculan en base a los mismos 78%/42% + un offset fijo en
+   px (ver .space-astronaut) para que la punta (a ~45%/84% del alto del
+   sprite) quede sobre su torso -mismo anclaje (right/bottom) y mismos
+   offsets que siempre tuvo, sólo se corrió el punto base para que la
+   pareja flote del lado izquierdo en vez de la esquina inferior derecha; si
+   se cambiara a left/top el cálculo dejaría de valer porque ancla lados
+   opuestos de cada sprite. A diferencia del astronauta, esta vive adentro
+   de #space-scene (el fondo), no de #space-scene-front: así queda detrás
+   de la nave principal en vez de delante -es el contraste que separa las
+   dos capas, ver comentario largo en .space-scene-front-. Al ser hijo de
+   #space-scene también hereda el mismo transform de cámara. */
+.space-bora-nave {
+  position: absolute;
+  right: calc(78% - 36px);
+  bottom: calc(5% + 97px);
+  height: 750px;
+  max-height: 70vh;
+  width: auto;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  transform-origin: 45% 84%;
+  animation: swayBoraNave 7s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.space-bora-nave.space-visible {
+  opacity: 1;
+}
+@keyframes swayBoraNave {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+@media (max-width: 900px) {
+  .space-bora-nave {
+    right: calc(78% - 25px);
+    bottom: calc(5% + 66px);
+    height: 508px;
+  }
+}
+@media (max-width: 600px) {
+  .space-bora-nave {
+    display: none;
+  }
+}
+.starry-cohete-pair {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 130px;
+  height: 130px;
+  /* La caja tiene mucho margen transparente alrededor del sprite; si acepta
+     clicks en todo el rectángulo, tapa lo que hay debajo (parallax) apenas
+     la nave (que persigue al mouse) se para encima. El click real se maneja
+     con un test de pixel opaco en script.js. */
+  pointer-events: none;
+  /* Bajo en la escena principal (z-index original: la nave pasa por
+     detrás del nombre/contenedor de .footer-col-left, que está a 20) para
+     no romper esa jerarquía de siempre. En la escena de espacio profundo
+     .in-space la sube por encima de .space-scene (250) pero por debajo de
+     .space-bora-nave (255), para que ahí sí pase por detrás del
+     cohete/cordón del astronauta -ver toggle en script.js. */
+  z-index: 10;
+  cursor: pointer;
+  opacity: 0;
+  will-change: transform, opacity;
+  max-width: 130px;
+}
+/* Luz de la nave, la misma en toda la página: dos halos sobre el sprite (uno
+   cercano y otro más ancho y tenue; script.js pone --nave-luz-halo en el sprite
+   de atrás al prender la luz) y un degradado grande y suave alrededor de la
+   nave (el ::before de abajo). El color es --luz-rgb (salmón por defecto); el
+   escenario 4 lo va cambiando del blanco al salmón a medida que se colorea la
+   nave (esc4-game.js). Se define en la nave y no en :root para que cada nave
+   use el --luz-rgb que tenga. */
+.starry-cohete-pair {
+  --nave-luz-halo: drop-shadow(0 0 8px rgba(var(--luz-rgb, 255, 159, 154), 0.3))
+    drop-shadow(0 0 20px rgba(var(--luz-rgb, 255, 159, 154), 0.15));
+}
+/* Luz de la nave, igual en todos los escenarios: además del resplandor del
+   sprite (--nave-luz-halo), un degradado grande y suave alrededor de la nave (el
+   mismo que dibuja el escenario 4 sobre su fondo, luzSprite en esc4-game.js: 4
+   paradas, opacidad máxima 0,12). Se centra sobre el cuerpo de la nave (el
+   sprite queda pegado a la izquierda de la caja) y aparece con la luz prendida
+   (luz-on, ver setLight en script.js). Va detrás de los sprites. */
+.starry-cohete-pair::before {
+  content: "";
+  position: absolute;
+  left: 44px;
+  top: 58px;
+  width: 560px;
+  height: 560px;
+  margin: -280px 0 0 -280px;
+  background: radial-gradient(
+    circle closest-side,
+    rgba(var(--luz-rgb, 255, 159, 154), 1) 0%,
+    rgba(var(--luz-rgb, 255, 159, 154), 0.65) 20%,
+    rgba(var(--luz-rgb, 255, 159, 154), 0.25) 50%,
+    rgba(var(--luz-rgb, 255, 159, 154), 0) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+.starry-cohete-pair.luz-on::before {
+  opacity: 0.12;
+}
+/* En el juego ese degradado lo dibuja el canvas sobre el fondo y debajo de las
+   rocas (así se ven como siluetas): acá solo va en la intro y en el final. */
+.starry-cohete-pair.in-game:not(.game-color):not(.game-luz-index)::before {
+  display: none;
+}
+.starry-cohete-pair.in-space {
+  z-index: 253;
+}
+/* Mismo trato que .in-space (ver arriba) pero para el escenario 3 -su
+   propia clase, aunque sea idéntica, para no atar el nombre "in-space" a
+   una escena que no es la de espacio profundo. */
+.starry-cohete-pair.in-salmon {
+  z-index: 253;
+}
+/* Escenario 4 (juego): igual que las otras escenas, por encima del fondo
+   (250). */
+.starry-cohete-pair.in-game {
+  z-index: 253;
+}
+/* Acá la nave es blanco y negro (ver el filtro #nave-gris en index.html) pero su
+   luz es la de siempre (salmón). Por eso el filtro va
+   en cada sprite y no en la caja: uno en la caja también volvería gris el
+   resplandor. El de .starry-cohete-fondo lo pone script.js junto con el
+   drop-shadow (ver scenes.game.light). */
+.starry-cohete-pair.in-game .starry-cohete-top,
+.starry-cohete-pair.in-game .starry-cohete-fuego {
+  filter: url(#nave-gris);
+}
+/* Solo apagada se ve oscura: con la luz prendida (script.js le pone luz-on a
+   la nave) el gris se levanta. */
+.starry-cohete-pair.in-game.luz-on .starry-cohete-top,
+.starry-cohete-pair.in-game.luz-on .starry-cohete-fuego {
+  filter: url(#nave-gris-luz);
+}
+/* Intro del escenario 4: la nave llega a color y con la luz apagada, y sigue
+   a color mientras la pantalla negra (.game-tapa) cae encima; esc4-game.js le
+   saca game-color cuando ya está toda negra y ella no se ve, así reaparece en
+   blanco y negro cuando prende la luz. Va al final para ganarle a las reglas de arriba, y con !important
+   el sprite de atrás porque script.js le escribe el gris en línea. */
+.starry-cohete-pair.in-game.game-color .starry-cohete-top,
+.starry-cohete-pair.in-game.game-color .starry-cohete-fuego,
+.starry-cohete-pair.in-game.game-color .starry-cohete-fondo {
+  filter: none !important;
+}
+/* La intro es a color: la luz es salmón aunque todavía no haya color de juego
+   (con !important, porque esc4-game.js escribe --luz-rgb en línea). */
+.starry-cohete-pair.in-game.game-color {
+  --luz-rgb: 255, 159, 154 !important;
+}
+/* Si en la intro el jugador prende la luz de la nave, se ve como en el index: el
+   sprite con la luz encendida (script.js cambia a cohete_on) y el mismo
+   resplandor salmón (--nave-luz-halo). */
+.starry-cohete-pair.in-game.game-color.luz-on .starry-cohete-fondo {
+  filter: var(--nave-luz-halo) !important;
+}
+/* Lo mismo en el zoom a la nave del final (esc4-game.js le pone game-luz-index):
+   con la luz prendida el resplandor es el de siempre y, a medida que la nave se
+   colorea, el gris de ese sprite se va. */
+.starry-cohete-pair.in-game.luz-on.game-luz-index .starry-cohete-fondo {
+  filter: grayscale(var(--nave-gris, 0)) var(--nave-luz-halo) !important;
+}
+/* Aviso de que la nave se está yendo del escenario (script.js, updateEdgeWarnings):
+   una franja transparente pegada al borde por el que se va, que crece y se hace
+   más marcada a medida que se acerca el cambio de escenario, con estrellas que
+   viajan adentro (un canvas que crea el script). Es totalmente transparente: no
+   deforma ni oscurece lo que hay detrás, solo se ven las estrellas. Es una caja
+   chica alrededor de la nave, que el
+   script mueve con un transform y recorta con clip-path con forma de onda (con el
+   pico a la altura de la nave); su tamaño también lo pone el script. Por encima
+   de los escenarios (250) y por debajo de la nave en ellos (253). */
+.edge-warn {
+  position: fixed;
+  z-index: 251;
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+.edge-warn--left,
+.edge-warn--right {
+  top: 0;
+}
+.edge-warn--left {
+  left: 0;
+}
+.edge-warn--right {
+  right: 0;
+}
+.edge-warn--top,
+.edge-warn--bottom {
+  left: 0;
+}
+.edge-warn--top {
+  top: 0;
+}
+.edge-warn--bottom {
+  bottom: 0;
+}
+/* Pantalla negra del escenario 4: al terminar la intro cae (clase "cae",
+   esc4-game.js) por encima de todo, la nave incluida, así que se oscurece
+   junto con el fondo. Se levanta, de a poco, cuando la nave prende la luz. */
+.game-tapa {
+  position: fixed;
+  inset: 0;
+  z-index: 254;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+.game-tapa.cae {
+  opacity: 1;
+  transition: opacity 1s ease;
+}
+.starry-cohete {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 130px;
+  width: auto;
+  pointer-events: none;
+  display: block;
+}
+.starry-cohete-fondo {
+  z-index: 1;
+}
+/* Fuego (canvas que dibuja script.js): va detrás del sprite de adelante y
+   queda invisible hasta que se carga el dibujo y se dibuja el primer cuadro. */
+.starry-cohete-fuego {
+  z-index: 1;
+  opacity: 0;
+}
+.starry-cohete-top {
+  z-index: 2;
+}
+.starry-p9-wrap {
+  position: absolute;
+  right: 8%;
+  top: 50%;
+  height: 110px;
+  width: auto;
+  z-index: 2;
+  pointer-events: none;
+  animation: floatP9 7s ease-in-out infinite;
+}
+.starry-p9 {
+  height: 110px;
+  width: auto;
+  opacity: 0.32;
+  display: block;
+  filter: drop-shadow(0 0 18px rgba(126, 184, 201, 0.25));
+}
+.starry-p9.spinning {
+  animation: spinX 2.2s ease-in-out;
+}
+@keyframes floatP9 {
+  0%,
+  100% {
+    transform: translateY(-8px);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+@keyframes spinX {
+  from {
+    transform: rotateY(0);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+@media (min-width: 601px) {
+  .starry-p9-wrap {
+    pointer-events: auto;
+    cursor: default;
+  }
+}
+.parallax-footer {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-top: auto;
+}
+/* Carga: en una recarga sin caché (Ctrl+Shift+R) las capas del parallax llegan
+   una por una y se veían aparecer de a pedazos. Mientras index.html no termine
+   de bajarlas y decodificarlas (html.cargando, ver el script del final del
+   body) quedan transparentes y después se funden todas juntas. El texto y el
+   fondo no esperan. Va sobre las capas y no sobre .parallax-footer para no
+   crear un contexto de apilamiento nuevo ahí (los z-index de adentro compiten
+   con la nave, que es fixed). Sin JS la clase nunca se pone: se ve todo. */
+#p1,
+.layer {
+  transition: opacity 0.6s ease;
+}
+html.cargando #p1,
+html.cargando .layer {
+  opacity: 0 !important; /* !important: #p8 fija su propia opacidad por id */
+}
+#p1 {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 200px;
+  z-index: 1;
+  background-image: url("parallax/parallax 1.webp");
+  background-size: auto 100%;
+  background-position: left center;
+  background-repeat: repeat-x;
+  animation: bgBreath 8s ease-in-out infinite;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 80%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 80%);
+}
+.layer {
+  position: absolute;
+  bottom: 0;
+  will-change: transform;
+}
+.layer img {
+  height: 100%;
+  width: auto;
+  display: block;
+}
+#p3 {
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  height: 320px;
+}
+#p3 img {
+  cursor: default;
+}
+#p4 {
+  z-index: 3;
+  left: 0;
+  bottom: 0;
+  height: 280px;
+  /* El halo de abajo usa mix-blend-mode: screen para que ilumine de verdad
+     en vez de pintar un círculo plano encima; "isolate" lo encierra adentro
+     de este layer para que sólo mezcle con el dibujo de la ventana, no con
+     los demás layers del parallax que quedan detrás. */
+  isolation: isolate;
+}
+/* Sprite del brillo solo (transparente salvo la luz), superpuesto sobre el
+   dibujo base para el parpadeo -ver script.js-, en vez de cambiar el PNG
+   entero cada vez. */
+#p4 img.p4-luz {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+/* Halo amarillo difuso alrededor de la ventanita que se prende: un círculo
+   con degradado (más claro y opaco en el centro, transparente en el borde)
+   posicionado a mano sobre las coordenadas de esa ventana dentro del PNG
+   (es un recuadro de ~2% del dibujo, muy chico para que un filtro
+   drop-shadow se note -el desenfoque diluye casi toda su opacidad-, así que
+   en vez de eso se dibuja un brillo propio del tamaño que hace falta). */
+#p4 .p4-glow {
+  position: absolute;
+  left: 29.6%;
+  top: 36.5%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 244, 190, 0.55) 0%,
+    rgba(187, 189, 42, 0.3) 40%,
+    rgba(187, 189, 42, 0) 75%
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+  opacity: 0;
+}
+#group-256 {
+  z-index: 4;
+  left: 0;
+  bottom: 0;
+  height: 280px;
+  width: 60%;
+}
+
+#group-256 .gl {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  pointer-events: none;
+}
+#group-256 .gl:has(img[src="parallax/parallax 2.webp"]) {
+  pointer-events: auto;
+}
+#group-256 .gl img {
+  height: 100%;
+  width: auto;
+  display: block;
+  cursor: default;
+  pointer-events: none;
+}
+#group-256 .gl img[src="parallax/parallax 2.webp"] {
+  pointer-events: auto;
+  cursor: default;
+}
+#p7 {
+  z-index: 5;
+  left: 0;
+  bottom: 0;
+  height: 320px;
+  width: auto;
+  pointer-events: none;
+}
+#p7 img {
+  pointer-events: none;
+}
+#p8 {
+  z-index: 1;
+  right: -100px;
+  bottom: 59px;
+  height: 230px;
+  opacity: 0.82;
+  rotate: -12deg;
+}
+.footer-text {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 50px 20px;
+  pointer-events: none;
+  color: var(--white);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.footer-col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  margin-top: 5%;
+}
+.footer-col-left .name {
+  font-family: Spaceport, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  line-height: 1.2;
+}
+.footer-col-left .role {
+  font-size: 16px;
+  font-weight: 400;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+.footer-col-left .year {
+  font-size: 15px;
+  font-weight: 400;
+  opacity: 0.7;
+  margin-top: 0;
+}
+/* El año se tipea de a una letra: con el ancho ya reservado (4 caracteres de
+   la monoespaciada) el "©" no se corre a cada tecla, que era lo que movía el
+   texto centrado en cada paso. */
+#typed-year {
+  display: inline-block;
+  min-width: 4ch;
+  text-align: left;
+}
+.footer-col-right {
+  text-align: center;
+  max-width: 320px;
+}
+.footer-col-right p {
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.85;
+  line-height: 1.8;
+  font-family: Georgia, serif;
+}
+@keyframes bgBreath {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+@media (max-width: 900px) {
+  nav {
+    padding: 16px 28px;
+  }
+  .nav-links {
+    gap: 20px;
+  }
+  .footer-text {
+    gap: 60px;
+  }
+  .footer-col-right p {
+    font-size: 10px;
+  }
+  .footer-col-left .name {
+    font-size: 18px;
+  }
+  .footer-col-left .role {
+    font-size: 12px;
+  }
+}
+@media (max-width: 600px) {
+  .footer-col-left .name {
+    white-space: nowrap;
+  }
+  nav {
+    padding: 12px 18px;
+  }
+  .nav-links {
+    gap: 17px;
+  }
+  .nav-links a {
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+  }
+  .parallax-footer {
+    height: 280px;
+  }
+  #p3 {
+    height: 275px;
+  }
+  #group-256,
+  #p3,
+  #p4,
+  #p7,
+  #p8 {
+    display: none;
+  }
+  .starry-cohete-pair {
+    width: 90px;
+    height: 90px;
+    max-width: 90px;
+  }
+  .starry-cohete {
+    height: 90px;
+  }
+  .footer-text {
+    flex-direction: column;
+    gap: 20px;
+    justify-content: center;
+    align-items: center;
+    padding: 4px;
+  }
+  .footer-col-left .name {
+    font-size: 20px;
+  }
+  .footer-col-left .role,
+  .footer-col-left .year {
+    font-size: 13px;
+  }
+}
+.starry-bg .footer-col-left {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+}
+@media (max-width: 400px) {
+  .footer-col-left .name {
+    white-space: nowrap;
+    font-size: 1.5rem;
+    letter-spacing: 0.03em;
+  }
+  .footer-col-left {
+    margin-top: 20%;
+    gap: 10px;
+  }
+  #p3 {
+    height: 230px;
+  }
+  #p8 {
+    height: 200px;
+  }
+  img {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    pointer-events: none;
+  }
+}
+@media (min-width: 601px) {
+  .starry-p9 {
+    pointer-events: auto;
+    cursor: default;
+  }
+}
