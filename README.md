@@ -21,6 +21,10 @@ copiados de ese repo), con una segunda nave manejada por la PC.
   entra a uno suma un gol y sale por el otro.
 - Gana el primero en llegar a **10**. El marcador está en el cuadrado del
   medio (tus goles en blanco, los de la PC en rojo) y la voz cuenta 1, 2, 3…
+- El color de la partida (las dos naves, el fondo, las piedras, los agujeros
+  y el marcador) avanza cuando alguno llega primero a un número de goles, y
+  como mucho llega al color del agujero 7 del juego original, repartido en
+  los 10 goles.
 - Si las naves se chocan, rebotan (nadie se lastima).
 - Al terminar aparece un cartel (GANASTE o GANO LA PC) y arranca otra
   partida.

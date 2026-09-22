@@ -465,6 +465,9 @@
   // Con dos lluvias el campo se llenaba demasiado: cada una cae LLUVIA_MENOS
   // veces más espaciada que la del juego original.
   const LLUVIA_MENOS = 2;
+  // Tope de color de la partida: el que en el juego original se tiene al pasar
+  // el agujero 7 de 10.
+  const COLOR_MAXIMO = 0.7;
   // Halo de la PC (el del jugador es CSS, .starry-cohete-pair.in-game).
   const HALO_RIVAL = "drop-shadow(0 0 5px rgba(255, 90, 90, 0.95)) drop-shadow(0 0 14px rgba(255, 90, 90, 0.55))";
 
@@ -648,7 +651,6 @@
   let poligonosRival = [];
   let acumSpawnRival = 0;
   let golesRival = 0;
-  let colorRival = 0; // se tiñe como la nave del jugador, con sus goles
   let stunJugador = 0; // segundos que le quedan fuera de juego a la nave del jugador
   let invulJugador = 0; // segundos que le quedan parpadeando (invulnerable)
   let reaparecer = null; // centro de la caja de la nave (pantalla) donde la golpearon
@@ -823,7 +825,6 @@
     poligonosRival = [];
     acumSpawnRival = 0;
     golesRival = 0;
-    colorRival = 0;
     stunJugador = 0;
     invulJugador = 0;
     reaparecer = null;
@@ -2189,7 +2190,7 @@
       sonarCruce();
       decirGol(cumulosTomados);
       mostrarTiempo();
-      colorObjetivo = Math.min(1, cumulosTomados / CUMULOS_PARA_COLOR);
+      actualizarColor();
       if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
     }
     for (const p of particulas) {
@@ -2495,8 +2496,6 @@
 
   function actualizarRival(dt, circulos) {
     if (!rival) return;
-    colorRival += (golesRival / CUMULOS_PARA_COLOR - colorRival) *
-      Math.min(1, dt * COLOR_SUAVIZADO);
 
     const antesX = rival.x;
     const antesY = rival.y;
@@ -2652,9 +2651,19 @@
     rival.y = salida.y;
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     golesRival++;
+    actualizarColor();
     sonarCruce();
     mostrarTiempo();
     if (golesRival >= CUMULOS_PARA_COLOR) terminarPartida("pc");
+  }
+
+  // El color de la partida (las dos naves, el fondo, las piedras, los agujeros
+  // y el marcador) lo marca el que va ganando: avanza cuando alguno llega
+  // primero a un número de goles, y como mucho llega a COLOR_MAXIMO, repartido
+  // en los 10 goles.
+  function actualizarColor() {
+    const goles = Math.max(cumulosTomados, golesRival);
+    colorObjetivo = COLOR_MAXIMO * Math.min(1, goles / CUMULOS_PARA_COLOR);
   }
 
   // Alguien llegó a 10: la música se corta, suena la nota de victoria (si
@@ -2700,7 +2709,7 @@
     // Igual que la nave del jugador en el juego: en blanco y negro, con el
     // levantado de brillo de la luz prendida (#nave-gris-luz), y se va tiñendo
     // con sus goles. Encima, su halo rojo.
-    const gris = 1 - Math.min(1, colorRival);
+    const gris = 1 - Math.min(1, colorNave);
     ctx.filter =
       "grayscale(" + gris.toFixed(3) + ") brightness(" +
       (1 + 0.35 * gris).toFixed(3) + ") " + HALO_RIVAL;
