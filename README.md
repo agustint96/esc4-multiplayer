@@ -13,9 +13,15 @@ Al arrancar se elige con el teclado:
 - **1 · contra la PC**: vos con WASD o flechas (Shift acelera, Espacio aleja
   la cámara), con el tutorial de siempre. La nave de la PC se ve
   semitransparente.
-- **2 · dos jugadores**: el jugador 1 con WASD y Shift izquierdo, el jugador 2
-  con las flechas y Shift derecho. Sin tutorial, y la cámara muestra el mapa
-  entero para que nadie quede fuera de pantalla.
+- **2 · dos jugadores**: sin tutorial, y la cámara muestra el mapa entero para
+  que nadie quede fuera de pantalla.
+  - Con un **joystick** conectado: el jugador 1 tiene todo el teclado (como en
+    el sitio) y el jugador 2 el joystick (stick o cruceta, RB acelera).
+  - Sin joystick: el jugador 1 WASD y Shift izquierdo, el jugador 2 las
+    flechas y Shift derecho.
+  La pantalla de elección muestra cuál de los dos va a ser. Si el navegador
+  no ve el joystick, apretá cualquier botón del joystick (los navegadores no
+  lo muestran hasta que se toca).
 
 ## Reglas
 

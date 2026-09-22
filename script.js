@@ -2010,7 +2010,9 @@ function drawStars() {
         mouseBoost = false;
       }),
       requestAnimationFrame(function tick() {
-        const gp = getFirstGamepad();
+        // Con dos jugadores y un joystick conectado, el joystick es del jugador 2
+        // (lo lee esc4-game.js): esta nave queda con todo el teclado.
+        const gp = window.j2Joystick ? null : getFirstGamepad();
         let gx = 0,
           gy = 0,
           boosting = false;
@@ -2044,9 +2046,9 @@ function drawStars() {
         // WASD/flechitas/Shift/Espacio: mismo camino que el D-pad/RB/LT del joystick
         // de arriba -pisan los ejes analógicos sólo si están apretados, así
         // no interfieren con el mouse/gamepad cuando no se usa el teclado.
-        // Con dos jugadores (escenario 4) las flechas y el Shift derecho son del
-        // jugador 2: los lee esc4-game.js y acá no mueven esta nave.
-        const flechas = !window.dosJugadores;
+        // Con dos jugadores sin joystick (escenario 4) las flechas y el Shift
+        // derecho son del jugador 2: los lee esc4-game.js y acá no mueven esta nave.
+        const flechas = !window.j2Teclado;
         if (keyLeft || (flechas && arrowLeft)) gx = -1;
         else if (keyRight || (flechas && arrowRight)) gx = 1;
         if (keyUp || (flechas && arrowUp)) gy = -1;
@@ -2774,6 +2776,9 @@ function drawStars() {
         const gp = pads[idx];
         if (!gp) continue;
         hayJoystick = true;
+        // El joystick es del jugador 2 (escenario 4): sus botones no prenden la
+        // luz de esta nave ni tocan nada del escenario.
+        if (window.j2Joystick) continue;
 
         const actionButton = gp.buttons[BTN_ACTION];
         const actionPressed = !!(actionButton && actionButton.pressed);

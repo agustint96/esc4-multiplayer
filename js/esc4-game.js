@@ -664,9 +664,9 @@
   let invulJugador = 0; // segundos que le quedan parpadeando (invulnerable)
   let reaparecer = null; // centro de la caja de la nave (pantalla) donde la golpearon
   let fin = null; // { t, ganador: "vos" | "pc" } alguien llegó a 10
-  // "pc": la segunda nave la maneja la PC; "dos": la maneja una persona con las
-  // flechas y Shift derecho (el jugador 1 queda con WASD y Shift izquierdo, ver
-  // window.dosJugadores en script.js). null mientras se elige, al arrancar.
+  // "pc": la segunda nave la maneja la PC; "dos": la maneja una persona, con el
+  // joystick si hay uno o si no con las flechas y Shift derecho (ver
+  // actualizarControles). null mientras se elige, al arrancar.
   let modo = null;
   const teclasJ2 = { up: false, down: false, left: false, right: false, boost: false };
   const TECLAS_J2 = {
@@ -695,6 +695,41 @@
     modo = m;
     window.dosJugadores = m === "dos";
     if (modoEl) modoEl.hidden = true;
+    actualizarControles();
+  }
+
+  // Con dos jugadores, quién usa qué (lo lee script.js cada cuadro):
+  // - con un joystick conectado, el jugador 1 tiene todo el teclado (como en el
+  //   sitio) y el jugador 2 el joystick (window.j2Joystick);
+  // - sin joystick, el jugador 1 WASD y Shift izquierdo, y el jugador 2 las
+  //   flechas y Shift derecho (window.j2Teclado).
+  // Se revisa en cada cuadro: si el joystick se conecta o se desconecta en el
+  // medio de la partida, cambia solo.
+  function actualizarControles() {
+    const joystick = modo === "dos" && !!primerJoystick();
+    window.j2Joystick = joystick;
+    window.j2Teclado = modo === "dos" && !joystick;
+  }
+
+  // Los mismos textos de controles que la elección muestra, según haya o no un
+  // joystick conectado (Spaceport no tiene tildes ni puntuación).
+  const CONTROLES_TECLADO = "J1 WASD y shift izquierdo<br />J2 flechas y shift derecho";
+  const CONTROLES_JOYSTICK = "J1 teclado<br />J2 joystick";
+  let controlesMostrados = "";
+  function mostrarControles() {
+    const el = document.getElementById("game-modo-controles");
+    const texto = primerJoystick() ? CONTROLES_JOYSTICK : CONTROLES_TECLADO;
+    if (!el || texto === controlesMostrados) return;
+    controlesMostrados = texto;
+    el.innerHTML = texto;
+  }
+
+  // Igual que applyDeadzone en script.js: sin respuesta hasta el 20 % y de ahí
+  // el recorrido completo, así el stick del jugador 2 responde como el del 1.
+  function zonaMuerta(v) {
+    const ZONA = 0.2;
+    if (Math.abs(v) < ZONA) return 0;
+    return Math.sign(v) * ((Math.abs(v) - ZONA) / (1 - ZONA));
   }
   // La nave de la PC se arma igual que la del jugador en index.html: el sprite
   // de atrás, el fuego y el de adelante (cohete_on: en el juego la luz va
@@ -2624,9 +2659,22 @@
     let gx = 0;
     let gy = 0;
     let empuje = RIVAL_EMPUJE;
-    if (modo === "dos") {
-      // La maneja el jugador 2, igual que las flechas a la nave del jugador 1
-      // en script.js (cada eje -1/0/1, sin normalizar la diagonal).
+    const pad = window.j2Joystick ? primerJoystick() : null;
+    if (modo === "dos" && pad) {
+      // La maneja el jugador 2 con el joystick, igual que el joystick a la nave
+      // del jugador 1 en script.js: stick con zona muerta, la cruceta lo pisa y
+      // RB acelera.
+      gx = zonaMuerta(pad.axes[0] || 0);
+      gy = zonaMuerta(pad.axes[1] || 0);
+      const apretado = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed);
+      if (apretado(PAD_CRUCETA.left)) gx = -1;
+      else if (apretado(PAD_CRUCETA.right)) gx = 1;
+      if (apretado(PAD_CRUCETA.up)) gy = -1;
+      else if (apretado(PAD_CRUCETA.down)) gy = 1;
+      if (apretado(PAD_RB)) empuje = RIVAL_EMPUJE_BOOST;
+    } else if (modo === "dos") {
+      // La maneja el jugador 2 con las flechas, igual que las flechas a la nave
+      // del jugador 1 en script.js (cada eje -1/0/1, sin normalizar la diagonal).
       gx = (teclasJ2.right ? 1 : 0) - (teclasJ2.left ? 1 : 0);
       gy = (teclasJ2.down ? 1 : 0) - (teclasJ2.up ? 1 : 0);
       if (teclasJ2.boost) empuje = RIVAL_EMPUJE_BOOST;
@@ -3096,9 +3144,11 @@
     if (!modo) {
       // Eligiendo el modo: todo espera, con la nave quieta en el medio abajo.
       if (window.shipMove) window.shipMove(0, 0);
+      mostrarControles();
       dibujar(circulos[1]);
       return;
     }
+    actualizarControles();
     // La nave va ganando color de a poco (no de golpe) hacia colorObjetivo, y
     // muy despacio: cada pasaje tarda varios segundos en terminar de teñirla.
     if (Math.abs(colorObjetivo - colorNave) > 0.0005) {
@@ -3286,6 +3336,8 @@
         saltearIntro();
         modo = null; // se elige de nuevo cada vez que se entra
         window.dosJugadores = false;
+        window.j2Joystick = false;
+        window.j2Teclado = false;
         if (modoEl) modoEl.hidden = false;
         ultimo = performance.now();
         raf = requestAnimationFrame(cuadro);
