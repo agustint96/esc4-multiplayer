@@ -658,6 +658,16 @@
   // Modo contra la PC (ver STUN y compañía arriba).
   let rival = null; // { x, y, vx, vy, rot, stun, invul, t, cae, hx, hy } centro de la caja, en el mundo
   let poligonosRival = [];
+  let idPoligono = 0; // online, para seguir cada piedra de un mensaje al otro
+  // Lo que llega del rival se muestra RETRASO_RED segundos en el pasado,
+  // pasando de a poco entre los dos mensajes que rodean ese momento: así la
+  // nave y las piedras se mueven parejo aunque los mensajes lleguen a
+  // destiempo (a veces tarde, a veces dos juntos). Mostrar solo el último,
+  // en cambio, las hace saltar hacia atrás con cada mensaje nuevo.
+  const RETRASO_RED = 0.1;
+  let estadosRival = []; // { t, x, y, rot, stun, tc, inv, p: Map id -> [x, y, vx, vy, ang, giro] }
+  const piedrasRival = new Map(); // id -> la piedra que se dibuja (forma fija)
+  let desfaseReloj = null; // reloj propio - reloj del rival, en s (sin la demora de más)
   let acumSpawnRival = 0;
   let golesRival = 0;
   let stunJugador = 0; // segundos que le quedan fuera de juego a la nave del jugador
@@ -822,6 +832,7 @@
     // (nunca más abajo del borde de arriba de la vista: no aparecen de la nada).
     const y = paraRival && objetivo ? Math.min(v.y, objetivo.y - v.h * 0.6) : v.y;
     return {
+      id: ++idPoligono,
       x,
       y: y - d,
       vx: 0, // solo se mueve de costado cuando busca a la nave
@@ -924,6 +935,9 @@
     tiempo = 0;
     rival = null; // se crea de nuevo cuando arranca el juego
     poligonosRival = [];
+    estadosRival = [];
+    piedrasRival.clear();
+    desfaseReloj = null;
     acumSpawnRival = 0;
     golesRival = 0;
     stunJugador = 0;
@@ -2403,7 +2417,7 @@
     const focoJugador = stunJugador > 0 || invulJugador > 0 ? null : circulos[1];
     const focoRival = rival && rival.stun <= 0 && rival.invul <= 0 ? rival : null;
     moverPoligonos(poligonos, focoJugador, busqueda, dt);
-    if (enLinea()) moverRemotas(poligonosRival, dt);
+    if (enLinea()) seguirRivalOnline(dt);
     else moverPoligonos(poligonosRival, focoRival, BUSQUEDA_BASE, dt);
     // Se descartan los que ya salieron por abajo, compactando el mismo array.
     // Nunca antes de haber pasado la nave, aunque esté más abajo de lo que se ve
@@ -2670,10 +2684,7 @@
 
   function actualizarRival(dt, circulos) {
     if (!rival) return;
-    if (enLinea()) {
-      actualizarRivalOnline(dt);
-      return;
-    }
+    if (enLinea()) return; // ver seguirRivalOnline
 
     const antesX = rival.x;
     const antesY = rival.y;
@@ -3010,6 +3021,7 @@
     const sy = pose.y + cajaNave / 2;
     const m = {
       tipo: "estado",
+      ts: Math.round(performance.now()), // ms, en el reloj de quien lo manda
       x: r4((cam.ox + (sx - cam.ox) / cam.z) / W),
       y: r4((cam.oy + (sy - cam.oy) / cam.z) / H),
       rot: r1(pose.rot),
@@ -3017,7 +3029,7 @@
       tc: r1(tChoque * 10) / 10,
       inv: r1(invulJugador * 10) / 10,
       p: poligonos.map((p) => [
-        r4(p.x / W), r4(p.y / H), r4(p.vx / W), r4(p.vy / H),
+        p.id, r4(p.x / W), r4(p.y / H), r4(p.vx / W), r4(p.vy / H),
         r1(p.ang * 100) / 100, r1(p.giro * 100) / 100, r1(p.radio),
         p.verts.map((v) => [r1(v.x), r1(v.y)]),
       ]),
@@ -3033,28 +3045,26 @@
     const W = window.innerWidth;
     const H = window.innerHeight;
     if (!rival) crearRival(circulosNave());
-    const antes = rival.stun;
-    rival.metaX = m.x * W;
-    rival.metaY = m.y * H;
-    rival.metaRot = m.rot;
-    rival.stun = m.stun;
-    rival.t = m.tc;
-    rival.invul = m.inv;
-    // Lo acaba de golpear una piedra: el mismo ruido y las chispas de siempre.
-    if (antes <= 0 && m.stun > 0) {
-      sonarPerder();
-      chispas(rival.x, rival.y);
+    const t = m.ts / 1000;
+    // El desfase de relojes es el más chico visto (el de un mensaje que llegó
+    // sin demoras de más); sube despacito por si la conexión se vuelve más lenta.
+    const d = performance.now() / 1000 - t;
+    desfaseReloj = desfaseReloj == null ? d : Math.min(d, desfaseReloj + 0.0005);
+    const p = new Map();
+    for (const [id, x, y, vx, vy, ang, giro, radio, verts] of m.p) {
+      p.set(id, [x * W, y * H, vx * W, vy * H, ang, giro]);
+      if (!piedrasRival.has(id))
+        piedrasRival.set(id, {
+          id, x: x * W, y: y * H, vx: 0, vy: 0, ang, giro, radio,
+          verts: verts.map(([a, b]) => ({ x: a, y: b })),
+          pts: [],
+        });
     }
-    // Sus piedras, tal cual las tiene él (entre un mensaje y otro siguen
-    // cayendo acá con la velocidad que traían, ver moverRemotas).
-    poligonosRival = m.p.map(([x, y, vx, vy, ang, giro, radio, verts]) => {
-      const p = {
-        x: x * W, y: y * H, vx: vx * W, vy: vy * H, ang, giro, radio,
-        verts: verts.map(([a, b]) => ({ x: a, y: b })),
-        pts: [],
-      };
-      actualizarPuntos(p);
-      return p;
+    const ultimo = estadosRival[estadosRival.length - 1];
+    if (ultimo && t <= ultimo.t) return; // llegó desordenado: ya hay uno más nuevo
+    estadosRival.push({
+      t, x: m.x * W, y: m.y * H, rot: m.rot,
+      stun: m.stun, tc: m.tc, inv: m.inv, p,
     });
     if (!soyAnfitrion() && m.c) {
       // Los agujeros del anfitrión (conservando el giro de los que ya estaban,
@@ -3085,33 +3095,83 @@
     }
   }
 
-  // Las piedras del rival entre un mensaje y otro: siguen derecho con la
-  // velocidad y el giro que traían.
-  function moverRemotas(lista, dt) {
-    for (const p of lista) {
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.ang += p.giro * dt;
-      actualizarPuntos(p);
+  // Cada cuadro: la nave y las piedras del rival como estaban hace
+  // RETRASO_RED (ver arriba). Si se quedó sin mensajes nuevos, la nave espera
+  // en el último y las piedras siguen derecho con la velocidad que traían.
+  function seguirRivalOnline(dt) {
+    if (!rival || !estadosRival.length) return;
+    const t = performance.now() / 1000 - desfaseReloj - RETRASO_RED;
+    while (estadosRival.length > 2 && estadosRival[1].t <= t) estadosRival.shift();
+    let a = estadosRival[0];
+    let b = estadosRival[1];
+    if (b && b.t <= t) {
+      a = b;
+      b = null;
     }
-  }
+    const f = b ? Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t))) : 0;
 
-  // La nave del rival sigue lo último que llegó, suavizado (llega 20 veces por
-  // segundo; sin suavizar se vería a los saltos). Un salto grande es un
-  // teletransporte: ahí no se suaviza.
-  function actualizarRivalOnline(dt) {
-    if (rival.metaX == null) return;
     const antesX = rival.x;
     const antesY = rival.y;
-    const salto = Math.hypot(rival.metaX - rival.x, rival.metaY - rival.y);
-    const k = salto > 250 ? 1 : Math.min(1, dt * 15);
-    rival.x += (rival.metaX - rival.x) * k;
-    rival.y += (rival.metaY - rival.y) * k;
-    let d = rival.metaRot - rival.rot;
-    d = ((((d + 180) % 360) + 360) % 360) - 180;
-    rival.rot += d * Math.min(1, dt * 15);
-    const dist = Math.hypot(rival.x - antesX, rival.y - antesY) * cam.z;
+    const primera = !rival.visto;
+    rival.visto = true;
+    if (!b) {
+      rival.x = a.x;
+      rival.y = a.y;
+      rival.rot = a.rot;
+    } else if (Math.hypot(b.x - a.x, b.y - a.y) > 250) {
+      // Un salto grande es un teletransporte (salió por un agujero): no se suaviza.
+      const e = f < 0.5 ? a : b;
+      rival.x = e.x;
+      rival.y = e.y;
+      rival.rot = e.rot;
+    } else {
+      rival.x = a.x + (b.x - a.x) * f;
+      rival.y = a.y + (b.y - a.y) * f;
+      let d = b.rot - a.rot;
+      d = ((((d + 180) % 360) + 360) % 360) - 180;
+      rival.rot = a.rot + d * f;
+    }
+    const e = b && f >= 1 ? b : a;
+    const antes = rival.stun;
+    rival.stun = e.stun;
+    rival.t = e.tc;
+    rival.invul = e.inv;
+    // Lo acaba de golpear una piedra: el mismo ruido y las chispas de siempre.
+    if (antes <= 0 && rival.stun > 0) {
+      sonarPerder();
+      chispas(rival.x, rival.y);
+    }
+    const dist = primera ? 0 : Math.hypot(rival.x - antesX, rival.y - antesY) * cam.z;
     actualizarFuegoRival(dt, dt > 0 && dist < 250 ? dist / dt : 0);
+
+    // Las piedras: las que están en el mensaje más nuevo (las que ya no están
+    // salieron por abajo). Una recién nacida se ubica hacia atrás con su velocidad.
+    const lista = [];
+    const ultimo = b || a;
+    for (const [id, q] of ultimo.p) {
+      const piedra = piedrasRival.get(id);
+      if (!piedra) continue;
+      const r = b && a.p.get(id);
+      if (r) {
+        piedra.x = r[0] + (q[0] - r[0]) * f;
+        piedra.y = r[1] + (q[1] - r[1]) * f;
+        piedra.ang = r[4] + (q[4] - r[4]) * f;
+      } else {
+        const s = Math.max(-0.5, Math.min(0.5, t - ultimo.t));
+        piedra.x = q[0] + q[2] * s;
+        piedra.y = q[1] + q[3] * s;
+        piedra.ang = q[4] + q[5] * s;
+      }
+      piedra.vx = q[2];
+      piedra.vy = q[3];
+      actualizarPuntos(piedra);
+      lista.push(piedra);
+    }
+    poligonosRival = lista;
+    // Las formas de las que ya no están en ningún mensaje guardado, fuera.
+    if (piedrasRival.size > lista.length + 50)
+      for (const id of piedrasRival.keys())
+        if (!estadosRival.some((s) => s.p.has(id))) piedrasRival.delete(id);
   }
 
   // Anfitrión: el invitado avisa que entró a un agujero. Si todavía existe (si
@@ -3125,10 +3185,6 @@
     const H = window.innerHeight;
     chispas(entrado.x, entrado.y);
     chispas(salida.x, salida.y);
-    if (rival) {
-      rival.x = rival.metaX = salida.x;
-      rival.y = rival.metaY = salida.y;
-    }
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     golesRival++;
     actualizarColor();
@@ -3176,10 +3232,6 @@
       decirGol(cumulosTomados);
     } else {
       chispas(s.x, s.y);
-      if (rival) {
-        rival.x = rival.metaX = s.x;
-        rival.y = rival.metaY = s.y;
-      }
     }
     sonarCruce();
     actualizarColor();
@@ -3190,7 +3242,7 @@
 
   function dibujarRival() {
     if (!rival || ganado) return;
-    if (enLinea() && rival.metaX == null) return; // todavía no llegó dónde está
+    if (enLinea() && !rival.visto) return; // todavía no llegó dónde está
     if (rival.stun > 0 && rival.t >= DURACION_CHOQUE) return; // fuera de juego: no se ve
     if (!imgRivalTop.complete || !imgRivalTop.naturalWidth) return;
     // Las tres capas juntas (atrás, fuego, adelante), como la nave del jugador.
