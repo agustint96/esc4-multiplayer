@@ -13,9 +13,10 @@ copiados de ese repo), con una segunda nave manejada por la PC.
   tuyas, borde **rojo** las de la PC. Caen la mitad de seguido que en el
   juego original (son dos lluvias).
 - **Cualquier piedra golpea a cualquier nave.** La golpeada cae, desaparece y
-  a los **3 segundos** vuelve en el medio abajo (como al reiniciar en el
-  original), con los goles que tenía, y parpadea **2 segundos** en los que no
-  la afecta nada. Mientras está fuera de juego no le caen piedras.
+  a los **3 segundos** vuelve donde la golpearon, con los goles que tenía, y
+  parpadea **2 segundos** en los que no la afecta nada. Mientras está fuera de
+  juego o parpadeando no nacen piedras suyas y las que venían dejan de
+  perseguirla.
 - Los **agujeros de gusano** aparecen de a pares, como siempre: el primero que
   entra a uno suma un gol y sale por el otro.
 - Gana el primero en llegar a **10**. El marcador está en el cuadrado del

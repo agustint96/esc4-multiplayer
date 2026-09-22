@@ -644,13 +644,14 @@
   let tQuieta = 0; // segundos seguidos sin que la nave se mueva
   let navePrev = null; // centro de la nave en el cuadro anterior (mundo)
   // Modo contra la PC (ver STUN y compañía arriba).
-  let rival = null; // { x, y, vx, vy, rot, stun, invul, t, cae } centro de la caja, en el mundo
+  let rival = null; // { x, y, vx, vy, rot, stun, invul, t, cae, hx, hy } centro de la caja, en el mundo
   let poligonosRival = [];
   let acumSpawnRival = 0;
   let golesRival = 0;
   let colorRival = 0; // se tiñe como la nave del jugador, con sus goles
   let stunJugador = 0; // segundos que le quedan fuera de juego a la nave del jugador
   let invulJugador = 0; // segundos que le quedan parpadeando (invulnerable)
+  let reaparecer = null; // centro de la caja de la nave (pantalla) donde la golpearon
   let rebote = null; // { vx, vy, t } empujón de la nave del jugador tras chocar con la PC
   let fin = null; // { t, ganador: "vos" | "pc" } alguien llegó a 10
   // La nave de la PC se arma igual que la del jugador en index.html: el sprite
@@ -825,6 +826,7 @@
     colorRival = 0;
     stunJugador = 0;
     invulJugador = 0;
+    reaparecer = null;
     rebote = null;
     fin = null;
     ship.classList.remove("fuera-de-juego", "invulnerable");
@@ -2214,15 +2216,15 @@
       Math.max(SPAWN_MIN, SPAWN_INICIAL - tiempo * SPAWN_RAMPA) * LLUVIA_MENOS;
     if (tiempo > gracia && !ganado) {
       // Cada nave tiene su lluvia; la de la golpeada se corta mientras está
-      // fuera de juego (las que ya venían siguen cayendo).
-      if (stunJugador <= 0) {
+      // fuera de juego y mientras parpadea (las que ya venían siguen cayendo).
+      if (stunJugador <= 0 && invulJugador <= 0) {
         acumSpawn += dt;
         if (acumSpawn >= intervalo) {
           acumSpawn = 0;
           poligonos.push(crearPoligono(circulos[1]));
         }
       }
-      if (rival && rival.stun <= 0) {
+      if (rival && rival.stun <= 0 && rival.invul <= 0) {
         acumSpawnRival += dt;
         if (acumSpawnRival >= intervalo) {
           acumSpawnRival = 0;
@@ -2242,8 +2244,12 @@
       Math.min(1, (tQuieta - QUIETA_SEG) / BUSQUEDA_RAMPA),
     );
     const busqueda = BUSQUEDA_BASE + (1 - BUSQUEDA_BASE) * quieta;
-    moverPoligonos(poligonos, circulos[1], busqueda, dt);
-    moverPoligonos(poligonosRival, rival, BUSQUEDA_BASE, dt);
+    // Fuera de juego o parpadeando, la nave no es el foco de su lluvia: las
+    // que ya venían dejan de corregir y siguen derecho.
+    const focoJugador = stunJugador > 0 || invulJugador > 0 ? null : circulos[1];
+    const focoRival = rival && rival.stun <= 0 && rival.invul <= 0 ? rival : null;
+    moverPoligonos(poligonos, focoJugador, busqueda, dt);
+    moverPoligonos(poligonosRival, focoRival, BUSQUEDA_BASE, dt);
     // Se descartan los que ya salieron por abajo, compactando el mismo array.
     // Nunca antes de haber pasado la nave, aunque esté más abajo de lo que se ve
     // (la nave puede salirse un poco de la pantalla): así no se puede esconder
@@ -2338,6 +2344,10 @@
     stunJugador = STUN;
     tChoque = 0;
     naveCae = caidaPorGolpe(p, tocado);
+    const pose = window.shipPose;
+    reaparecer = pose
+      ? { x: pose.x + cajaNave / 2, y: pose.y + cajaNave / 2 }
+      : null;
     rebote = null;
     sonarPerder();
   }
@@ -2345,6 +2355,8 @@
   function golpearRival(p, tocado) {
     rival.stun = STUN;
     rival.t = 0;
+    rival.hx = rival.x;
+    rival.hy = rival.y;
     rival.cae = caidaPorGolpe(p, tocado);
     rival.vx = 0;
     rival.vy = 0;
@@ -2365,11 +2377,12 @@
       if (window.shipMove) window.shipMove(0, 0); // sin control mientras tanto
     }
     if (stunJugador <= 0) {
-      // Vuelve en el medio abajo, como al reiniciar en el juego original, y
-      // parpadea un rato sin que nada la afecte.
+      // Vuelve donde la golpearon y parpadea un rato sin que nada la afecte.
       stunJugador = 0;
       ship.classList.remove("fuera-de-juego");
-      centrarNave();
+      if (reaparecer && window.shipPlace)
+        window.shipPlace(reaparecer.x, reaparecer.y);
+      reaparecer = null;
       invulJugador = INVULNERABLE;
       ship.classList.add("invulnerable");
     }
@@ -2402,6 +2415,8 @@
       invul: 0,
       t: 0,
       cae: null,
+      hx: 0, // donde la golpearon (ahí reaparece)
+      hy: 0,
     };
   }
 
@@ -2548,11 +2563,11 @@
         rival.rot += rival.cae.giro * dt;
       }
       if (rival.stun <= 0) {
-        // Vuelve en el medio abajo, derecha y quieta, y parpadea un rato.
+        // Vuelve donde la golpearon, derecha y quieta, y parpadea un rato.
         rival.stun = 0;
         rival.cae = null;
-        rival.x = window.innerWidth / 2;
-        rival.y = window.innerHeight * POSICION_Y_INICIAL;
+        rival.x = rival.hx;
+        rival.y = rival.hy;
         rival.vx = 0;
         rival.vy = 0;
         rival.rot = 0;
