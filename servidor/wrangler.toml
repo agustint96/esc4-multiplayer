@@ -1,0 +1,15 @@
+name = "esc4-emparejador"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Una sola sala de espera para todo el mundo (un Durable Object): ahí se juntan
+# los que buscan partida y ahí pasan los mensajes de cada pareja.
+[[durable_objects.bindings]]
+name = "SALA"
+class_name = "Emparejador"
+
+# En el plan gratis de Cloudflare los Durable Objects tienen que ser de los
+# "con SQLite" (aunque este no guarde nada).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Emparejador"]
