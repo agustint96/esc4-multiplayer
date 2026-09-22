@@ -9,7 +9,7 @@
 <body>
   <div id="lobby">
     <h1>Escenario 4 · Multiplayer</h1>
-    <p class="sub">Cancha vertical, movimiento sincronizado y lluvia de piedras.</p>
+    <p class="sub">Piedras, agujeros negros a 10 y modo práctica contra la PC.</p>
 
     <div class="panel">
       <button id="btn-crear">Crear sala</button>
@@ -24,6 +24,11 @@
       <button id="btn-unirse">Unirse</button>
     </div>
 
+    <div class="panel">
+      <button id="btn-bot">Practicar contra la PC</button>
+      <p class="sub" style="margin: 8px 0 0">Sin red: para probar el juego vos solo.</p>
+    </div>
+
     <p id="estado"></p>
   </div>
 
@@ -32,6 +37,7 @@
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="js/net.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/bot.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

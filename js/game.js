@@ -10,6 +10,10 @@ window.Game = (function () {
   const INTERVALO_PIEDRA = 0.8;
   const DURACION_STUN = 3;
   const DISTANCIA_IMPACTO = RADIO_NAVE + RADIO_PIEDRA;
+  const RADIO_AGUJERO = 22;
+  const DISTANCIA_AGUJERO = RADIO_NAVE + RADIO_AGUJERO;
+  const MARGEN_AGUJERO = RADIO_AGUJERO + 20; // px: no aparece pegado al borde
+  const GOLES_PARA_GANAR = 10; // cuenta ascendente (1..10), al revés del contador regresivo del single-player
   const SUAVIZADO_REMOTO = 12; // 1/s: qué tan rápido sigue la nave remota al último dato
 
   const COLOR = { p1: "#4d9dff", p2: "#f15a5a" };
@@ -30,6 +34,10 @@ window.Game = (function () {
   let siguientePiedra = 0;
   let stunHasta = 0;
   let stunRemotoHasta = 0;
+  let agujero = null; // { id, x, y } — autoridad es siempre P1 (host)
+  let puntajes = { p1: 0, p2: 0 };
+  let ganador = null; // null | "p1" | "p2"
+  let ultimoReclamoEnviado = null;
   let ultimoTs = null;
 
   const teclas = { up: false, down: false, left: false, right: false };
@@ -95,6 +103,48 @@ window.Game = (function () {
     }
   }
 
+  // El agujero negro y el marcador los maneja siempre P1 (host): genera la
+  // posición, decide quién llegó primero y lo reparte por red. P2 solo avisa
+  // "lo toqué" y espera que el host confirme — así no hay que sincronizar
+  // relojes entre los dos clientes para saber quién llegó antes.
+  function generarAgujero() {
+    return {
+      id: `${Date.now()}-${Math.random()}`,
+      x: MARGEN_AGUJERO + Math.random() * (ancho - MARGEN_AGUJERO * 2),
+      y: MARGEN_AGUJERO + Math.random() * (alto - MARGEN_AGUJERO * 2),
+    };
+  }
+
+  function resolverReclamo(jugador) {
+    if (ganador || !agujero) return;
+    puntajes[jugador] += 1;
+    if (puntajes[jugador] >= GOLES_PARA_GANAR) {
+      ganador = jugador;
+      agujero = null;
+    } else {
+      agujero = generarAgujero();
+    }
+  }
+
+  function recibirReclamo({ jugador, agujeroId }) {
+    if (!soyP1) return; // solo el host resuelve
+    if (!agujero || agujero.id !== agujeroId || ganador) return;
+    resolverReclamo(jugador);
+  }
+
+  function detectarAgujero() {
+    if (!agujero || ganador || estaAturdida()) return;
+    if (Math.hypot(agujero.x - local.x, agujero.y - local.y) > DISTANCIA_AGUJERO) return;
+
+    const miJugador = soyP1 ? "p1" : "p2";
+    if (soyP1) {
+      resolverReclamo(miJugador);
+    } else if (ultimoReclamoEnviado !== agujero.id) {
+      ultimoReclamoEnviado = agujero.id;
+      Net.enviar({ tipo: "reclamo", jugador: miJugador, agujeroId: agujero.id });
+    }
+  }
+
   function init(canvasEl, esP1) {
     canvas = canvasEl;
     ctx = canvas.getContext("2d");
@@ -108,6 +158,8 @@ window.Game = (function () {
     local = crearNave(ancho * (soyP1 ? 0.3 : 0.7), alto * 0.5);
     remoto = crearNave(ancho * (soyP1 ? 0.7 : 0.3), alto * 0.5);
     remotoObjetivo = { x: remoto.x, y: remoto.y };
+
+    if (soyP1) agujero = generarAgujero();
   }
 
   function ajustarTamano() {
@@ -125,6 +177,8 @@ window.Game = (function () {
   }
 
   function actualizar(dt) {
+    if (ganador) return; // congela todo al terminar la partida
+
     let ax = 0, ay = 0;
     if (teclas.up) ay -= 1;
     if (teclas.down) ay += 1;
@@ -165,6 +219,7 @@ window.Game = (function () {
 
     moverPiedras(dt);
     detectarImpactoRemoto();
+    detectarAgujero();
   }
 
   function recibirEstadoRemoto(estado) {
@@ -176,17 +231,31 @@ window.Game = (function () {
     } else {
       stunRemotoHasta = 0;
     }
+    // El host manda el estado autoritativo del agujero/marcador; el que se
+    // une solo lo recibe y lo pinta, nunca lo decide por su cuenta.
+    if (!soyP1 && estado.agujero !== undefined) {
+      agujero = estado.agujero;
+      puntajes = estado.puntajes || puntajes;
+      ganador = estado.ganador || null;
+    }
   }
 
   function estadoLocal() {
     const ahora = performance.now();
-    return {
+    const estado = {
+      tipo: "estado",
       x: local.x,
       y: local.y,
       t: ahora,
       piedras,
       stunRestante: Math.max(0, stunHasta - ahora),
     };
+    if (soyP1) {
+      estado.agujero = agujero;
+      estado.puntajes = puntajes;
+      estado.ganador = ganador;
+    }
+    return estado;
   }
 
   function dibujarNave(n, color) {
@@ -211,22 +280,68 @@ window.Game = (function () {
     }
   }
 
+  function dibujarAgujero(a) {
+    const brillo = ctx.createRadialGradient(a.x, a.y, 1, a.x, a.y, RADIO_AGUJERO);
+    brillo.addColorStop(0, "#000000");
+    brillo.addColorStop(1, "#1a2436");
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, RADIO_AGUJERO, 0, Math.PI * 2);
+    ctx.fillStyle = brillo;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#f19280";
+    ctx.stroke();
+  }
+
+  function dibujarPuntaje() {
+    ctx.font = "bold 20px system-ui, sans-serif";
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    ctx.fillStyle = COLOR.p1;
+    ctx.fillText(`P1: ${puntajes.p1}`, 12, 12);
+    ctx.textAlign = "right";
+    ctx.fillStyle = COLOR.p2;
+    ctx.fillText(`P2: ${puntajes.p2}`, ancho - 12, 12);
+  }
+
+  function dibujarGanador() {
+    ctx.fillStyle = "rgba(5, 10, 20, 0.75)";
+    ctx.fillRect(0, 0, ancho, alto);
+    ctx.textAlign = "center";
+    ctx.fillStyle = ganador === "p1" ? COLOR.p1 : COLOR.p2;
+    ctx.font = "bold 28px system-ui, sans-serif";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(`Ganó ${ganador.toUpperCase()}`, ancho / 2, alto / 2 - 8);
+    ctx.fillStyle = "#eaf0fb";
+    ctx.font = "14px system-ui, sans-serif";
+    ctx.fillText("Recargá la página para jugar de nuevo", ancho / 2, alto / 2 + 20);
+  }
+
   function dibujar() {
     ctx.fillStyle = "#0d1b2e";
     ctx.fillRect(0, 0, ancho, alto);
 
+    if (agujero) dibujarAgujero(agujero);
     dibujarPiedras(piedras, soyP1 ? COLOR.p1 : COLOR.p2);
     dibujarPiedras(piedrasRemotas, soyP1 ? COLOR.p2 : COLOR.p1);
     if (!estaAturdida()) dibujarNave(local, soyP1 ? COLOR.p1 : COLOR.p2);
     if (performance.now() >= stunRemotoHasta) {
       dibujarNave(remoto, soyP1 ? COLOR.p2 : COLOR.p1);
     }
+    dibujarPuntaje();
+    if (ganador) dibujarGanador();
   }
+
+  let alPrincipioDeFrame = null;
 
   function loop(ts) {
     if (ultimoTs === null) ultimoTs = ts;
     const dt = Math.min(0.05, (ts - ultimoTs) / 1000);
     ultimoTs = ts;
+
+    // Hook para el modo práctica: el bot corre su propia simulación acá,
+    // antes de que Game use sus piedras/agujero, y sin pasar por la red.
+    if (alPrincipioDeFrame) alPrincipioDeFrame(dt);
 
     actualizar(dt);
     dibujar();
@@ -234,9 +349,31 @@ window.Game = (function () {
     requestAnimationFrame(loop);
   }
 
-  function iniciarLoop() {
+  function iniciarLoop(hook) {
+    alPrincipioDeFrame = hook || null;
     requestAnimationFrame(loop);
   }
 
-  return { init, iniciarLoop, estadoLocal, recibirEstadoRemoto };
+  function piedrasPropias() {
+    return piedras;
+  }
+
+  function agujeroActual() {
+    return agujero;
+  }
+
+  function puntajesActuales() {
+    return puntajes;
+  }
+
+  return {
+    init,
+    iniciarLoop,
+    estadoLocal,
+    recibirEstadoRemoto,
+    recibirReclamo,
+    piedrasPropias,
+    agujeroActual,
+    puntajesActuales,
+  };
 })();

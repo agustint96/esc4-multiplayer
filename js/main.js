@@ -5,6 +5,7 @@
   const canvas = document.getElementById("juego");
   const btnCrear = document.getElementById("btn-crear");
   const btnUnirse = document.getElementById("btn-unirse");
+  const btnBot = document.getElementById("btn-bot");
   const inputCodigo = document.getElementById("input-codigo");
   const estadoEl = document.getElementById("estado");
   const codigoWrap = document.getElementById("codigo-wrap");
@@ -19,8 +20,27 @@
     Game.init(canvas, esP1);
     Game.iniciarLoop();
 
-    Net.alRecibir((estado) => Game.recibirEstadoRemoto(estado));
+    Net.alRecibir((msg) => {
+      if (msg.tipo === "reclamo") Game.recibirReclamo(msg);
+      else Game.recibirEstadoRemoto(msg);
+    });
     setInterval(() => Net.enviar(Game.estadoLocal()), 1000 / ENVIO_HZ);
+  }
+
+  function empezarModoBot() {
+    lobby.style.display = "none";
+    canvas.style.display = "block";
+
+    Game.init(canvas, true); // el humano siempre es P1/host en modo práctica
+    Bot.init(canvas.clientWidth, canvas.clientHeight);
+
+    Game.iniciarLoop((dt) => {
+      Bot.ajustarTamano(canvas.clientWidth, canvas.clientHeight);
+      Bot.actualizar(dt, Game.piedrasPropias(), Game.agujeroActual(), (agujeroId) => {
+        Game.recibirReclamo({ jugador: "p2", agujeroId });
+      });
+      Game.recibirEstadoRemoto(Bot.estado());
+    });
   }
 
   btnCrear.addEventListener("click", () => {
@@ -60,4 +80,6 @@
       }
     );
   });
+
+  btnBot.addEventListener("click", () => empezarModoBot());
 })();

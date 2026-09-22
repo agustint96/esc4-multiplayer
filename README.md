@@ -25,19 +25,31 @@ tiempo real entre dos jugadores).
 
 ## Estado actual
 
-Prototipo: lobby para crear/unirse a una sala P2P (WebRTC vía
-[PeerJS](https://peerjs.com/), sin servidor propio), dos naves moviéndose
-sincronizadas por red y una lluvia homing por jugador. Las piedras se
-transmiten junto con el estado y cualquier impacto aplica un stun de 3
-segundos dentro de una cancha vertical. Todavía **sin agujeros y sin choque
-entre naves**.
+Prototipo jugable: lobby para crear/unirse a una sala P2P (WebRTC vía
+[PeerJS](https://peerjs.com/), sin servidor propio), naves sincronizadas por
+red con su lluvia homing y stun de 3s, y agujero negro con marcador a 10
+(gana quien llegue primero, cuenta ascendente 1..10 como goles). El host
+(quien crea la sala, P1) es la autoridad para el agujero y el marcador: sin
+esto, sincronizar "quién llegó primero" entre dos relojes distintos sería
+mucho más complicado. Limitación conocida: como el host resuelve por orden
+de llegada del mensaje y no hay sincronización real de relojes, ante un
+empate muy ajustado el host tiene una ligera ventaja de latencia.
+
+También hay un **modo práctica contra una IA simple** (botón "Practicar
+contra la PC" en el lobby) para poder probar el juego sin un segundo
+jugador real: no usa la red, el bot corre en el mismo cliente y esquiva
+piedras / va al agujero con un esquema de "huir de lo cercano, si no hay
+nada cerca ir al objetivo" (ver `js/bot.js`).
+
+Todavía **sin choque entre naves**.
 
 ## Próximos pasos
 
-1. Agujeros negros / cúmulos + marcador a 10.
-2. Choque nave-nave con rebote elástico.
-3. Pulir sincronización (interpolación/extrapolación mejor que el suavizado
+1. Choque nave-nave con rebote elástico.
+2. Pulir sincronización (interpolación/extrapolación mejor que el suavizado
    simple actual) y manejo de desconexión.
+3. Si el modo práctica se siente demasiado fácil o difícil, ajustar
+   `RADIO_PELIGRO` y la agresividad del bot en `js/bot.js`.
 
 ## Cómo correrlo
 
