@@ -5,6 +5,7 @@
 //   tareas     tareas largas (>50 ms) acumuladas: cantidad y ms totales
 //   heap       memoria de JS (solo Chrome/Edge)
 //   escena     el escenario en el que está la nave
+//   red, recib, hueco, ping   solo online: ver red() abajo
 // Para comparar antes/después de un cambio: mismo recorrido, mismo navegador.
 (function () {
   const box = document.createElement("pre");
@@ -30,6 +31,22 @@
     }).observe({ entryTypes: ["longtask"] });
   } catch (e) {}
 
+  // Online (lo llena js/esc4-game.js en window.esc4Red): por dónde llega el
+  // rival (directo o servidor), cuántos estados por segundo (deberían ser 20),
+  // el hueco más largo entre dos y la ida y vuelta de un ping.
+  function red(ms) {
+    const r = window.esc4Red;
+    if (!r || r.via === "-") return "";
+    const texto =
+      "\nred    " + r.via +
+      "\nrecib  " + ((r.recibidos * 1000) / ms).toFixed(0) + "/s" +
+      "\nhueco  " + Math.round(r.huecoMax) + " ms" +
+      "\nping   " + (r.ping == null ? "?" : Math.round(r.ping) + " ms");
+    r.recibidos = 0;
+    r.huecoMax = 0;
+    return texto;
+  }
+
   function cuadroMedidor(ahora) {
     frames++;
     peor = Math.max(peor, ahora - ultimo);
@@ -44,7 +61,8 @@
         "\npeor   " + peor.toFixed(1) + " ms" +
         "\ntareas " + largas + " (" + Math.round(largasMs) + " ms)" +
         "\nheap   " + heap +
-        "\nescena " + escena;
+        "\nescena " + escena +
+        red(ahora - desde);
       frames = 0;
       peor = 0;
       desde = ahora;

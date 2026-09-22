@@ -2922,6 +2922,13 @@
   let acumEnvio = 0;
   let idCumulo = 0; // para que el invitado sepa a qué agujero entró
   const reclamados = new Set(); // agujeros a los que el invitado ya avisó que entró
+  // Para el medidor de ?perf=1 (js/perf-debug.js): por dónde llega el estado
+  // del rival, cuántos llegaron y el hueco más largo entre dos (los pone en 0
+  // el medidor), y la ida y vuelta de un ping.
+  const infoRed = (window.esc4Red = {
+    via: "-", recibidos: 0, huecoMax: 0, ultimo: 0, ping: null,
+  });
+  let acumPing = 0;
   const soyAnfitrion = () => !!red && red.rol === "anfitrion";
   const enLinea = () => modo === "online";
   // Buscando rival o sin conexión: la partida todavía no arranca.
@@ -2950,6 +2957,7 @@
       } catch (e) {
         return;
       }
+      if (m.tipo === "estado") infoRed.via = "servidor";
       recibirOnline(m);
     };
     ws.onclose = () => {
@@ -3011,6 +3019,7 @@
         } catch (e) {
           return;
         }
+        if (m.tipo === "estado") infoRed.via = "directo";
         recibirOnline(m);
       };
     }
@@ -3080,6 +3089,10 @@
       conectarDirecto();
     } else if (m.tipo === "rtc") {
       recibirRtc(m);
+    } else if (m.tipo === "ping") {
+      enviarOnline({ tipo: "pong", t: m.t });
+    } else if (m.tipo === "pong") {
+      infoRed.ping = performance.now() - m.t;
     } else if (m.tipo === "rival-se-fue") {
       rivalSeFue();
     } else if (m.tipo === "estado") {
@@ -3137,6 +3150,10 @@
     const W = window.innerWidth;
     const H = window.innerHeight;
     if (!rival) crearRival(circulosNave());
+    const ahora = performance.now();
+    if (infoRed.ultimo) infoRed.huecoMax = Math.max(infoRed.huecoMax, ahora - infoRed.ultimo);
+    infoRed.ultimo = ahora;
+    infoRed.recibidos++;
     const t = m.ts / 1000;
     // El desfase de relojes es el más chico visto (el de un mensaje que llegó
     // sin demoras de más); sube despacito por si la conexión se vuelve más lenta.
@@ -3840,8 +3857,15 @@
     if (enLinea() && red && red.estado === "jugando") {
       acumEnvio += dt;
       if (acumEnvio >= ENVIO_CADA) {
-        acumEnvio = 0;
+        // Se descuenta (no se pone en 0) para que sean 20 por segundo de verdad
+        // y no uno cada 4 cuadros; el tope, por si hubo un cuadro muy largo.
+        acumEnvio = Math.min(acumEnvio - ENVIO_CADA, ENVIO_CADA);
         enviarEstado();
+      }
+      acumPing += dt;
+      if (acumPing >= 1) {
+        acumPing = 0;
+        enviarOnline({ tipo: "ping", t: performance.now() });
       }
     }
   }
