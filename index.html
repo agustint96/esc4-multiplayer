@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escenario 4 · Multiplayer (prototipo)</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="lobby">
+    <h1>Escenario 4 · Multiplayer</h1>
+    <p class="sub">Prototipo: solo movimiento sincronizado, todavía sin piedras ni agujeros.</p>
+
+    <div class="panel">
+      <button id="btn-crear">Crear sala</button>
+      <p id="codigo-wrap" class="oculto">
+        Código de la sala: <strong id="codigo-propio"></strong>
+        <br />Pasáselo al otro jugador.
+      </p>
+    </div>
+
+    <div class="panel">
+      <input id="input-codigo" type="text" placeholder="Código de la sala" />
+      <button id="btn-unirse">Unirse</button>
+    </div>
+
+    <p id="estado"></p>
+  </div>
+
+  <canvas id="juego"></canvas>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
