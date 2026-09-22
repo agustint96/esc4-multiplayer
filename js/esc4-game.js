@@ -455,7 +455,6 @@
   const RIVAL_EMPUJE_BOOST = 0.72; // GAMEPAD_THRUST_BOOST 0.6 × 1.2: el jugador 2 con Shift derecho
   const RIVAL_FRENO = 0.9;
   const RIVAL_PELIGRO = 170; // px del mundo: desde acá una piedra la espanta
-  const RIVAL_GIRO = 6; // 1/s: qué tan rápido gira hacia donde va
   const FIN_DURA = 4; // segundos con el cartel del ganador
   // Repulsión entre naves, medida en largos de nave (el dibujo, no la hitbox,
   // que es bastante más chica): empiezan a empujarse con los centros a
@@ -2405,6 +2404,7 @@
     rival.vx = 0;
     rival.vy = 0;
     chispas(tocado.x, tocado.y);
+    sonarPerder(); // el mismo ruido que cuando golpean a la nave del jugador
   }
 
   // Mientras la nave del jugador está fuera de juego: primero cae golpeada
@@ -2652,13 +2652,14 @@
     rival.x = Math.max(margen, Math.min(window.innerWidth - margen, rival.x));
     rival.y = Math.max(margen, Math.min(window.innerHeight - margen, rival.y));
 
-    // Mira hacia donde va (0° = nariz arriba, como la nave del jugador).
-    const vel = Math.hypot(rival.vx, rival.vy);
-    if (vel > 0.4) {
-      const meta = (Math.atan2(rival.vx, -rival.vy) * 180) / Math.PI;
+    // Gira igual que la nave del jugador con las flechas en script.js: hacia
+    // donde se la empuja (0° = nariz arriba), un 25 % de lo que falta por
+    // cuadro de 60 Hz, y sin empuje se queda mirando para donde estaba.
+    if (gx !== 0 || gy !== 0) {
+      const meta = (Math.atan2(gy, gx) * 180) / Math.PI + 90;
       let d = meta - rival.rot;
       d = ((((d + 180) % 360) + 360) % 360) - 180;
-      rival.rot += d * Math.min(1, dt * RIVAL_GIRO);
+      rival.rot += d * (1 - Math.pow(1 - 0.25, cuadros));
     }
   }
 
