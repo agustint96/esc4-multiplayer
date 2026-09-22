@@ -42,10 +42,13 @@ a su nave. Los agujeros y los goles los decide el anfitrión (el que estaba
 esperando). Las posiciones viajan como fracción de la pantalla, así juegan
 bien aunque los monitores sean de distinto tamaño.
 
-La sala se crea en Sudamérica (por donde pasan todos los mensajes de cada
-pareja, así que conviene que esté cerca). Para ver en qué centro de datos de
-Cloudflare quedó: abrir `https://esc4-emparejador.agustintardella7.workers.dev/donde`
-(GRU es São Paulo, EZE Buenos Aires).
+Una vez emparejados, el servidor solo los presenta: el juego va directo de
+una PC a la otra (WebRTC), porque la sala quedó lejos, en Miami (se le pide
+Sudamérica, pero Cloudflare no tiene Durable Objects ahí). Si la conexión
+directa no se logra (hay redes que no la dejan), todo sigue pasando por el
+servidor. En la consola del navegador (F12) aparece "[online] conexión directa
+con el rival" cuando se logra. Para ver en qué centro de datos de Cloudflare
+está la sala: `https://esc4-emparejador.agustintardella7.workers.dev/donde`.
 
 Para subir cambios del servidor: `cd servidor` y `npx wrangler deploy`. Para
 probar el servidor en la PC: `npx wrangler dev` y abrir el juego con

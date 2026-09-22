@@ -2918,7 +2918,7 @@
     new URLSearchParams(location.search).get("servidor") ||
     "wss://esc4-emparejador.agustintardella7.workers.dev/buscar";
   const ENVIO_CADA = 0.05; // 20 veces por segundo
-  let red = null; // { ws, rol: "anfitrion" | "invitado" | null, estado }
+  let red = null; // { ws, rol: "anfitrion" | "invitado" | null, estado, pc, canales }
   let acumEnvio = 0;
   let idCumulo = 0; // para que el invitado sepa a qué agujero entró
   const reclamados = new Set(); // agujeros a los que el invitado ya avisó que entró
@@ -2962,8 +2962,97 @@
     };
   }
 
+  // Si ya está la conexión directa (ver conectarDirecto) va por ahí: el estado
+  // por el canal que no reenvía lo perdido (uno perdido ya no sirve, llega
+  // otro enseguida) y el resto (goles) por el que sí. Si no, por el servidor.
   function enviarOnline(m) {
+    if (!red) return;
+    const canal = red.canales && red.canales[m.tipo === "estado" ? "estado" : "eventos"];
+    if (canal && canal.readyState === "open") canal.send(JSON.stringify(m));
+    else if (red.ws && red.ws.readyState === 1) red.ws.send(JSON.stringify(m));
+  }
+
+  // --- Conexión directa (WebRTC) ----------------------------------------------
+  // El servidor de emparejamiento está lejos (en Miami: Cloudflare no tiene
+  // Durable Objects en Sudamérica), así que pasar todo por él suma mucha
+  // demora. Una vez emparejados, se usa solo para presentarlos (las ofertas y
+  // candidatos de WebRTC viajan como mensajes "rtc") y el juego va directo de
+  // una PC a la otra. Si la conexión directa no se logra (hay redes que no la
+  // dejan), todo sigue por el servidor como antes. El WebSocket queda abierto:
+  // por él llega "rival-se-fue".
+  const SERVIDORES_STUN = [
+    { urls: "stun:stun.cloudflare.com:3478" },
+    { urls: "stun:stun.l.google.com:19302" },
+  ];
+
+  function conectarDirecto() {
+    if (typeof RTCPeerConnection === "undefined") return;
+    let pc;
+    try {
+      pc = new RTCPeerConnection({ iceServers: SERVIDORES_STUN });
+    } catch (e) {
+      return;
+    }
+    red.pc = pc;
+    red.iceEnEspera = []; // candidatos que llegan antes que la oferta o la respuesta
+    // Los dos canales se arman igual de los dos lados (negotiated), sin
+    // esperar a que el otro los anuncie.
+    red.canales = {
+      estado: pc.createDataChannel("estado", {
+        negotiated: true, id: 0, ordered: false, maxRetransmits: 0,
+      }),
+      eventos: pc.createDataChannel("eventos", { negotiated: true, id: 1 }),
+    };
+    for (const canal of Object.values(red.canales)) {
+      canal.onmessage = (ev) => {
+        let m;
+        try {
+          m = JSON.parse(ev.data);
+        } catch (e) {
+          return;
+        }
+        recibirOnline(m);
+      };
+    }
+    red.canales.eventos.onopen = () => console.info("[online] conexión directa con el rival");
+    pc.onicecandidate = (ev) => {
+      if (ev.candidate) enviarPorServidor({ tipo: "rtc", ice: ev.candidate });
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "failed")
+        console.info("[online] sin conexión directa: sigue por el servidor");
+    };
+    if (soyAnfitrion()) {
+      pc.createOffer()
+        .then((oferta) => pc.setLocalDescription(oferta))
+        .then(() => enviarPorServidor({ tipo: "rtc", sdp: pc.localDescription }))
+        .catch(() => {});
+    }
+  }
+
+  function enviarPorServidor(m) {
     if (red && red.ws && red.ws.readyState === 1) red.ws.send(JSON.stringify(m));
+  }
+
+  function recibirRtc(m) {
+    const pc = red && red.pc;
+    if (!pc) return;
+    if (m.sdp) {
+      pc.setRemoteDescription(m.sdp)
+        .then(() => {
+          for (const c of red.iceEnEspera) pc.addIceCandidate(c).catch(() => {});
+          red.iceEnEspera = [];
+          if (m.sdp.type !== "offer") return;
+          return pc
+            .createAnswer()
+            .then((respuesta) => pc.setLocalDescription(respuesta))
+            .then(() => enviarPorServidor({ tipo: "rtc", sdp: pc.localDescription }));
+        })
+        .catch(() => {});
+    } else if (m.ice) {
+      if (pc.remoteDescription) pc.addIceCandidate(m.ice).catch(() => {});
+      else red.iceEnEspera.push(m.ice);
+    }
   }
 
   function mostrarEstadoOnline() {
@@ -2988,6 +3077,9 @@
       red.rol = m.rol;
       red.estado = "jugando";
       if (modoEl) modoEl.hidden = true;
+      conectarDirecto();
+    } else if (m.tipo === "rtc") {
+      recibirRtc(m);
     } else if (m.tipo === "rival-se-fue") {
       rivalSeFue();
     } else if (m.tipo === "estado") {
