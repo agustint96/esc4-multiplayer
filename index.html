@@ -502,6 +502,20 @@
       <div class="game-cuadrado">
         <span class="game-timer" id="game-timer">0.0</span>
       </div>
+      <!-- Elección del modo al arrancar (esc4-game.js): contra la PC o dos
+           jugadores en el mismo teclado. Se elige con 1 o 2 (con el mouse la
+           nave sigue al cursor). Spaceport no tiene tildes ni puntuación. -->
+      <div class="game-modo" id="game-modo" hidden>
+        <p class="game-ayuda-paso visible">
+          <kbd class="game-tecla">1</kbd><span>contra la PC</span>
+        </p>
+        <p class="game-ayuda-paso visible">
+          <kbd class="game-tecla">2</kbd><span>dos jugadores</span>
+        </p>
+        <p class="game-modo-controles">
+          J1 WASD y shift izquierdo<br />J2 flechas y shift derecho
+        </p>
+      </div>
       <!-- Instrucciones del arranque (esc4-game.js las muestra de a un paso y
            marca .pulsada en lo que se aprieta de verdad). Hay dos versiones, la
            del teclado y la del joystick (la elige según haya uno conectado). -->

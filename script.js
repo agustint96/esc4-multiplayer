@@ -1187,7 +1187,9 @@ function drawStars() {
       keyDown = false,
       keyLeft = false,
       keyRight = false,
-      keyBoost = false;
+      keyBoost = false,
+      // Shift derecho aparte: con dos jugadores es el boost del jugador 2.
+      keyBoostDer = false;
     // Las flechitas hacen lo mismo que WASD; van en flags aparte para que
     // soltar una de las dos no corte a la otra si se aprietan juntas.
     let arrowUp = false,
@@ -1261,8 +1263,10 @@ function drawStars() {
           keyRight = true;
           break;
         case "ShiftLeft":
-        case "ShiftRight":
           keyBoost = true;
+          break;
+        case "ShiftRight":
+          keyBoostDer = true;
           break;
       }
     });
@@ -1295,8 +1299,10 @@ function drawStars() {
           keyRight = false;
           break;
         case "ShiftLeft":
-        case "ShiftRight":
           keyBoost = false;
+          break;
+        case "ShiftRight":
+          keyBoostDer = false;
           break;
       }
     });
@@ -1446,6 +1452,9 @@ function drawStars() {
         // lee de nuevo cada cuadro, ver el tick más abajo) en vez de quedar
         // pegado al que había al cargar la página.
         get zoom() {
+          // Con dos jugadores la cámara no puede seguir a uno solo: se ve el
+          // mapa completo (como con Espacio), así nadie queda fuera de pantalla.
+          if (window.dosJugadores) return 1;
           return window.innerWidth <= 600
             ? GAME_CAMERA_ZOOM_MOBILE
             : GAME_CAMERA_ZOOM;
@@ -2035,11 +2044,14 @@ function drawStars() {
         // WASD/flechitas/Shift/Espacio: mismo camino que el D-pad/RB/LT del joystick
         // de arriba -pisan los ejes analógicos sólo si están apretados, así
         // no interfieren con el mouse/gamepad cuando no se usa el teclado.
-        if (keyLeft || arrowLeft) gx = -1;
-        else if (keyRight || arrowRight) gx = 1;
-        if (keyUp || arrowUp) gy = -1;
-        else if (keyDown || arrowDown) gy = 1;
-        if (keyBoost) boosting = true;
+        // Con dos jugadores (escenario 4) las flechas y el Shift derecho son del
+        // jugador 2: los lee esc4-game.js y acá no mueven esta nave.
+        const flechas = !window.dosJugadores;
+        if (keyLeft || (flechas && arrowLeft)) gx = -1;
+        else if (keyRight || (flechas && arrowRight)) gx = 1;
+        if (keyUp || (flechas && arrowUp)) gy = -1;
+        else if (keyDown || (flechas && arrowDown)) gy = 1;
+        if (keyBoost || (flechas && keyBoostDer)) boosting = true;
         if (gx !== 0 || gy !== 0) {
           gamepadActive = true;
           i = e + gx * 1000;

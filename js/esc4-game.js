@@ -452,6 +452,7 @@
   // (GAMEPAD_THRUST_BASE 0.3 × GAME_SHIP_SPEED 1.2, GAMEPAD_DAMPING 0.9, todo
   // por cuadro de 60 Hz), así las dos naves corren igual.
   const RIVAL_EMPUJE = 0.36;
+  const RIVAL_EMPUJE_BOOST = 0.72; // GAMEPAD_THRUST_BOOST 0.6 × 1.2: el jugador 2 con Shift derecho
   const RIVAL_FRENO = 0.9;
   const RIVAL_PELIGRO = 170; // px del mundo: desde acá una piedra la espanta
   const RIVAL_GIRO = 6; // 1/s: qué tan rápido gira hacia donde va
@@ -485,6 +486,7 @@
   const ship = document.getElementById("starry-cohete-pair");
   const tapa = document.getElementById("game-tapa"); // pantalla negra por encima de la nave
   const ayudaEl = document.getElementById("game-ayuda"); // instrucciones del arranque
+  const modoEl = document.getElementById("game-modo"); // elección: contra la PC o dos jugadores
   if (!scene || !canvas || !timerEl || !ship || !ayudaEl) return;
   // Las dos versiones de las instrucciones (ver #game-ayuda en index.html), cada
   // una con sus pasos y con el dibujo de cada tecla o botón ("up", "shift"...).
@@ -663,6 +665,38 @@
   let invulJugador = 0; // segundos que le quedan parpadeando (invulnerable)
   let reaparecer = null; // centro de la caja de la nave (pantalla) donde la golpearon
   let fin = null; // { t, ganador: "vos" | "pc" } alguien llegó a 10
+  // "pc": la segunda nave la maneja la PC; "dos": la maneja una persona con las
+  // flechas y Shift derecho (el jugador 1 queda con WASD y Shift izquierdo, ver
+  // window.dosJugadores en script.js). null mientras se elige, al arrancar.
+  let modo = null;
+  const teclasJ2 = { up: false, down: false, left: false, right: false, boost: false };
+  const TECLAS_J2 = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+    ShiftRight: "boost",
+  };
+  document.addEventListener("keydown", (ev) => {
+    if (TECLAS_J2[ev.code]) teclasJ2[TECLAS_J2[ev.code]] = true;
+    if (activo && !modo) {
+      if (ev.code === "Digit1" || ev.code === "Numpad1") elegirModo("pc");
+      else if (ev.code === "Digit2" || ev.code === "Numpad2") elegirModo("dos");
+    }
+  });
+  document.addEventListener("keyup", (ev) => {
+    if (TECLAS_J2[ev.code]) teclasJ2[TECLAS_J2[ev.code]] = false;
+  });
+  // Al perder el foco no llega el keyup: se sueltan todas.
+  window.addEventListener("blur", () => {
+    for (const k in teclasJ2) teclasJ2[k] = false;
+  });
+
+  function elegirModo(m) {
+    modo = m;
+    window.dosJugadores = m === "dos";
+    if (modoEl) modoEl.hidden = true;
+  }
   // La nave de la PC se arma igual que la del jugador en index.html: el sprite
   // de atrás, el fuego y el de adelante (cohete_on: en el juego la luz va
   // prendida), los tres en el mismo lienzo de 203x300.
@@ -1866,8 +1900,12 @@
   function mostrarTiempo() {
     const texto = fin
       ? fin.ganador === "vos"
-        ? "GANASTE"
-        : '<span class="marcador-rival">GANO LA PC</span>'
+        ? modo === "dos"
+          ? "GANO J1"
+          : "GANASTE"
+        : '<span class="marcador-rival">' +
+          (modo === "dos" ? "GANO J2" : "GANO LA PC") +
+          "</span>"
       : cumulosTomados +
         '<span class="marcador-separador"></span><span class="marcador-rival">' +
         golesRival +
@@ -2583,17 +2621,28 @@
 
     // Misma física que la nave con flechas (script.js): empuje constante en la
     // dirección elegida y freno exponencial, en subpasos de ~1 cuadro de 60 Hz.
-    const r = rumboRival(circulos);
-    const m = Math.hypot(r.x, r.y);
-    const gx = m > 1e-3 ? r.x / m : 0;
-    const gy = m > 1e-3 ? r.y / m : 0;
+    let gx = 0;
+    let gy = 0;
+    let empuje = RIVAL_EMPUJE;
+    if (modo === "dos") {
+      // La maneja el jugador 2, igual que las flechas a la nave del jugador 1
+      // en script.js (cada eje -1/0/1, sin normalizar la diagonal).
+      gx = (teclasJ2.right ? 1 : 0) - (teclasJ2.left ? 1 : 0);
+      gy = (teclasJ2.down ? 1 : 0) - (teclasJ2.up ? 1 : 0);
+      if (teclasJ2.boost) empuje = RIVAL_EMPUJE_BOOST;
+    } else {
+      const r = rumboRival(circulos);
+      const m = Math.hypot(r.x, r.y);
+      gx = m > 1e-3 ? r.x / m : 0;
+      gy = m > 1e-3 ? r.y / m : 0;
+    }
     const cuadros = dt * 60;
     const subpasos = Math.max(1, Math.round(cuadros));
     const paso = cuadros / subpasos;
     const freno = Math.pow(RIVAL_FRENO, paso);
     for (let i = 0; i < subpasos; i++) {
-      rival.vx += gx * RIVAL_EMPUJE * paso;
-      rival.vy += gy * RIVAL_EMPUJE * paso;
+      rival.vx += gx * empuje * paso;
+      rival.vy += gy * empuje * paso;
       rival.vx *= freno;
       rival.vy *= freno;
       rival.x += rival.vx * paso;
@@ -2656,6 +2705,8 @@
     golesRival++;
     actualizarColor();
     sonarCruce();
+    // Con dos jugadores la voz también le cuenta los goles al jugador 2.
+    if (modo === "dos") decirGol(golesRival);
     mostrarTiempo();
     if (golesRival >= CUMULOS_PARA_COLOR) terminarPartida("pc");
   }
@@ -2676,7 +2727,8 @@
   function terminarPartida(ganador) {
     fin = { t: 0, ganador };
     frenarMusica();
-    if (ganador === "vos") {
+    // Con dos jugadores siempre gana alguien de carne y hueso: suena la nota.
+    if (ganador === "vos" || modo === "dos") {
       sonarNota();
     } else {
       cortarVoz();
@@ -2708,9 +2760,11 @@
     ctx.scale(k, k);
     // Recién vuelta de un golpe parpadea (igual que la del jugador, ver
     // .invulnerable en styles.css).
-    // Siempre más transparente que la del jugador, para no confundirlas.
+    // La de la PC, más transparente que la del jugador para no confundirlas;
+    // la del jugador 2 se ve entera (es de alguien que la está manejando).
     ctx.globalAlpha =
-      RIVAL_OPACIDAD * (rival.invul > 0 ? parpadeo(rival.invul) : 1);
+      (modo === "dos" ? 1 : RIVAL_OPACIDAD) *
+      (rival.invul > 0 ? parpadeo(rival.invul) : 1);
     // Igual que la nave del jugador en el juego: en blanco y negro, con el
     // levantado de brillo de la luz prendida (#nave-gris-luz), y se va tiñendo
     // con sus goles. Encima, su halo rojo.
@@ -3038,6 +3092,12 @@
 
     const circulos = circulosNave();
     reloj += dt;
+    if (!modo) {
+      // Eligiendo el modo: todo espera, con la nave quieta en el medio abajo.
+      if (window.shipMove) window.shipMove(0, 0);
+      dibujar(circulos[1]);
+      return;
+    }
     // La nave va ganando color de a poco (no de golpe) hacia colorObjetivo, y
     // muy despacio: cada pasaje tarda varios segundos en terminar de teñirla.
     if (Math.abs(colorObjetivo - colorNave) > 0.0005) {
@@ -3121,7 +3181,8 @@
         if (window.shipLightSet) window.shipLightSet(true);
         // En celulares se saltea el tutorial (ver esCelular arriba): arranca
         // el juego directo, como si ya hubiera terminado.
-        if (esCelular()) terminarAyuda();
+        // Con dos jugadores también: las instrucciones son las de uno solo.
+        if (esCelular() || modo === "dos") terminarAyuda();
         else empezarAyuda();
       }
       if (ayuda) actualizarAyuda(dt);
@@ -3222,10 +3283,14 @@
         }
         reiniciar(false, true);
         saltearIntro();
+        modo = null; // se elige de nuevo cada vez que se entra
+        window.dosJugadores = false;
+        if (modoEl) modoEl.hidden = false;
         ultimo = performance.now();
         raf = requestAnimationFrame(cuadro);
       } else {
         cancelAnimationFrame(raf);
+        if (modoEl) modoEl.hidden = true;
         frenarSonidos();
         cancelarAyuda();
         limpiarFinal(); // la nave vuelve a verse en el resto de los escenarios

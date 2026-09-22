@@ -684,6 +684,32 @@ html.escenas-listas .salmon-scene {
   transition: color 1s ease;
   font-variant-numeric: tabular-nums;
 }
+/* Elección del modo al arrancar (contra la PC o dos jugadores): mismas letras y
+   teclas que las instrucciones. */
+.game-modo {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.8em;
+  transform: translate(-50%, -50%);
+  font-size: clamp(0.7rem, 1.7vmin, 1rem);
+  pointer-events: none;
+}
+.game-modo[hidden] {
+  display: none;
+}
+.game-modo-controles {
+  margin: 1em 0 0;
+  font-family: Spaceport, ui-monospace, Consolas, monospace;
+  letter-spacing: 0.2em;
+  line-height: 2;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+}
 /* Contra la PC el segundero es el marcador: tus goles y los de la PC (rojo,
    el mismo del borde de sus piedras en esc4-game.js). */
 .marcador-rival {

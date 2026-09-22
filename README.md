@@ -1,9 +1,21 @@
-# Escenario 4 · contra la PC
+# Escenario 4 · contra la PC o de a dos
 
 El minijuego del escenario 4 de
 [agustint96.github.io](https://github.com/agustint96/agustint96.github.io),
 tal cual (mismo `esc4-game.js`, `script.js`, `styles.css`, sprites y sonidos,
-copiados de ese repo), con una segunda nave manejada por la PC.
+copiados de ese repo), con una segunda nave manejada por la PC o por otra
+persona en el mismo teclado.
+
+## Modos
+
+Al arrancar se elige con el teclado:
+
+- **1 · contra la PC**: vos con WASD o flechas (Shift acelera, Espacio aleja
+  la cámara), con el tutorial de siempre. La nave de la PC se ve
+  semitransparente.
+- **2 · dos jugadores**: el jugador 1 con WASD y Shift izquierdo, el jugador 2
+  con las flechas y Shift derecho. Sin tutorial, y la cámara muestra el mapa
+  entero para que nadie quede fuera de pantalla.
 
 ## Reglas
 
@@ -27,14 +39,16 @@ copiados de ese repo), con una segunda nave manejada por la PC.
   los 10 goles.
 - Cuando las naves se acercan se repelen un poco, sin llegar a chocarse
   (nadie se lastima ni pierde el control).
-- Al terminar aparece un cartel (GANASTE o GANO LA PC) y arranca otra
-  partida.
+- Al terminar aparece un cartel (GANASTE / GANO LA PC, o GANO J1 / GANO J2)
+  y arranca otra partida en el mismo modo.
 
 ## Qué cambia respecto del sitio
 
 - `script.js`: arranca directo en el escenario 4 (sin pasar por el index), el
   escenario no tiene bordes de salida y hay un `shipPush` para empujar la
-  nave sin sacarle el control (la repulsión entre naves).
+  nave sin sacarle el control (la repulsión entre naves); con dos jugadores
+  las flechas y el Shift derecho no mueven la nave del jugador 1 y la cámara
+  va sin zoom.
 - `js/esc4-game.js`: la PC (bloque "Modo contra la PC"), las dos lluvias, el
   golpe con 3 s fuera de juego en vez de reiniciar la partida, el marcador, la
   voz contando para arriba, y sin la intro ni el final de las navecitas (se
@@ -53,5 +67,5 @@ Necesita servirse por http (no abriendo el `index.html` directo):
 npx http-server .
 ```
 
-y abrir `http://127.0.0.1:8080` en el navegador. Se juega con flechas/WASD
-(Shift acelera, Espacio aleja la cámara), igual que en el sitio.
+y abrir `http://127.0.0.1:8080` en el navegador (con Ctrl+Shift+R si se
+cambió algo, para que no use lo guardado).
