@@ -1,8 +1,11 @@
 :root {
+  /* Misma paleta que agustint96.github.io (styles.css: --navy/--navy-mid/--accent/--accent2) */
   --navy: #0d1b2e;
+  --navy-mid: #1a2d4a;
   --accent: #f19280;
-  --p1: #4d9dff;
-  --p2: #f15a5a;
+  --accent2: #7eb8c9;
+  --p1: var(--accent2);
+  --p2: #e2555f;
 }
 
 * {
@@ -12,7 +15,10 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--navy);
+  background-color: var(--navy);
+  background-image: url("../assets/fondo-estrellado.webp");
+  background-size: cover;
+  background-position: center;
   color: #eaf0fb;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   display: flex;
@@ -38,11 +44,12 @@ body {
 }
 
 .panel {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(26, 45, 74, 0.55); /* --navy-mid con transparencia */
+  border: 1px solid rgba(126, 184, 201, 0.25); /* --accent2 tenue */
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 16px;
+  backdrop-filter: blur(2px);
 }
 
 button {

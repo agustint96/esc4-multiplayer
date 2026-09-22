@@ -16,7 +16,25 @@ window.Game = (function () {
   const GOLES_PARA_GANAR = 10; // cuenta ascendente (1..10), al revés del contador regresivo del single-player
   const SUAVIZADO_REMOTO = 12; // 1/s: qué tan rápido sigue la nave remota al último dato
 
-  const COLOR = { p1: "#4d9dff", p2: "#f15a5a" };
+  // Misma paleta que agustint96.github.io: --accent2 (celeste) para P1,
+  // un rojo cálido para P2 (el sitio original solo tiene un acento, salmón,
+  // que acá queda reservado para agujeros/UI).
+  const COLOR = { p1: "#7eb8c9", p2: "#e2555f" };
+
+  // Sprites reales del juego original (parallax/cohete.webp y
+  // parallax/piedra*.webp), copiados a assets/. Se cargan una sola vez acá
+  // arriba; mientras no terminan de cargar, dibujarNave/dibujarPiedras caen
+  // a un círculo simple para no romper el primer cuadro.
+  const imgNave = new Image();
+  imgNave.src = "assets/cohete.webp";
+  const imgsPiedra = ["assets/piedra.webp", "assets/piedra_2.webp"].map((src) => {
+    const img = new Image();
+    img.src = src;
+    return img;
+  });
+  const imgFondo = new Image();
+  imgFondo.src = "assets/fondo-estrellado.webp";
+  let patronFondo = null;
 
   const MAPA_TECLAS = {
     ArrowUp: "up", w: "up", W: "up",
@@ -53,6 +71,7 @@ window.Game = (function () {
       y: -RADIO_PIEDRA,
       vx: 0,
       vy: VELOCIDAD_PIEDRA,
+      sprite: Math.random() < 0.5 ? 0 : 1, // qué imagen de asteroide dibujar (fijo, no por cuadro)
     };
   }
 
@@ -258,39 +277,84 @@ window.Game = (function () {
     return estado;
   }
 
-  function dibujarNave(n, color) {
+  // Resplandor de color detrás de un sprite, para distinguir de quién es
+  // (nave o piedra) sin tener que recolorear la imagen original.
+  function dibujarResplandor(x, y, radio, color) {
+    const brillo = ctx.createRadialGradient(x, y, radio * 0.15, x, y, radio);
+    brillo.addColorStop(0, color + "aa");
+    brillo.addColorStop(1, color + "00");
     ctx.beginPath();
-    ctx.arc(n.x, n.y, RADIO_NAVE, 0, Math.PI * 2);
-    ctx.fillStyle = "#0d1b2e";
+    ctx.arc(x, y, radio, 0, Math.PI * 2);
+    ctx.fillStyle = brillo;
     ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = color;
-    ctx.stroke();
   }
 
-  function dibujarPiedras(lista, color) {
-    for (const piedra of lista) {
+  function dibujarNave(n, color) {
+    const alto = RADIO_NAVE * 3;
+    const ancho = imgNave.naturalWidth
+      ? alto * (imgNave.naturalWidth / imgNave.naturalHeight)
+      : alto * 0.68;
+
+    dibujarResplandor(n.x, n.y, alto * 0.85, color);
+
+    if (imgNave.complete && imgNave.naturalWidth) {
+      ctx.drawImage(imgNave, n.x - ancho / 2, n.y - alto / 2, ancho, alto);
+    } else {
       ctx.beginPath();
-      ctx.arc(piedra.x, piedra.y, RADIO_PIEDRA, 0, Math.PI * 2);
-      ctx.fillStyle = "#05070b";
+      ctx.arc(n.x, n.y, RADIO_NAVE, 0, Math.PI * 2);
+      ctx.fillStyle = "#0d1b2e";
       ctx.fill();
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.strokeStyle = color;
       ctx.stroke();
     }
   }
 
+  function dibujarPiedras(lista, color) {
+    const diametro = RADIO_PIEDRA * 3.4;
+    for (const piedra of lista) {
+      dibujarResplandor(piedra.x, piedra.y, diametro * 0.75, color);
+
+      const img = imgsPiedra[piedra.sprite || 0];
+      if (img && img.complete && img.naturalWidth) {
+        const altoImg = diametro * (img.naturalHeight / img.naturalWidth);
+        ctx.drawImage(img, piedra.x - diametro / 2, piedra.y - altoImg / 2, diametro, altoImg);
+      } else {
+        ctx.beginPath();
+        ctx.arc(piedra.x, piedra.y, RADIO_PIEDRA, 0, Math.PI * 2);
+        ctx.fillStyle = "#05070b";
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = color;
+        ctx.stroke();
+      }
+    }
+  }
+
   function dibujarAgujero(a) {
-    const brillo = ctx.createRadialGradient(a.x, a.y, 1, a.x, a.y, RADIO_AGUJERO);
+    // Pulso suave, como los cúmulos del juego original.
+    const radio = RADIO_AGUJERO * (1 + Math.sin(performance.now() / 400) * 0.06);
+
+    dibujarResplandor(a.x, a.y, radio * 2.4, "#f19280");
+
+    const brillo = ctx.createRadialGradient(a.x, a.y, 1, a.x, a.y, radio);
     brillo.addColorStop(0, "#000000");
     brillo.addColorStop(1, "#1a2436");
     ctx.beginPath();
-    ctx.arc(a.x, a.y, RADIO_AGUJERO, 0, Math.PI * 2);
+    ctx.arc(a.x, a.y, radio, 0, Math.PI * 2);
     ctx.fillStyle = brillo;
     ctx.fill();
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#f19280";
     ctx.stroke();
+  }
+
+  function dibujarFondo() {
+    if (!patronFondo && imgFondo.complete && imgFondo.naturalWidth) {
+      patronFondo = ctx.createPattern(imgFondo, "repeat");
+    }
+    ctx.fillStyle = patronFondo || "#0d1b2e";
+    ctx.fillRect(0, 0, ancho, alto);
   }
 
   function dibujarPuntaje() {
@@ -318,8 +382,7 @@ window.Game = (function () {
   }
 
   function dibujar() {
-    ctx.fillStyle = "#0d1b2e";
-    ctx.fillRect(0, 0, ancho, alto);
+    dibujarFondo();
 
     if (agujero) dibujarAgujero(agujero);
     dibujarPiedras(piedras, soyP1 ? COLOR.p1 : COLOR.p2);

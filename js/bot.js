@@ -27,6 +27,7 @@ window.Bot = (function () {
       y: -RADIO_PIEDRA,
       vx: 0,
       vy: VELOCIDAD_PIEDRA,
+      sprite: Math.random() < 0.5 ? 0 : 1,
     };
   }
 

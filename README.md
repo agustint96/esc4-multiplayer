@@ -41,6 +41,15 @@ jugador real: no usa la red, el bot corre en el mismo cliente y esquiva
 piedras / va al agujero con un esquema de "huir de lo cercano, si no hay
 nada cerca ir al objetivo" (ver `js/bot.js`).
 
+**Estética**: reusa los sprites reales del juego original (`parallax/cohete.webp`,
+`parallax/piedra.webp`, `parallax/piedra_2.webp`, `parallax/fondo-estrellado.webp`
+de agustint96.github.io, copiados a `assets/` porque este es un repo
+separado) y la misma paleta de colores (`--navy`/`--navy-mid`/`--accent`/
+`--accent2` de `styles.css`). Como el sprite del cohete tiene un solo
+esquema de color fijo, P1/P2 no se recolorea la nave: se distinguen por un
+resplandor de color detrás (celeste `--accent2` para P1, rojo para P2), que
+se usa igual para las piedras de cada lluvia.
+
 Todavía **sin choque entre naves**.
 
 ## Próximos pasos
