@@ -33,7 +33,8 @@
 
   // Online (lo llena js/esc4-game.js en window.esc4Red): por dónde llega el
   // rival (directo o servidor), cuántos estados por segundo (deberían ser 20),
-  // el hueco más largo entre dos y la ida y vuelta de un ping.
+  // el hueco más largo entre dos, la ida y vuelta de un ping y cuánto en el
+  // pasado se muestra al rival (sube solo si la conexión va a los tirones).
   function red(ms) {
     const r = window.esc4Red;
     if (!r || r.via === "-") return "";
@@ -41,7 +42,8 @@
       "\nred    " + r.via +
       "\nrecib  " + ((r.recibidos * 1000) / ms).toFixed(0) + "/s" +
       "\nhueco  " + Math.round(r.huecoMax) + " ms" +
-      "\nping   " + (r.ping == null ? "?" : Math.round(r.ping) + " ms");
+      "\nping   " + (r.ping == null ? "?" : Math.round(r.ping) + " ms") +
+      "\natraso " + Math.round(r.retraso * 1000) + " ms";
     r.recibidos = 0;
     r.huecoMax = 0;
     return texto;

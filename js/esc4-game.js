@@ -659,12 +659,18 @@
   let rival = null; // { x, y, vx, vy, rot, stun, invul, t, cae, hx, hy } centro de la caja, en el mundo
   let poligonosRival = [];
   let idPoligono = 0; // online, para seguir cada piedra de un mensaje al otro
-  // Lo que llega del rival se muestra RETRASO_RED segundos en el pasado,
+  // Lo que llega del rival se muestra unos segundos en el pasado (retrasoRed),
   // pasando de a poco entre los dos mensajes que rodean ese momento: así la
   // nave y las piedras se mueven parejo aunque los mensajes lleguen a
   // destiempo (a veces tarde, a veces dos juntos). Mostrar solo el último,
   // en cambio, las hace saltar hacia atrás con cada mensaje nuevo.
-  const RETRASO_RED = 0.1;
+  // El retraso se adapta: con una conexión pareja es RETRASO_MIN; si los
+  // mensajes llegan a los tirones, sube hasta cubrir el atraso más largo de
+  // los últimos segundos (con tope en RETRASO_MAX).
+  const RETRASO_MIN = 0.1;
+  const RETRASO_MAX = 0.5;
+  let retrasoRed = RETRASO_MIN;
+  let atrasoRed = 0; // el atraso más largo reciente (s), que se va olvidando
   let estadosRival = []; // { t, x, y, rot, stun, tc, inv, p: Map id -> [x, y, vx, vy, ang, giro] }
   const piedrasRival = new Map(); // id -> la piedra que se dibuja (forma fija)
   let desfaseReloj = null; // reloj propio - reloj del rival, en s (sin la demora de más)
@@ -938,6 +944,8 @@
     estadosRival = [];
     piedrasRival.clear();
     desfaseReloj = null;
+    retrasoRed = RETRASO_MIN;
+    atrasoRed = 0;
     acumSpawnRival = 0;
     golesRival = 0;
     stunJugador = 0;
@@ -2926,7 +2934,7 @@
   // del rival, cuántos llegaron y el hueco más largo entre dos (los pone en 0
   // el medidor), y la ida y vuelta de un ping.
   const infoRed = (window.esc4Red = {
-    via: "-", recibidos: 0, huecoMax: 0, ultimo: 0, ping: null,
+    via: "-", recibidos: 0, huecoMax: 0, ultimo: 0, ping: null, retraso: 0,
   });
   let acumPing = 0;
   const soyAnfitrion = () => !!red && red.rol === "anfitrion";
@@ -3159,6 +3167,9 @@
     // sin demoras de más); sube despacito por si la conexión se vuelve más lenta.
     const d = performance.now() / 1000 - t;
     desfaseReloj = desfaseReloj == null ? d : Math.min(d, desfaseReloj + 0.0005);
+    // Cuánto más tarde que el más rápido llegó este (se olvida a la mitad en
+    // unos 2 s, a 20 mensajes por segundo).
+    atrasoRed = Math.max(d - desfaseReloj, atrasoRed * 0.983);
     const p = new Map();
     for (const [id, x, y, vx, vy, ang, giro, radio, verts] of m.p) {
       p.set(id, [x * W, y * H, vx * W, vy * H, ang, giro]);
@@ -3205,11 +3216,17 @@
   }
 
   // Cada cuadro: la nave y las piedras del rival como estaban hace
-  // RETRASO_RED (ver arriba). Si se quedó sin mensajes nuevos, la nave espera
-  // en el último y las piedras siguen derecho con la velocidad que traían.
+  // retrasoRed (ver arriba). Si se quedó sin mensajes nuevos, la nave y las
+  // piedras siguen un poco con la velocidad que traían.
   function seguirRivalOnline(dt) {
     if (!rival || !estadosRival.length) return;
-    const t = performance.now() / 1000 - desfaseReloj - RETRASO_RED;
+    // El retraso va hacia el que hace falta: rápido si hay que subirlo (si
+    // no, la nave se queda sin mensajes y se frena) y despacio si hay que
+    // bajarlo (el rival se ve apenas más rápido un rato, sin saltos).
+    const meta = Math.min(RETRASO_MAX, Math.max(RETRASO_MIN, atrasoRed + 0.03));
+    retrasoRed += Math.max(-0.1 * dt, Math.min(0.5 * dt, meta - retrasoRed));
+    const t = performance.now() / 1000 - desfaseReloj - retrasoRed;
+    infoRed.retraso = retrasoRed;
     while (estadosRival.length > 2 && estadosRival[1].t <= t) estadosRival.shift();
     let a = estadosRival[0];
     let b = estadosRival[1];
@@ -3224,8 +3241,18 @@
     const primera = !rival.visto;
     rival.visto = true;
     if (!b) {
-      rival.x = a.x;
-      rival.y = a.y;
+      // Sin mensajes nuevos: sigue un poco con la velocidad que traía (la de
+      // los dos últimos), en vez de quedarse clavada hasta que llegue otro.
+      const prev = estadosRival.length > 1 ? estadosRival[0] : null;
+      const hueco = prev ? a.t - prev.t : 0;
+      const s = Math.min(Math.max(0, t - a.t), 0.3);
+      if (prev && hueco > 0 && Math.hypot(a.x - prev.x, a.y - prev.y) < 250) {
+        rival.x = a.x + ((a.x - prev.x) / hueco) * s;
+        rival.y = a.y + ((a.y - prev.y) / hueco) * s;
+      } else {
+        rival.x = a.x;
+        rival.y = a.y;
+      }
       rival.rot = a.rot;
     } else if (Math.hypot(b.x - a.x, b.y - a.y) > 250) {
       // Un salto grande es un teletransporte (salió por un agujero): no se suaviza.
