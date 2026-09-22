@@ -455,9 +455,18 @@
   const RIVAL_FRENO = 0.9;
   const RIVAL_PELIGRO = 170; // px del mundo: desde acá una piedra la espanta
   const RIVAL_GIRO = 6; // 1/s: qué tan rápido gira hacia donde va
-  const PERDIO_DURA = 4; // segundos con el cartel de que ganó la PC
+  const FIN_DURA = 4; // segundos con el cartel del ganador
   const REBOTE_DURA = 0.18; // segundos que dura el empujón de un choque entre naves
   const REBOTE_FUERZA = 260; // px/s del empujón
+  // Al volver después de un golpe, la nave reaparece en el medio abajo (como al
+  // reiniciar en el juego original) y parpadea INVULNERABLE segundos: en ese
+  // rato no la golpea nada ni rebota con la otra nave.
+  const INVULNERABLE = 2;
+  // Con dos lluvias el campo se llenaba demasiado: cada una cae LLUVIA_MENOS
+  // veces más espaciada que la del juego original.
+  const LLUVIA_MENOS = 2;
+  // Halo de la PC (el del jugador es CSS, .starry-cohete-pair.in-game).
+  const HALO_RIVAL = "drop-shadow(0 0 5px rgba(255, 90, 90, 0.95)) drop-shadow(0 0 14px rgba(255, 90, 90, 0.55))";
 
   const scene = document.getElementById("game-scene");
   const canvas = document.getElementById("game-canvas");
@@ -635,17 +644,33 @@
   let tQuieta = 0; // segundos seguidos sin que la nave se mueva
   let navePrev = null; // centro de la nave en el cuadro anterior (mundo)
   // Modo contra la PC (ver STUN y compañía arriba).
-  let rival = null; // { x, y, vx, vy, rot, stun, cae, hx, hy } centro de la caja, en el mundo
+  let rival = null; // { x, y, vx, vy, rot, stun, invul, t, cae } centro de la caja, en el mundo
   let poligonosRival = [];
   let acumSpawnRival = 0;
   let golesRival = 0;
   let colorRival = 0; // se tiñe como la nave del jugador, con sus goles
   let stunJugador = 0; // segundos que le quedan fuera de juego a la nave del jugador
-  let reaparecer = null; // centro de la caja de la nave (pantalla) donde la golpearon
+  let invulJugador = 0; // segundos que le quedan parpadeando (invulnerable)
   let rebote = null; // { vx, vy, t } empujón de la nave del jugador tras chocar con la PC
-  let perdio = null; // { t } ganó la PC
-  const imgRival = new Image();
-  imgRival.src = "parallax/cohete.webp";
+  let fin = null; // { t, ganador: "vos" | "pc" } alguien llegó a 10
+  // La nave de la PC se arma igual que la del jugador en index.html: el sprite
+  // de atrás, el fuego y el de adelante (cohete_on: en el juego la luz va
+  // prendida), los tres en el mismo lienzo de 203x300.
+  const cargarImagen = (src) => {
+    const img = new Image();
+    img.src = src;
+    return img;
+  };
+  const imgRivalFondo = cargarImagen("parallax/cohete_fondo.webp");
+  const imgRivalTop = cargarImagen("parallax/cohete_on.webp");
+  const imgFuego = cargarImagen("parallax/cohete_fuego.webp");
+  const lienzoFuegoRival = document.createElement("canvas");
+  lienzoFuegoRival.width = 203;
+  lienzoFuegoRival.height = 300;
+  const lienzoRival = document.createElement("canvas"); // las tres capas juntas
+  lienzoRival.width = 203;
+  lienzoRival.height = 300;
+  const fuegoRival = { nivel: 0, fase: 0 };
   // Cámara (ver arriba): zoom y punto de la pantalla que queda fijo (la nave).
   const cam = { z: 1, ox: window.innerWidth / 2, oy: window.innerHeight / 2 };
   let luz = false; // luz de la nave prendida (la maneja script.js)
@@ -799,10 +824,10 @@
     golesRival = 0;
     colorRival = 0;
     stunJugador = 0;
-    reaparecer = null;
+    invulJugador = 0;
     rebote = null;
-    perdio = null;
-    ship.classList.remove("fuera-de-juego");
+    fin = null;
+    ship.classList.remove("fuera-de-juego", "invulnerable");
     // Con intro el segundero queda oculto y parado hasta que se van las naves y
     // terminan las instrucciones.
     introT = conIntro ? 0 : -1;
@@ -1468,6 +1493,19 @@
     }
   }
 
+  // Contra la PC no está la intro de las navecitas: se deja la intro recién
+  // terminada (fondo negro, nave en blanco y negro, en el medio abajo) y en el
+  // cuadro siguiente la nave prende la luz y arrancan las instrucciones, igual
+  // que al final de la intro del sitio.
+  function saltearIntro() {
+    introT = INTRO_JUEGO;
+    oscuro = true;
+    negro = true;
+    scene.classList.remove("game-intro");
+    ship.classList.remove("game-color");
+    centrarNave();
+  }
+
   function centrarNave() {
     if (window.shipPlace)
       window.shipPlace(
@@ -1817,8 +1855,10 @@
   // segundero: tus goles en blanco (se tiñen como siempre) y los de la PC en
   // rojo. Spaceport no tiene tildes: "GANO".
   function mostrarTiempo() {
-    const texto = perdio
-      ? '<span class="marcador-rival">GANO LA PC</span>'
+    const texto = fin
+      ? fin.ganador === "vos"
+        ? "GANASTE"
+        : '<span class="marcador-rival">GANO LA PC</span>'
       : cumulosTomados +
         '<span class="marcador-separador"></span><span class="marcador-rival">' +
         golesRival +
@@ -2148,14 +2188,7 @@
       decirGol(cumulosTomados);
       mostrarTiempo();
       colorObjetivo = Math.min(1, cumulosTomados / CUMULOS_PARA_COLOR);
-      if (cumulosTomados >= CUMULOS_PARA_COLOR) {
-        // El último: suena la nota y empieza el final enseguida (no hay que
-        // esperar a que termine de teñirse ni cruzar otro; el color sigue subiendo
-        // durante la animación). La música del juego se corta y queda solo la nota.
-        frenarMusica();
-        sonarNota();
-        iniciarFinal();
-      }
+      if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
     }
     for (const p of particulas) {
       p.t += dt;
@@ -2177,7 +2210,8 @@
 
     if (!rival && !ganado) crearRival(circulos);
 
-    const intervalo = Math.max(SPAWN_MIN, SPAWN_INICIAL - tiempo * SPAWN_RAMPA);
+    const intervalo =
+      Math.max(SPAWN_MIN, SPAWN_INICIAL - tiempo * SPAWN_RAMPA) * LLUVIA_MENOS;
     if (tiempo > gracia && !ganado) {
       // Cada nave tiene su lluvia; la de la golpeada se corta mientras está
       // fuera de juego (las que ya venían siguen cayendo).
@@ -2223,13 +2257,13 @@
     // Durante el final (ya completó el color) no se choca: el nivel está ganado.
     if (!ganado) {
       // Cualquier piedra golpea a cualquier nave, sea de la lluvia que sea.
-      if (stunJugador <= 0) {
+      if (stunJugador <= 0 && invulJugador <= 0) {
         const golpe =
           piedraQueToca(poligonos, circulos) ||
           piedraQueToca(poligonosRival, circulos);
         if (golpe) golpearJugador(golpe.p, golpe.c);
       }
-      if (rival && rival.stun <= 0) {
+      if (rival && rival.stun <= 0 && rival.invul <= 0) {
         const circ = circulosRival();
         const golpe =
           piedraQueToca(poligonos, circ) || piedraQueToca(poligonosRival, circ);
@@ -2304,10 +2338,6 @@
     stunJugador = STUN;
     tChoque = 0;
     naveCae = caidaPorGolpe(p, tocado);
-    const pose = window.shipPose;
-    reaparecer = pose
-      ? { x: pose.x + cajaNave / 2, y: pose.y + cajaNave / 2 }
-      : null;
     rebote = null;
     sonarPerder();
   }
@@ -2315,8 +2345,6 @@
   function golpearRival(p, tocado) {
     rival.stun = STUN;
     rival.t = 0;
-    rival.hx = rival.x;
-    rival.hy = rival.y;
     rival.cae = caidaPorGolpe(p, tocado);
     rival.vx = 0;
     rival.vy = 0;
@@ -2337,11 +2365,22 @@
       if (window.shipMove) window.shipMove(0, 0); // sin control mientras tanto
     }
     if (stunJugador <= 0) {
+      // Vuelve en el medio abajo, como al reiniciar en el juego original, y
+      // parpadea un rato sin que nada la afecte.
       stunJugador = 0;
       ship.classList.remove("fuera-de-juego");
-      if (reaparecer && window.shipPlace)
-        window.shipPlace(reaparecer.x, reaparecer.y);
-      reaparecer = null;
+      centrarNave();
+      invulJugador = INVULNERABLE;
+      ship.classList.add("invulnerable");
+    }
+  }
+
+  function actualizarInvulJugador(dt) {
+    if (invulJugador <= 0) return;
+    invulJugador -= dt;
+    if (invulJugador <= 0) {
+      invulJugador = 0;
+      ship.classList.remove("invulnerable");
     }
   }
 
@@ -2360,10 +2399,9 @@
       vy: 0,
       rot: 0,
       stun: 0,
+      invul: 0,
       t: 0,
       cae: null,
-      hx: 0,
-      hy: 0,
     };
   }
 
@@ -2445,6 +2483,61 @@
     colorRival += (golesRival / CUMULOS_PARA_COLOR - colorRival) *
       Math.min(1, dt * COLOR_SUAVIZADO);
 
+    const antesX = rival.x;
+    const antesY = rival.y;
+    moverRival(dt, circulos);
+    // El fuego se guía por lo que se movió de verdad (como el de la nave del
+    // jugador), en px/s de pantalla.
+    // Un salto grande en un cuadro es un teletransporte, no velocidad.
+    const dist = Math.hypot(rival.x - antesX, rival.y - antesY) * cam.z;
+    actualizarFuegoRival(dt, dt > 0 && dist < 250 ? dist / dt : 0);
+  }
+
+  // Fuego de la PC: el mismo de la nave del jugador (updateShipFire en
+  // script.js, mismos números), dibujado en su propio lienzo de 203x300. Quieta
+  // arde bajito; al moverse se alarga y se agita. Cada franja horizontal del
+  // dibujo se corre de costado (más cuanto más cerca de la punta), el largo
+  // parpadea y el ancho respira. La PC no usa boost.
+  const FUEGO_TOP = 196;
+  const FUEGO_BOTTOM = 270;
+  const FUEGO_X = 60;
+  const FUEGO_W = 90;
+  const FUEGO_CX = 102;
+  const FUEGO_FRANJA = 2;
+  function actualizarFuegoRival(dt, velocidad) {
+    const f = fuegoRival;
+    const meta = Math.max(0, Math.min(1, (velocidad - 15) / (75 - 15)));
+    const tau = meta > f.nivel ? 0.08 : 0.6;
+    f.nivel += (meta - f.nivel) * (1 - Math.exp(-dt / tau));
+    if (f.nivel < 0.004 && meta === 0) f.nivel = 0;
+    f.fase += dt * (0.35 + 0.65 * f.nivel);
+    if (!imgFuego.complete || !imgFuego.naturalWidth) return;
+    const s = f.fase;
+    const amp = 0.15 + 0.85 * f.nivel;
+    const largo =
+      (0.55 + 0.45 * f.nivel) *
+      (1 +
+        amp *
+          (0.1 * Math.sin(s * 23) +
+            0.06 * Math.sin(s * 37 + 1) +
+            0.04 * Math.sin(s * 11 + 2)));
+    const ancho = 1 + amp * 0.06 * Math.sin(s * 29 + 0.5);
+    const c = lienzoFuegoRival.getContext("2d");
+    c.clearRect(0, 0, lienzoFuegoRival.width, lienzoFuegoRival.height);
+    for (let sy = FUEGO_TOP; sy < FUEGO_BOTTOM; sy += FUEGO_FRANJA) {
+      const p = (sy - FUEGO_TOP) / (FUEGO_BOTTOM - FUEGO_TOP); // 0 motores .. 1 punta
+      const sh = Math.min(FUEGO_FRANJA, FUEGO_BOTTOM - sy);
+      const dy = FUEGO_TOP + (sy - FUEGO_TOP) * largo;
+      const dh = sh * largo + 0.6;
+      const vaiven =
+        amp * 8 * p * p *
+        (Math.sin(s * 14 - p * 7) * 0.7 + Math.sin(s * 23 - p * 11 + 1) * 0.3);
+      const dx = FUEGO_CX + (FUEGO_X - FUEGO_CX) * ancho + vaiven;
+      c.drawImage(imgFuego, FUEGO_X, sy, FUEGO_W, sh, dx, dy, FUEGO_W * ancho, dh);
+    }
+  }
+
+  function moverRival(dt, circulos) {
     if (rival.stun > 0) {
       rival.stun -= dt;
       rival.t += dt;
@@ -2455,15 +2548,19 @@
         rival.rot += rival.cae.giro * dt;
       }
       if (rival.stun <= 0) {
-        // Vuelve donde la golpearon, derecha y quieta.
+        // Vuelve en el medio abajo, derecha y quieta, y parpadea un rato.
         rival.stun = 0;
         rival.cae = null;
-        rival.x = rival.hx;
-        rival.y = rival.hy;
+        rival.x = window.innerWidth / 2;
+        rival.y = window.innerHeight * POSICION_Y_INICIAL;
+        rival.vx = 0;
+        rival.vy = 0;
         rival.rot = 0;
+        rival.invul = INVULNERABLE;
       }
       return;
     }
+    if (rival.invul > 0) rival.invul = Math.max(0, rival.invul - dt);
 
     // Misma física que la nave con flechas (script.js): empuje constante en la
     // dirección elegida y freno exponencial, en subpasos de ~1 cuadro de 60 Hz.
@@ -2501,6 +2598,7 @@
   // (ninguna se lastima).
   function chocarNaves(circulos) {
     if (!rival || rival.stun > 0 || stunJugador > 0) return;
+    if (rival.invul > 0 || invulJugador > 0) return; // parpadeando no rebota
     const a = circulos[1];
     const b = circulosRival()[1];
     if (!a || !b) return;
@@ -2541,15 +2639,23 @@
     golesRival++;
     sonarCruce();
     mostrarTiempo();
-    if (golesRival >= CUMULOS_PARA_COLOR) ganaLaPC();
+    if (golesRival >= CUMULOS_PARA_COLOR) terminarPartida("pc");
   }
 
-  function ganaLaPC() {
-    perdio = { t: 0 };
+  // Alguien llegó a 10: la música se corta, suena la nota de victoria (si
+  // ganaste; la voz ya felicita con el último gol) o el sonido de perder, y
+  // queda todo quieto con el cartel FIN_DURA segundos. Sin el final de las
+  // navecitas del sitio: acá arranca otra partida.
+  function terminarPartida(ganador) {
+    fin = { t: 0, ganador };
     frenarMusica();
-    cortarVoz();
-    vozPendiente = null;
-    sonarPerder();
+    if (ganador === "vos") {
+      sonarNota();
+    } else {
+      cortarVoz();
+      vozPendiente = null;
+      sonarPerder();
+    }
     cumulos = [];
     mostrarTiempo();
   }
@@ -2557,23 +2663,41 @@
   function dibujarRival() {
     if (!rival || ganado) return;
     if (rival.stun > 0 && rival.t >= DURACION_CHOQUE) return; // fuera de juego: no se ve
-    if (!imgRival.complete || !imgRival.naturalWidth) return;
+    if (!imgRivalTop.complete || !imgRivalTop.naturalWidth) return;
+    // Las tres capas juntas (atrás, fuego, adelante), como la nave del jugador.
+    const c = lienzoRival.getContext("2d");
+    c.clearRect(0, 0, lienzoRival.width, lienzoRival.height);
+    if (imgRivalFondo.complete && imgRivalFondo.naturalWidth)
+      c.drawImage(imgRivalFondo, 0, 0, lienzoRival.width, lienzoRival.height);
+    c.drawImage(lienzoFuegoRival, 0, 0);
+    c.drawImage(imgRivalTop, 0, 0, lienzoRival.width, lienzoRival.height);
+
     const k = escalaNaveMundo();
     const lado = cajaNave;
-    const ancho = (lado * imgRival.naturalWidth) / imgRival.naturalHeight;
+    const ancho = (lado * lienzoRival.width) / lienzoRival.height;
     ctx.save();
     ctx.translate(rival.x, rival.y);
     ctx.rotate((rival.rot * Math.PI) / 180);
     ctx.scale(k, k);
-    // Igual que la nave del jugador en el juego: en blanco y negro, y se va
-    // tiñendo con sus goles. El sprite va pegado a la izquierda de su caja.
-    // Con el mismo levantado de brillo que la nave del jugador con la luz
-    // prendida (#nave-gris-luz), que se va apagando a medida que se tiñe.
+    // Recién vuelta de un golpe parpadea (igual que la del jugador, ver
+    // .invulnerable en styles.css).
+    if (rival.invul > 0) ctx.globalAlpha = parpadeo(rival.invul);
+    // Igual que la nave del jugador en el juego: en blanco y negro, con el
+    // levantado de brillo de la luz prendida (#nave-gris-luz), y se va tiñendo
+    // con sus goles. Encima, su halo rojo.
     const gris = 1 - Math.min(1, colorRival);
     ctx.filter =
-      "grayscale(" + gris.toFixed(3) + ") brightness(" + (1 + 0.35 * gris).toFixed(3) + ")";
-    ctx.drawImage(imgRival, -lado / 2, -lado / 2, ancho, lado);
+      "grayscale(" + gris.toFixed(3) + ") brightness(" +
+      (1 + 0.35 * gris).toFixed(3) + ") " + HALO_RIVAL;
+    // El sprite va pegado a la izquierda de su caja.
+    ctx.drawImage(lienzoRival, -lado / 2, -lado / 2, ancho, lado);
     ctx.restore();
+  }
+
+  // Opacidad del parpadeo: baja a 0.35 y vuelve, 0.3 s por vuelta (mismo ritmo
+  // que la animación CSS de la nave del jugador).
+  function parpadeo(t) {
+    return 0.35 + 0.65 * (0.5 + 0.5 * Math.cos((t / 0.3) * Math.PI * 2));
   }
 
   function dibujarPoligonos(lista, borde) {
@@ -2995,12 +3119,13 @@
           tQuieta = 0;
           if (enCentro) centrarNave();
         }
-        if (perdio) {
-          // Ganó la PC: todo quieto con el cartel y después, otra partida.
-          perdio.t += dt;
+        if (fin) {
+          // Alguien llegó a 10: todo quieto con el cartel y después, otra partida.
+          fin.t += dt;
           if (window.shipMove) window.shipMove(0, 0);
-          if (perdio.t >= PERDIO_DURA) reiniciar(true);
+          if (fin.t >= FIN_DURA) reiniciar(true);
         } else {
+          actualizarInvulJugador(dt);
           if (stunJugador > 0) {
             tQuieta = 0;
             actualizarStunJugador(dt);
@@ -3067,12 +3192,8 @@
           musicaIniciada = true;
           cargarMusica(); // que esté lista cuando termina la intro
         }
-        if (!spriteP7) {
-          spriteP7 = new Image();
-          spriteP7.onload = () => (spriteP7BN = armarSpriteP7BN(spriteP7));
-          spriteP7.src = "parallax/parallax 7.webp";
-        }
         reiniciar(false, true);
+        saltearIntro();
         ultimo = performance.now();
         raf = requestAnimationFrame(cuadro);
       } else {
