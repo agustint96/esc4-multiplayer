@@ -456,8 +456,11 @@
   const RIVAL_PELIGRO = 170; // px del mundo: desde acá una piedra la espanta
   const RIVAL_GIRO = 6; // 1/s: qué tan rápido gira hacia donde va
   const FIN_DURA = 4; // segundos con el cartel del ganador
-  const REBOTE_DURA = 0.18; // segundos que dura el empujón de un choque entre naves
-  const REBOTE_FUERZA = 260; // px/s del empujón
+  // Repulsión entre naves: empiezan a empujarse a REPELER_ALCANCE veces la suma
+  // de los radios de sus cuerpos, y pegadas el empujón es REPELER_FUERZA px por
+  // cuadro² (más que el motor, RIVAL_EMPUJE).
+  const REPELER_ALCANCE = 3.5;
+  const REPELER_FUERZA = 2.4;
   // Al volver después de un golpe, la nave reaparece en el medio abajo (como al
   // reiniciar en el juego original) y parpadea INVULNERABLE segundos: en ese
   // rato no la golpea nada ni rebota con la otra nave.
@@ -654,7 +657,6 @@
   let stunJugador = 0; // segundos que le quedan fuera de juego a la nave del jugador
   let invulJugador = 0; // segundos que le quedan parpadeando (invulnerable)
   let reaparecer = null; // centro de la caja de la nave (pantalla) donde la golpearon
-  let rebote = null; // { vx, vy, t } empujón de la nave del jugador tras chocar con la PC
   let fin = null; // { t, ganador: "vos" | "pc" } alguien llegó a 10
   // La nave de la PC se arma igual que la del jugador en index.html: el sprite
   // de atrás, el fuego y el de adelante (cohete_on: en el juego la luz va
@@ -828,7 +830,6 @@
     stunJugador = 0;
     invulJugador = 0;
     reaparecer = null;
-    rebote = null;
     fin = null;
     ship.classList.remove("fuera-de-juego", "invulnerable");
     // Con intro el segundero queda oculto y parado hasta que se van las naves y
@@ -2276,7 +2277,7 @@
           piedraQueToca(poligonos, circ) || piedraQueToca(poligonosRival, circ);
         if (golpe) golpearRival(golpe.p, golpe.c);
       }
-      chocarNaves(circulos);
+      repelerNaves(circulos, dt);
     }
     mostrarTiempo();
   }
@@ -2349,7 +2350,6 @@
     reaparecer = pose
       ? { x: pose.x + cajaNave / 2, y: pose.y + cajaNave / 2 }
       : null;
-    rebote = null;
     sonarPerder();
   }
 
@@ -2608,39 +2608,36 @@
     }
   }
 
-  // Si las naves se chocan, rebotan: cada una sale empujada para su lado
-  // (ninguna se lastima).
-  function chocarNaves(circulos) {
+  // Cerca una de la otra, las naves se repelen: cada una recibe un empujón
+  // para su lado, más fuerte cuanto más cerca (pegadas le gana al motor, así
+  // que no llegan a chocarse). Ninguna se lastima y ninguna pierde el control.
+  function repelerNaves(circulos, dt) {
     if (!rival || rival.stun > 0 || stunJugador > 0) return;
-    if (rival.invul > 0 || invulJugador > 0) return; // parpadeando no rebota
+    if (rival.invul > 0 || invulJugador > 0) return; // parpadeando no la afecta
     const a = circulos[1];
     const b = circulosRival()[1];
     if (!a || !b) return;
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const dist = Math.hypot(dx, dy) || 1;
-    const minimo = a.r + b.r;
-    if (dist >= minimo) return;
+    const alcance = (a.r + b.r) * REPELER_ALCANCE;
+    if (dist >= alcance) return;
+    const k = (alcance - dist) / alcance; // 0 en el borde del alcance .. 1 pegadas
+    const empuje = REPELER_FUERZA * k * k * dt * 60; // px por cuadro de 60 Hz
     const nx = dx / dist;
     const ny = dy / dist;
-    const solape = minimo - dist;
-    rival.x += nx * solape;
-    rival.y += ny * solape;
-    rival.vx = nx * REBOTE_FUERZA / 60;
-    rival.vy = ny * REBOTE_FUERZA / 60;
-    rebote = { vx: -nx * REBOTE_FUERZA, vy: -ny * REBOTE_FUERZA, t: 0 };
-    if (window.shipMove) window.shipMove(-nx * solape, -ny * solape);
-  }
-
-  function actualizarRebote(dt) {
-    if (!rebote) return;
-    rebote.t += dt;
-    const k = 1 - rebote.t / REBOTE_DURA;
-    if (k <= 0) {
-      rebote = null;
-      return;
+    rival.vx += nx * empuje;
+    rival.vy += ny * empuje;
+    // Si igual se llegaron a encimar (venían las dos a toda velocidad de frente),
+    // se corre la PC lo que falta: nunca quedan una encima de la otra.
+    const minimo = a.r + b.r;
+    if (dist < minimo) {
+      rival.x += nx * (minimo - dist);
+      rival.y += ny * (minimo - dist);
     }
-    if (window.shipMove) window.shipMove(rebote.vx * k * dt, rebote.vy * k * dt);
+    // La velocidad de la nave del jugador está en px de pantalla por cuadro,
+    // que para ella es lo mismo que px del mundo (la cámara está anclada ahí).
+    if (window.shipPush) window.shipPush(-nx * empuje, -ny * empuje);
   }
 
   function golRival(entrado) {
@@ -3154,7 +3151,6 @@
             tQuieta = 0;
             actualizarStunJugador(dt);
           }
-          actualizarRebote(dt);
           actualizar(dt, circulos);
         }
       }

@@ -25,14 +25,16 @@ copiados de ese repo), con una segunda nave manejada por la PC.
   y el marcador) avanza cuando alguno llega primero a un número de goles, y
   como mucho llega al color del agujero 7 del juego original, repartido en
   los 10 goles.
-- Si las naves se chocan, rebotan (nadie se lastima).
+- Cuando las naves se acercan se repelen un poco, sin llegar a chocarse
+  (nadie se lastima ni pierde el control).
 - Al terminar aparece un cartel (GANASTE o GANO LA PC) y arranca otra
   partida.
 
 ## Qué cambia respecto del sitio
 
-- `script.js`: arranca directo en el escenario 4 (sin pasar por el index) y el
-  escenario no tiene bordes de salida.
+- `script.js`: arranca directo en el escenario 4 (sin pasar por el index), el
+  escenario no tiene bordes de salida y hay un `shipPush` para empujar la
+  nave sin sacarle el control (la repulsión entre naves).
 - `js/esc4-game.js`: la PC (bloque "Modo contra la PC"), las dos lluvias, el
   golpe con 3 s fuera de juego en vez de reiniciar la partida, el marcador, la
   voz contando para arriba, y sin la intro ni el final de las navecitas (se

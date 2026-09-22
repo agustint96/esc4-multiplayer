@@ -1599,6 +1599,13 @@ function drawStars() {
       r = 0;
       shipCarriedUntil = performance.now() + 100;
     };
+    // shipPush(vx, vy) le suma velocidad a la nave (px por cuadro de 60 Hz) sin
+    // sacarle el control: lo usa el escenario 4 para que la nave de la PC la
+    // repela un poco cuando están cerca.
+    window.shipPush = (vx, vy) => {
+      n += vx;
+      r += vy;
+    };
     window.shipMove = (dx, dy, giro = 0) => {
       e += dx;
       a += dy;
