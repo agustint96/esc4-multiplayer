@@ -102,10 +102,7 @@ input {
 
 #juego {
   display: none;
-  width: min(100vw, calc(100vh * 9 / 16));
-  height: min(100vh, calc(100vw * 16 / 9));
-  aspect-ratio: 9 / 16;
-  background: #07111f;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
+  position: fixed;
+  inset: 0;
+  background: var(--navy);
 }

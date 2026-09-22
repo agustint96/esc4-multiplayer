@@ -17,11 +17,14 @@
     lobby.style.display = "none";
     canvas.style.display = "block";
 
-    Game.init(canvas, esP1);
+    // Si el rival (no yo) anota, el host me tiene que avisar que me
+    // teletransporta — yo no puedo mover su nave desde acá.
+    Game.init(canvas, esP1, (x, y) => Net.enviar({ tipo: "teletransportar", x, y }));
     Game.iniciarLoop();
 
     Net.alRecibir((msg) => {
       if (msg.tipo === "reclamo") Game.recibirReclamo(msg);
+      else if (msg.tipo === "teletransportar") Game.recibirTeletransporte(msg);
       else Game.recibirEstadoRemoto(msg);
     });
     setInterval(() => Net.enviar(Game.estadoLocal()), 1000 / ENVIO_HZ);
@@ -31,12 +34,13 @@
     lobby.style.display = "none";
     canvas.style.display = "block";
 
-    Game.init(canvas, true); // el humano siempre es P1/host en modo práctica
-    Bot.init(canvas.clientWidth, canvas.clientHeight);
+    // El humano siempre es P1/host en modo práctica; si el bot (P2) anota,
+    // lo teletransporto yo mismo en vez de mandarlo por red.
+    Game.init(canvas, true, (x, y) => Bot.teletransportar(x, y));
+    Bot.init(Game.mundo());
 
     Game.iniciarLoop((dt) => {
-      Bot.ajustarTamano(canvas.clientWidth, canvas.clientHeight);
-      Bot.actualizar(dt, Game.piedrasPropias(), Game.agujeroActual(), (agujeroId) => {
+      Bot.actualizar(dt, Game.piedrasPropias(), Game.agujerosActuales(), (agujeroId) => {
         Game.recibirReclamo({ jugador: "p2", agujeroId });
       });
       Game.recibirEstadoRemoto(Bot.estado());
