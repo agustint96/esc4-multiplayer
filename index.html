@@ -505,6 +505,11 @@
       <!-- Elección del modo al arrancar (esc4-game.js): contra la PC o dos
            jugadores en el mismo teclado. Se elige con 1 o 2 (con el mouse la
            nave sigue al cursor). Spaceport no tiene tildes ni puntuación. -->
+      <!-- Volver a la elección del modo (también con Escape). Sin foco de
+           teclado: si no, Espacio (alejar la cámara) lo apretaría. -->
+      <button class="game-menu" id="game-menu" type="button" tabindex="-1" hidden>
+        menu
+      </button>
       <div class="game-modo" id="game-modo" hidden>
         <p class="game-ayuda-paso visible">
           <kbd class="game-tecla">1</kbd><span>contra la PC</span>

@@ -683,12 +683,19 @@
       if (ev.code === "Digit1" || ev.code === "Numpad1") elegirModo("pc");
       else if (ev.code === "Digit2" || ev.code === "Numpad2") elegirModo("dos");
       else if (ev.code === "Digit3" || ev.code === "Numpad3") elegirModo("online");
-    } else if (activo && modo === "online" && ev.code === "Escape") {
-      // Cancelar la búsqueda o irse de la partida: se vuelve a la elección
-      // (al rival le llega que se fue).
-      location.reload();
+    } else if (activo && modo && ev.code === "Escape") {
+      salirAlMenu();
     }
   });
+  const menuEl = document.getElementById("game-menu");
+  if (menuEl) menuEl.addEventListener("click", () => salirAlMenu());
+
+  // Volver a la elección del modo, desde cualquier modo. Se recarga la página:
+  // así todo arranca limpio. Online es como irse: al rival le llega que se fue
+  // (se cierra la conexión) y a él le aparece el cartel.
+  function salirAlMenu() {
+    location.reload();
+  }
   document.addEventListener("keyup", (ev) => {
     if (TECLAS_J2[ev.code]) teclasJ2[TECLAS_J2[ev.code]] = false;
   });
@@ -701,6 +708,7 @@
     modo = m;
     window.dosJugadores = m === "dos";
     actualizarControles();
+    if (menuEl) menuEl.hidden = false;
     if (m === "online") {
       // La elección queda en pantalla con el estado hasta que aparece un rival.
       conectarOnline();
@@ -3710,6 +3718,7 @@
       } else {
         cancelAnimationFrame(raf);
         if (modoEl) modoEl.hidden = true;
+        if (menuEl) menuEl.hidden = true;
         frenarSonidos();
         cancelarAyuda();
         limpiarFinal(); // la nave vuelve a verse en el resto de los escenarios

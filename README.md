@@ -8,7 +8,8 @@ persona en el mismo teclado o en otra PC por internet.
 
 ## Modos
 
-Al arrancar se elige con el teclado:
+Al arrancar se elige con el teclado. Durante el juego, el botón **MENU**
+(arriba a la izquierda) o **Escape** vuelven a esta elección.
 
 - **1 · contra la PC**: vos con WASD o flechas (Shift acelera, Espacio aleja
   la cámara), con el tutorial de siempre. La nave de la PC se ve
@@ -24,8 +25,8 @@ Al arrancar se elige con el teclado:
   lo muestran hasta que se toca).
 - **3 · online**: busca a alguien que también esté buscando y juegan cada uno
   en su PC, con los controles de siempre y la cámara siguiendo a tu nave.
-  Escape cancela la búsqueda o te saca de la partida. Si el rival se va,
-  aparece un cartel y se vuelve a la elección.
+  MENU o Escape cancelan la búsqueda o te sacan de la partida; salir cuenta
+  como irse: al rival le aparece EL RIVAL SE FUE y vuelve a su elección.
 
 ## Online
 

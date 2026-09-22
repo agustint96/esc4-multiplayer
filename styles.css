@@ -702,6 +702,31 @@ html.escenas-listas .salmon-scene {
 .game-modo[hidden] {
   display: none;
 }
+/* Botón para volver a la elección del modo, arriba a la izquierda. La escena
+   no recibe clicks (pointer-events: none), el botón sí. */
+.game-menu {
+  position: absolute;
+  top: 1.2rem;
+  left: 1.2rem;
+  z-index: 3;
+  padding: 0.5em 0.9em;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 0.35em;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: Spaceport, ui-monospace, Consolas, monospace;
+  font-size: clamp(0.7rem, 1.5vmin, 0.9rem);
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.game-menu:hover {
+  border-color: #fff;
+  color: #fff;
+}
+.game-menu[hidden] {
+  display: none;
+}
 /* Online, buscando rival: solo queda el estado ("buscando rival"...). */
 .game-modo.buscando > :not(.game-modo-estado) {
   display: none;
