@@ -1429,6 +1429,9 @@ function drawStars() {
     registerScene("game", {
       setVisible: (visible) => {
         if (gameScene) gameScene.classList.toggle("game-visible", visible);
+        // Ya visible de verdad: de acá en más entra y sale con su fundido (ver
+        // html.entra-juego en index.html).
+        document.documentElement.classList.remove("entra-juego");
         if (window.esc4Game) window.esc4Game.setActive(visible);
         // La nave entra con la luz apagada (la intro es a color; la prende
         // esc4-game.js cuando se van las navecitas, ver shipLightSet) y al
@@ -2051,13 +2054,27 @@ function drawStars() {
         // de arriba -pisan los ejes analógicos sólo si están apretados, así
         // no interfieren con el mouse/gamepad cuando no se usa el teclado.
         // Con dos jugadores sin joystick (escenario 4) las flechas y el Shift
-        // derecho son del jugador 2: los lee esc4-game.js y acá no mueven esta nave.
-        const flechas = !window.j2Teclado;
-        if (keyLeft || (flechas && arrowLeft)) gx = -1;
-        else if (keyRight || (flechas && arrowRight)) gx = 1;
-        if (keyUp || (flechas && arrowUp)) gy = -1;
-        else if (keyDown || (flechas && arrowDown)) gy = 1;
-        if (keyBoost || (flechas && keyBoostDer)) boosting = true;
+        // derecho son del jugador 2: los lee esc4-game.js y acá no mueven esta
+        // nave. Con los lados dados vuelta (tecladoAlReves) es al revés: esta
+        // nave va con las flechas y WASD es del jugador 2.
+        const alReves = !!window.tecladoAlReves;
+        const flechas = !window.j2Teclado || alReves;
+        const wasd = !alReves;
+        if ((wasd && keyLeft) || (flechas && arrowLeft)) gx = -1;
+        else if ((wasd && keyRight) || (flechas && arrowRight)) gx = 1;
+        if ((wasd && keyUp) || (flechas && arrowUp)) gy = -1;
+        else if ((wasd && keyDown) || (flechas && arrowDown)) gy = 1;
+        if ((wasd && keyBoost) || (flechas && keyBoostDer)) boosting = true;
+        // Terminó la partida del escenario 4 (window.shipSinControl): ni
+        // teclado, ni joystick, ni mouse; la nave sigue de largo con lo que
+        // traía.
+        if (window.shipSinControl) {
+          gx = 0;
+          gy = 0;
+          boosting = false;
+          gamepadActive = false;
+          l = false;
+        }
         if (gx !== 0 || gy !== 0) {
           gamepadActive = true;
           i = e + gx * 1000;
@@ -2075,7 +2092,11 @@ function drawStars() {
         // son 2 de tamaño 1; en 120 Hz es 1 de tamaño 0,5): la velocidad, el freno y
         // la posición se avanzan de a un paso, como se afinó, y no de un saque.
         const ahoraNave = performance.now();
-        const cuadros = shipPrevT ? cuadrosDe(ahoraNave - shipPrevT) : 1;
+        // window.shipLento: cámara lenta (1 = normal), la usa el final de la
+        // partida del escenario 4.
+        const cuadros =
+          (shipPrevT ? cuadrosDe(ahoraNave - shipPrevT) : 1) *
+          (window.shipLento || 1);
         shipPrevT = ahoraNave;
         shipCuadros = cuadros;
         const subpasos = Math.max(1, Math.round(cuadros));
@@ -2814,7 +2835,12 @@ function drawStars() {
         if (window.j2Joystick) {
           const lightButton = gp.buttons[BTN_LIGHT];
           const lightPressed = !!(lightButton && lightButton.pressed);
-          if (lightPressed && !prevLightPressed[idx] && window.esc4Game)
+          if (
+            lightPressed &&
+            !prevLightPressed[idx] &&
+            window.esc4Game &&
+            !window.juegoEnPausa
+          )
             window.esc4Game.toggleLuzRival();
           prevLightPressed[idx] = lightPressed;
           continue;
@@ -2827,7 +2853,14 @@ function drawStars() {
 
         const lightButton = gp.buttons[BTN_LIGHT];
         const lightPressed = !!(lightButton && lightButton.pressed);
-        if (lightPressed && !prevLightPressed[idx] && toggleShipLight) {
+        // En la pausa del escenario 4 (ver abrirPausa en esc4-game.js) la
+        // luz no se toca: todo queda como estaba.
+        if (
+          lightPressed &&
+          !prevLightPressed[idx] &&
+          toggleShipLight &&
+          !window.juegoEnPausa
+        ) {
           toggleShipLight();
         }
         prevLightPressed[idx] = lightPressed;
@@ -2844,19 +2877,24 @@ function drawStars() {
   // vez de una sola vez por tecla apretada, como sí hace el chequeo de
   // flanco (prevActionPressed/prevLightPressed) del lado del joystick.
   document.addEventListener("keydown", (ev) => {
-    if (ev.repeat) return;
+    if (ev.repeat || window.juegoEnPausa) return;
     if (ev.code === "KeyE") triggerAction();
     else if (ev.code === "KeyQ") {
       // Con dos jugadores y el joystick en el jugador 1, Q le queda libre
       // (no la usa para moverse): pasa a prender la luz del jugador 2 (ver
-      // toggleLuzRival). Si no, sigue siendo la luz de siempre, de esta nave.
-      if (window.j1Joystick) {
+      // toggleLuzRival). Lo mismo si los dos están en el teclado con los
+      // lados dados vuelta: Q es de quien usa WASD, que ahí es el jugador 2.
+      // Si no, sigue siendo la luz de siempre, de esta nave.
+      if (window.j1Joystick || window.tecladoAlReves) {
         if (window.esc4Game) window.esc4Game.toggleLuzRival();
       } else if (toggleShipLight) toggleShipLight();
     } else if (ev.code === "KeyL" && window.j2Teclado && !window.j1Joystick) {
-      // Los dos jugadores en el teclado (sin joystick): Q sigue siendo la
-      // del jugador 1, L es la del jugador 2.
-      if (window.esc4Game) window.esc4Game.toggleLuzRival();
+      // Los dos jugadores en el teclado (sin joystick): Q es de quien usa
+      // WASD y L de quien usa las flechas (el jugador 2, o el 1 con los
+      // lados dados vuelta).
+      if (window.tecladoAlReves) {
+        if (toggleShipLight) toggleShipLight();
+      } else if (window.esc4Game) window.esc4Game.toggleLuzRival();
     }
   });
 })();

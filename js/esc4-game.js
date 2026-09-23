@@ -526,6 +526,11 @@
   const BUSQUEDA_VUELTA_EXTRA = 0.6; // con presión 1, las piedras corrigen 60 % más rápido de costado
   const RIVAL_PELIGRO = 170; // px del mundo: desde acá una piedra la espanta
   const FIN_DURA = 4; // segundos con el cartel del ganador
+  // Apenas alguien llega a 10 el juego no se frena de golpe: sigue FIN_LENTO_DURA
+  // segundos más en cámara lenta (a FIN_LENTO de la velocidad normal), ya sin
+  // que nadie pueda mover nada, y recién ahí queda quieto (ver animarFin).
+  const FIN_LENTO_DURA = 1; // s de verdad
+  const FIN_LENTO = 0.25;
   // Repulsión entre naves, medida en largos de nave (el dibujo, no la hitbox,
   // que es bastante más chica): empiezan a empujarse con los centros a
   // REPELER_ALCANCE largos, y nunca quedan a menos de REPELER_MINIMO. El empujón
@@ -785,27 +790,73 @@
     ArrowRight: "right",
     ShiftRight: "boost",
   };
+  // Los dos en el teclado con los lados dados vuelta (window.tecladoAlReves,
+  // ver actualizarControles): el jugador 2 pasa a WASD y Shift izquierdo.
+  const teclasJ2Wasd = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    boost: false,
+  };
+  const TECLAS_J2_WASD = {
+    KeyW: "up",
+    KeyS: "down",
+    KeyA: "left",
+    KeyD: "right",
+    ShiftLeft: "boost",
+  };
+  // En el menú de modos WASD hace lo mismo que las flechas: W y S suben y
+  // bajan, A y D dan vuelta los lados de dos jugadores.
+  const FLECHA_DE = {
+    ArrowUp: "ArrowUp",
+    ArrowDown: "ArrowDown",
+    ArrowLeft: "ArrowLeft",
+    ArrowRight: "ArrowRight",
+    KeyW: "ArrowUp",
+    KeyS: "ArrowDown",
+    KeyA: "ArrowLeft",
+    KeyD: "ArrowRight",
+  };
   document.addEventListener("keydown", (ev) => {
     if (TECLAS_J2[ev.code]) teclasJ2[TECLAS_J2[ev.code]] = true;
-    if (activo && !modo) {
+    if (TECLAS_J2_WASD[ev.code]) teclasJ2Wasd[TECLAS_J2_WASD[ev.code]] = true;
+    if (!activo) return;
+    if (modo && ev.code === "Escape") {
+      alternarPausa();
+    } else if (pausa === "salir") {
+      // Online, el cartel de salir: las flechas pasan de una opción a la otra
+      // (también mueven la nave: el juego sigue). Las opciones están una al
+      // lado de la otra, pero valen las cuatro.
+      const paso = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+      if (paso[ev.code]) apuntarSalir(salirApuntada + paso[ev.code]);
+      else if (
+        ev.code === "Enter" ||
+        ev.code === "NumpadEnter" ||
+        ev.code === "KeyE"
+      )
+        elegirSalir();
+    } else if (!modo || pausa === "menu") {
       const MODOS = { 1: "tutorial", 2: "pc", 3: "dos", 4: "online" };
       const n = /^(?:Digit|Numpad)([1-4])$/.exec(ev.code);
+      const flecha = FLECHA_DE[ev.code];
       if (n) elegirModo(MODOS[n[1]]);
-      else if (ev.code === "ArrowUp" || ev.code === "ArrowDown") {
-        apuntarOpcion(opcionApuntada + (ev.code === "ArrowDown" ? 1 : -1));
+      else if (flecha === "ArrowUp" || flecha === "ArrowDown") {
+        apuntarOpcion(opcionApuntada + (flecha === "ArrowDown" ? 1 : -1));
         ev.preventDefault(); // que no scrollee la página detrás
+      } else if (flecha === "ArrowLeft" || flecha === "ArrowRight") {
+        cambiarControles(); // solo hace algo parado en dos jugadores
+        ev.preventDefault();
       } else if (
         ev.code === "Enter" ||
         ev.code === "NumpadEnter" ||
         ev.code === "KeyE"
       )
         elegirApuntada();
-    } else if (activo && modo && ev.code === "Escape") {
-      salirAlMenu();
     }
   });
   const menuEl = document.getElementById("game-menu");
-  if (menuEl) menuEl.addEventListener("click", () => salirAlMenu());
+  if (menuEl) menuEl.addEventListener("click", () => alternarPausa());
 
   // Volver a la elección del modo, desde cualquier modo. Se recarga la página:
   // así todo arranca limpio. Online es como irse: al rival le llega que se fue
@@ -814,12 +865,190 @@
     location.reload();
   }
 
-  // Lo mismo desde el joystick: el botón de menú (el de la derecha de los dos
+  // Pausa, con Escape, el botón de menú de arriba a la izquierda o el del
+  // joystick (ver pausaConJoystick). null jugando; si no:
+  // - "menu" (tutorial, contra la PC y dos jugadores): todo queda quieto -el
+  //   juego, la nave y los sonidos-, en blanco y negro, con el menú de modos en
+  //   el medio; se lo recorre igual que al arrancar y lo que se elige arranca de
+  //   cero (ver reiniciarEnModo). Otra vez Escape (o el botón) sigue jugando.
+  // - "salir" (online): el rival sigue jugando, así que no se frena nada; solo
+  //   aparece el cartel que pregunta si salir, con continuar y salir.
+  let pausa = null;
+  const salirEl = document.getElementById("game-salir");
+  // Capa por encima de la nave (la nave va por encima de toda la escena): el
+  // menú se muda ahí mientras dura la pausa y después vuelve a su lugar.
+  const capaEl = document.getElementById("game-capa");
+  let modoCasa = null; // { padre, siguiente }: dónde estaba el menú
+  const opcionesSalir = salirEl
+    ? [...salirEl.querySelectorAll("[data-salir]")]
+    : [];
+  let salirApuntada = 0;
+  let padSalirLR = false; // si LB o RB venían apretados (cartel de salir)
+  let padSalirCruceta = 0; // 1 derecha o abajo, -1 izquierda o arriba, 0 nada
+  // leerJoystick ya junta el stick (con su zona muerta) y la cruceta.
+  const crucetaSalir = () => {
+    const t = leerJoystick().teclas;
+    return t.has("right") || t.has("down")
+      ? 1
+      : t.has("left") || t.has("up")
+        ? -1
+        : 0;
+  };
+  let padSalirA = false; // si el botón A venía apretado (cartel de salir)
+  // Los <audio> de respaldo que sonaban al pausar, para seguirlos después.
+  let sonandoAntesDePausa = [];
+
+  function alternarPausa() {
+    if (pausa) cerrarPausa();
+    else if (enLinea()) abrirSalir();
+    else abrirPausa();
+  }
+
+  function abrirPausa() {
+    pausa = "menu";
+    window.juegoEnPausa = true; // script.js: sin luz ni zoom mientras tanto
+    pausarSonidos(true);
+    scene.classList.add("en-pausa");
+    // El menú arranca apuntando al modo que se está jugando.
+    apuntarOpcion(opcionesModo.findIndex((el) => el.dataset.elegir === modo));
+    sincronizarPadMenu();
+    if (capaEl) capaEl.classList.add("velo");
+    if (modoEl) {
+      if (capaEl) {
+        modoCasa = { padre: modoEl.parentNode, siguiente: modoEl.nextSibling };
+        capaEl.appendChild(modoEl);
+      }
+      modoEl.classList.add("pausa");
+      modoEl.hidden = false;
+    }
+  }
+
+  function abrirSalir() {
+    pausa = "salir";
+    apuntarSalir(0); // arranca en continuar
+    const gp = primerJoystick();
+    padSalirLR = !!gp && (botonPad(gp, PAD_LB) || botonPad(gp, PAD_RB));
+    padSalirA = !!gp && botonPad(gp, PAD_A);
+    padSalirCruceta = gp ? crucetaSalir() : 0;
+    if (salirEl) salirEl.hidden = false;
+    // Buscando rival, el "buscando rival" queda justo detrás del cartel y
+    // asoma por arriba: se esconde mientras está abierto.
+    if (modoEl) modoEl.style.visibility = "hidden";
+  }
+
+  function cerrarPausa() {
+    if (pausa === "menu") {
+      pausarSonidos(false);
+      scene.classList.remove("en-pausa");
+      if (capaEl) capaEl.classList.remove("velo");
+      if (modoEl) {
+        modoEl.classList.remove("pausa");
+        modoEl.hidden = true;
+        if (modoCasa) {
+          modoCasa.padre.insertBefore(modoEl, modoCasa.siguiente);
+          modoCasa = null;
+        }
+      }
+    }
+    if (salirEl) salirEl.hidden = true;
+    if (modoEl) modoEl.style.removeProperty("visibility");
+    pausa = null;
+    window.juegoEnPausa = false;
+  }
+
+  // Con Web Audio alcanza con suspender el contexto (se frena todo lo que
+  // suena por ahí, y su reloj también); los <audio> de respaldo se pausan de a
+  // uno y siguen solo los que venían sonando.
+  function pausarSonidos(frenar) {
+    if (frenar) {
+      if (audioCtx) audioCtx.suspend().catch(() => {});
+      sonandoAntesDePausa = [
+        musica,
+        musicaIntro,
+        vozAudio,
+        perder,
+        nota,
+        portal,
+        portalCruce,
+      ].filter((a) => a && !a.paused);
+      for (const a of sonandoAntesDePausa) a.pause();
+    } else {
+      if (audioCtx) audioCtx.resume().catch(() => {});
+      for (const a of sonandoAntesDePausa) a.play().catch(() => {});
+      sonandoAntesDePausa = [];
+    }
+  }
+
+  // Elegir un modo desde la pausa: se recarga la página (como salirAlMenu, así
+  // todo arranca limpio) y al volver se entra directo a ese modo, con los
+  // controles como se hayan dejado (ver setActive).
+  const CLAVE_MODO_PAUSA = "esc4-modo-pausa";
+  function reiniciarEnModo(m) {
+    try {
+      sessionStorage.setItem(
+        CLAVE_MODO_PAUSA,
+        JSON.stringify({ modo: m, cambiados: controlesCambiados }),
+      );
+    } catch (e) {}
+    salirAlMenu();
+  }
+
+  // Las dos opciones del cartel de salir; da la vuelta.
+  function apuntarSalir(i) {
+    const n = opcionesSalir.length;
+    if (!n) return;
+    salirApuntada = ((i % n) + n) % n;
+    opcionesSalir.forEach((el, j) =>
+      el.classList.toggle("elegida", j === salirApuntada),
+    );
+  }
+
+  function elegirSalir() {
+    const el = opcionesSalir[salirApuntada];
+    if (!el) return;
+    if (el.dataset.salir === "si") salirAlMenu();
+    else cerrarPausa();
+  }
+
+  opcionesSalir.forEach((el, i) => {
+    el.addEventListener("click", () => {
+      apuntarSalir(i);
+      elegirSalir();
+    });
+    el.addEventListener("pointerenter", () => apuntarSalir(i));
+  });
+
+  // Joystick en el cartel de salir, un cuadro a la vez: LB y RB, o la cruceta
+  // o el stick para cualquier lado, pasan de una opción a la otra y A elige,
+  // todo por flanco (un paso por empujón). El stick y la cruceta también mueven
+  // la nave: el juego sigue.
+  function navegarSalirJoystick() {
+    const gp = primerJoystick();
+    if (!gp) {
+      padSalirLR = false;
+      padSalirCruceta = 0;
+      padSalirA = false;
+      return;
+    }
+    const lb = botonPad(gp, PAD_LB);
+    const rb = botonPad(gp, PAD_RB);
+    if ((lb || rb) && !padSalirLR) apuntarSalir(salirApuntada + (rb ? 1 : -1));
+    padSalirLR = lb || rb;
+    const cruceta = crucetaSalir();
+    if (cruceta && cruceta !== padSalirCruceta)
+      apuntarSalir(salirApuntada + cruceta);
+    padSalirCruceta = cruceta;
+    const a = botonPad(gp, PAD_A);
+    if (a && !padSalirA) elegirSalir();
+    padSalirA = a;
+  }
+
+  // La pausa desde el joystick: el botón de menú (el de la derecha de los dos
   // del medio, el start de toda la vida) o el X (el de la izquierda de los
   // cuatro). Los números son los del mapeo estándar del navegador, que es el
   // que usan los joysticks de hoy. Por flanco, para que no se dispare en cada
   // cuadro mientras se lo tiene apretado, y vale tenga el joystick quien lo
-  // tenga: con dos jugadores es del segundo, pero salir es salir.
+  // tenga: con dos jugadores es del segundo, pero pausar es pausar.
   const PAD_START = 9;
   const PAD_X = 2;
   let padSalirAntes = false;
@@ -827,17 +1056,19 @@
     const gp = primerJoystick();
     return !!gp && (botonPad(gp, PAD_START) || botonPad(gp, PAD_X));
   };
-  function salirConJoystick() {
+  function pausaConJoystick() {
     const apretado = padSalirApretado();
-    if (apretado && !padSalirAntes) salirAlMenu();
+    if (apretado && !padSalirAntes) alternarPausa();
     padSalirAntes = apretado;
   }
   document.addEventListener("keyup", (ev) => {
     if (TECLAS_J2[ev.code]) teclasJ2[TECLAS_J2[ev.code]] = false;
+    if (TECLAS_J2_WASD[ev.code]) teclasJ2Wasd[TECLAS_J2_WASD[ev.code]] = false;
   });
   // Al perder el foco no llega el keyup: se sueltan todas.
   window.addEventListener("blur", () => {
     for (const k in teclasJ2) teclasJ2[k] = false;
+    for (const k in teclasJ2Wasd) teclasJ2Wasd[k] = false;
   });
 
   // El menú de modo se puede recorrer de tres maneras, todas sobre el mismo
@@ -882,16 +1113,34 @@
     if (el) elegirModo(el.dataset.elegir);
   }
 
-  // LB y RB dan vuelta quién usa el joystick y quién el teclado. Solo tiene
-  // sentido parado en "dos jugadores" (es la única opción con dos controles) y
-  // con un joystick conectado: sin joystick no habría con qué apretar LB ni RB.
-  // El renglón de abajo del menú lo muestra solo en el próximo cuadro
-  // (mostrarControles).
+  // Da vuelta quién usa el joystick y quién el teclado: con LB, RB o el stick
+  // o la cruceta para los costados, las flechas de los costados del teclado o
+  // la ruedita del mouse (y A y D en el teclado). Solo tiene sentido parado en
+  // "dos jugadores" (es la única opción con dos controles). Sin joystick los
+  // dos juegan en el teclado y lo que se da vuelta es quién usa WASD y quién
+  // las flechas. El renglón de abajo del menú lo muestra solo en el próximo
+  // cuadro (mostrarControles).
   function cambiarControles() {
     const opcion = opcionesModo[opcionApuntada];
     if (!opcion || opcion.dataset.elegir !== "dos") return;
     controlesCambiados = !controlesCambiados;
   }
+
+  // La ruedita del mouse también da vuelta los lados, con el menú a la vista.
+  // Una vuelta de rueda manda muchos eventos seguidos: cuenta uno y los que
+  // llegan en los próximos RUEDA_ESPERA ms se ignoran.
+  const RUEDA_ESPERA = 250;
+  let ruedaAntes = 0;
+  window.addEventListener(
+    "wheel",
+    (ev) => {
+      if (!activo || (modo && pausa !== "menu") || !ev.deltaY) return;
+      if (ev.timeStamp - ruedaAntes < RUEDA_ESPERA) return;
+      ruedaAntes = ev.timeStamp;
+      cambiarControles();
+    },
+    { passive: true },
+  );
 
   opcionesModo.forEach((el, i) => {
     el.addEventListener("click", () => {
@@ -903,6 +1152,13 @@
     el.addEventListener("pointerenter", () => apuntarOpcion(i));
   });
   apuntarOpcion(0);
+
+  // Lo que en el joystick da vuelta los lados (ver cambiarControles).
+  const cambiaLados = (gp, joy) =>
+    botonPad(gp, PAD_LB) ||
+    botonPad(gp, PAD_RB) ||
+    joy.teclas.has("left") ||
+    joy.teclas.has("right");
 
   // Joystick en el menú, un cuadro a la vez (lo llama cuadro() mientras no hay
   // modo elegido). El stick se comporta como una tecla: un paso al empujarlo y
@@ -930,9 +1186,9 @@
         padMenuT = MENU_PAD_REPITE;
       }
     }
-    // LB o RB: cambian de lado los controles, y también repiten si se los deja
-    // apretados.
-    const lr = botonPad(gp, PAD_LB) || botonPad(gp, PAD_RB);
+    // LB o RB, o el stick o la cruceta para los costados: cambian de lado los
+    // controles, y también repiten si se los deja apretados.
+    const lr = cambiaLados(gp, joy);
     if (lr !== padMenuLR) {
       padMenuLR = lr;
       padMenuLRT = MENU_PAD_ESPERA;
@@ -949,7 +1205,31 @@
     padMenuA = a;
   }
 
+  // Al abrir la pausa el stick seguramente viene empujado (se estaba jugando):
+  // se toma como ya contado, si no el menú daría un paso solo apenas aparece.
+  function sincronizarPadMenu() {
+    const gp = primerJoystick();
+    if (!gp) {
+      padMenuY = 0;
+      padMenuA = false;
+      padMenuLR = false;
+      return;
+    }
+    const joy = leerJoystick();
+    padMenuY = joy.teclas.has("down") ? 1 : joy.teclas.has("up") ? -1 : 0;
+    padMenuT = MENU_PAD_ESPERA;
+    padMenuA = botonPad(gp, PAD_A);
+    padMenuLR = cambiaLados(gp, joy);
+    padMenuLRT = MENU_PAD_ESPERA;
+  }
+
   function elegirModo(m) {
+    // Con un modo ya en juego, el menú solo se ve en la pausa: ahí elegir
+    // arranca ese modo de cero.
+    if (modo) {
+      reiniciarEnModo(m);
+      return;
+    }
     modo = m;
     // Si el botón de salir ya venía apretado (se volvió al menú con él y se
     // eligió sin soltarlo), que no cuente como una apretada nueva y se salga
@@ -985,7 +1265,8 @@
   //   cambiaron los lados en el menú con LB o RB (controlesCambiados): ahí el
   //   joystick pasa a ser del jugador 1 y el 2 se queda con las flechas;
   // - sin joystick, el jugador 1 WASD y Shift izquierdo, y el jugador 2 las
-  //   flechas y Shift derecho (window.j2Teclado).
+  //   flechas y Shift derecho (window.j2Teclado), o al revés si se cambiaron
+  //   los lados (window.tecladoAlReves: el 1 las flechas y el 2 WASD).
   // Se revisa en cada cuadro: si el joystick se conecta o se desconecta en el
   // medio de la partida, cambia solo.
   function actualizarControles() {
@@ -997,6 +1278,7 @@
     // queda libre, no prende la suya), o con L si los dos están en el
     // teclado (ahí Q sigue siendo la del jugador 1).
     window.j1Joystick = hayPad && controlesCambiados;
+    window.tecladoAlReves = modo === "dos" && !hayPad && controlesCambiados;
   }
 
   // El renglón de abajo del menú dice de qué se trata la opción apuntada. Solo
@@ -1007,10 +1289,24 @@
   // cae a otra fuente y la palabra se ve partida al medio. Por eso los textos
   // van en infinitivo -"aprender", no "aprendé"-, que no lleva tilde y no
   // cambia de significado al sacársela (tampoco tiene comas ni paréntesis).
-  const CONTROLES_TECLADO =
-    "J1 WASD y shift izquierdo<br />J2 flechas y shift derecho";
-  const CONTROLES_JOYSTICK = "J1 teclado<br />J2 joystick";
-  const CONTROLES_JOYSTICK_AL_REVES = "J1 joystick<br />J2 teclado";
+  //
+  // Con dos jugadores, cada uno de su lado: J1 a la izquierda y J2 a la
+  // derecha (ver .game-modo-lado en styles.css).
+  const lados = (j1, j2) =>
+    `<span class="game-modo-lado">${j1}</span>` +
+    `<span class="game-modo-lado">${j2}</span>`;
+  // Sin joystick no entra en un renglón por lado: se corta a mano, antes del
+  // shift, para que no quede partido en cualquier lado.
+  const CONTROLES_TECLADO = lados(
+    "J1 WASD<br />shift izquierdo",
+    "J2 flechas<br />shift derecho",
+  );
+  const CONTROLES_TECLADO_AL_REVES = lados(
+    "J1 flechas<br />shift derecho",
+    "J2 WASD<br />shift izquierdo",
+  );
+  const CONTROLES_JOYSTICK = lados("J1 teclado", "J2 joystick");
+  const CONTROLES_JOYSTICK_AL_REVES = lados("J1 joystick", "J2 teclado");
   const PIE_MODO = {
     tutorial: () => "Aprender a jugar y practicar",
     // Contra la PC juega uno solo, y el teclado y el joystick andan los dos a la
@@ -1020,7 +1316,9 @@
     pc: () => (primerJoystick() ? "J1 joystick" : "J1 teclado"),
     dos: () =>
       !primerJoystick()
-        ? CONTROLES_TECLADO
+        ? controlesCambiados
+          ? CONTROLES_TECLADO_AL_REVES
+          : CONTROLES_TECLADO
         : controlesCambiados
           ? CONTROLES_JOYSTICK_AL_REVES
           : CONTROLES_JOYSTICK,
@@ -1236,6 +1534,7 @@
     invulJugador = 0;
     reaparecer = null;
     fin = null;
+    limpiarFin();
     reclamados.clear();
     golesPredichos.clear();
     ship.classList.remove("fuera-de-juego", "invulnerable");
@@ -3271,11 +3570,13 @@
       else if (apretado(PAD_CRUCETA.down)) gy = 1;
       if (apretado(PAD_RB)) empuje = RIVAL_EMPUJE_BOOST;
     } else if (modo === "dos") {
-      // La maneja el jugador 2 con las flechas, igual que las flechas a la nave
-      // del jugador 1 en script.js (cada eje -1/0/1, sin normalizar la diagonal).
-      gx = (teclasJ2.right ? 1 : 0) - (teclasJ2.left ? 1 : 0);
-      gy = (teclasJ2.down ? 1 : 0) - (teclasJ2.up ? 1 : 0);
-      if (teclasJ2.boost) empuje = RIVAL_EMPUJE_BOOST;
+      // La maneja el jugador 2 con las flechas (o WASD, con los lados dados
+      // vuelta), igual que las flechas a la nave del jugador 1 en script.js
+      // (cada eje -1/0/1, sin normalizar la diagonal).
+      const t = window.tecladoAlReves ? teclasJ2Wasd : teclasJ2;
+      gx = (t.right ? 1 : 0) - (t.left ? 1 : 0);
+      gy = (t.down ? 1 : 0) - (t.up ? 1 : 0);
+      if (t.boost) empuje = RIVAL_EMPUJE_BOOST;
     } else {
       const r = rumboRival(circulos);
       const m = Math.hypot(r.x, r.y);
@@ -3289,6 +3590,11 @@
       e += (quiere ? -RIVAL_BOOST_GASTO : RIVAL_BOOST_RECUPERA) * dt;
       rival.energia = Math.max(0, Math.min(1, e));
       if (quiere) empuje = RIVAL_EMPUJE_BOOST;
+    }
+    if (fin) {
+      // Terminó la partida: nadie la maneja, sigue con lo que traía.
+      gx = 0;
+      gy = 0;
     }
     const cuadros = dt * 60;
     const subpasos = Math.max(1, Math.round(cuadros));
@@ -3405,6 +3711,18 @@
   // navecitas del sitio: acá arranca otra partida.
   function terminarPartida(ganador) {
     fin = { t: 0, ganador };
+    // Nadie mueve más nada: la nave del jugador sigue de largo con lo que
+    // traía, en cámara lenta (script.js), y la del rival igual (moverRival).
+    window.shipSinControl = true;
+    window.shipLento = FIN_LENTO;
+    // Si perdiste, el fondo pasa a blanco y negro; si ganaste queda a color.
+    // Con dos jugadores siempre gana alguien de los que están mirando (igual
+    // que la nota de abajo), y que el rival se vaya online no es perder.
+    scene.classList.toggle(
+      "fin-perdiste",
+      ganador === "pc" && modo !== "dos",
+    );
+    ship.classList.toggle("fin-perdiste", ganador === "pc" && modo !== "dos");
     frenarMusica();
     // Con dos jugadores siempre gana alguien de carne y hueso: suena la nota.
     if (ganador === "vos" || modo === "dos") {
@@ -3416,6 +3734,26 @@
     }
     cumulos = [];
     mostrarTiempo();
+  }
+
+  // Vuelve todo a como estaba antes del final de la partida.
+  function limpiarFin() {
+    window.shipSinControl = false;
+    window.shipLento = 1;
+    scene.classList.remove("fin-perdiste");
+    ship.classList.remove("fin-perdiste");
+  }
+
+  // El segundo en cámara lenta del final: las piedras que venían siguen su
+  // camino (ya sin buscar a nadie), la nave del rival sigue de largo y las
+  // chispas y los números terminan de caer, todo con el dt ya ralentizado. No
+  // cae nada nuevo ni golpea nada: la partida ya terminó.
+  function animarFin(dt, circulos) {
+    actualizarCumulos(dt, circulos); // ya sin agujeros: solo chispas y números
+    moverPoligonos(poligonos, null, 0, dt);
+    if (enLinea()) seguirRivalOnline(dt);
+    else moverPoligonos(poligonosRival, null, 0, dt);
+    actualizarRival(dt, circulos);
   }
 
   // --- Online -----------------------------------------------------------------
@@ -4632,6 +4970,22 @@
     ultimo = ahora;
     avanzarPosicionMusica();
 
+    if (modo) {
+      // Con un modo ya elegido, el joystick puede pausar en cualquier momento
+      // (jugando, buscando rival o con el cartel del final), igual que Escape
+      // y que el botón de arriba a la izquierda.
+      pausaConJoystick();
+      if (pausa === "menu") {
+        // En pausa no avanza nada ni se vuelve a dibujar (el canvas queda con
+        // el último cuadro): la nave quieta y el joystick recorre el menú.
+        if (window.shipMove) window.shipMove(0, 0);
+        navegarMenuJoystick(dt);
+        mostrarControles();
+        return;
+      }
+      if (pausa === "salir") navegarSalirJoystick();
+    }
+
     const circulos = circulosNave();
     reloj += dt;
     if (!modo) {
@@ -4642,10 +4996,6 @@
       dibujar(circulos[1]);
       return;
     }
-    // Con un modo ya elegido, el joystick puede volver al menú en cualquier
-    // momento (jugando, buscando rival o con el cartel del final), igual que
-    // Escape y que el botón de arriba a la izquierda.
-    salirConJoystick();
     if (esperandoRival()) {
       // Online, buscando rival: igual que eligiendo, hasta que el emparejador
       // junta a los dos.
@@ -4769,9 +5119,15 @@
           if (enCentro) centrarNave();
         }
         if (fin) {
-          // Alguien llegó a 10: todo quieto con el cartel y después, otra partida.
+          // Alguien llegó a 10: el cartel, un segundo más en cámara lenta y
+          // después todo quieto hasta la otra partida.
           fin.t += dt;
-          if (window.shipMove) window.shipMove(0, 0);
+          if (fin.t < FIN_LENTO_DURA) {
+            animarFin(dt * FIN_LENTO, circulos);
+          } else {
+            window.shipLento = 1;
+            if (window.shipMove) window.shipMove(0, 0);
+          }
           // Si se fue el rival online, de vuelta a la elección; si no, otra
           // partida (online, con el mismo rival).
           if (fin.t >= FIN_DURA) {
@@ -4860,9 +5216,10 @@
       return negro && !ganado;
     },
     // script.js: ¿está bloqueado alejar la cámara (M/Espacio/LT/rueda)? Sí en la
-    // intro y en el final.
+    // intro, en el final y con el menú de modos a la vista (al arrancar o en
+    // la pausa: ahí la rueda da vuelta los lados de dos jugadores).
     sinZoom() {
-      return introT >= 0 || ganado;
+      return introT >= 0 || ganado || !modo || pausa === "menu";
     },
     setActive(valor) {
       if (valor === activo) return;
@@ -4883,6 +5240,7 @@
         window.vueltaAlBorde = false;
         window.j2Joystick = false;
         window.j2Teclado = false;
+        window.tecladoAlReves = false;
         if (modoEl) modoEl.hidden = false;
         apuntarOpcion(0); // el menú arranca de nuevo en la primera opción
         padMenuY = 0;
@@ -4890,14 +5248,32 @@
         padMenuA = false;
         padMenuLR = false;
         controlesCambiados = false;
+        // Se eligió un modo desde la pausa (ver reiniciarEnModo): se entra
+        // directo, sin pasar por el menú. Una sola vez: si no, cada recarga
+        // volvería a ese modo.
+        let dePausa = null;
+        try {
+          dePausa = JSON.parse(sessionStorage.getItem(CLAVE_MODO_PAUSA));
+          sessionStorage.removeItem(CLAVE_MODO_PAUSA);
+        } catch (e) {}
+        const i = dePausa
+          ? opcionesModo.findIndex((el) => el.dataset.elegir === dePausa.modo)
+          : -1;
+        if (i >= 0) {
+          controlesCambiados = !!dePausa.cambiados;
+          apuntarOpcion(i);
+          elegirApuntada();
+        }
         ultimo = performance.now();
         raf = requestAnimationFrame(cuadro);
       } else {
         cancelAnimationFrame(raf);
+        if (pausa) cerrarPausa();
         if (modoEl) modoEl.hidden = true;
         if (menuEl) menuEl.hidden = true;
         frenarSonidos();
         cancelarAyuda();
+        limpiarFin();
         limpiarFinal(); // la nave vuelve a verse en el resto de los escenarios
         ship.classList.remove("game-color");
         ship.style.removeProperty("--luz-rgb"); // en el resto de los escenarios la luz es la de siempre

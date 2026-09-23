@@ -26,8 +26,8 @@
   src: url("fonts/dm-mono-300-latin.woff2") format("woff2");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
-    U+2212, U+2215, U+FEFF, U+FFFD;
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "DM Mono";
@@ -36,8 +36,8 @@
   src: url("fonts/dm-mono-400-latin.woff2") format("woff2");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
-    U+2212, U+2215, U+FEFF, U+FFFD;
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "JetBrains Mono";
@@ -46,8 +46,8 @@
   src: url("fonts/jetbrains-mono-latin.woff2") format("woff2");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
-    U+2212, U+2215, U+FEFF, U+FFFD;
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "JetBrains Mono";
@@ -632,6 +632,16 @@ html.escenas-listas .salmon-scene {
 .game-scene.game-visible {
   opacity: 1;
 }
+/* Al cargar la página: el juego ya tapa todo desde el primer render, sin
+   fundido (ver html.entra-juego en index.html). */
+html.entra-juego .game-scene {
+  opacity: 1;
+  transition: none;
+}
+/* Mientras tanto, sin el segundero: en el menú de modos no se ve. */
+html.entra-juego .game-cuadrado {
+  visibility: hidden;
+}
 /* Fondo starry azul del escenario 4. En la intro está a pleno (game-intro): al
    ponerse la clase es instantáneo (transition: none) y cuando esc4-game.js se
    la saca (ya se fueron las navecitas) se funde a negro con la transición de
@@ -782,6 +792,77 @@ html.escenas-listas .salmon-scene {
 .game-menu[hidden] {
   display: none;
 }
+/* Pausa (Escape o el botón de menú del joystick, ver abrirPausa en
+   esc4-game.js): todo queda quieto, en blanco y negro y un poco borroso (ver
+   .game-capa.velo), y el menú de modos aparece en el medio dentro de un
+   recuadro negro. El cartel de salir del online (.game-salir) usa el mismo
+   recuadro. */
+/* Las instrucciones del tutorial se esconden: si no, asoman bajo el recuadro. */
+.game-scene.en-pausa .game-ayuda {
+  visibility: hidden;
+}
+/* Capa por encima de la nave (z-index 253) y de la pantalla negra
+   (.game-tapa): ahí van el menú de la pausa y el cartel de salir, que si no
+   quedarían tapados por la nave. No recibe clicks, sus opciones sí. */
+.game-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 255;
+  pointer-events: none;
+}
+/* En la pausa: todo lo de abajo (el juego y la nave, que están en otras
+   capas) en blanco y negro y con un blur suave. Va como backdrop-filter y no
+   como filter en la escena: así el borde de la pantalla no se desvanece
+   mostrando la página de atrás, y el menú, que está en esta capa, queda nítido. */
+.game-capa.velo {
+  -webkit-backdrop-filter: grayscale(1) blur(4px);
+  backdrop-filter: grayscale(1) blur(1px);
+}
+.game-modo.pausa,
+.game-salir {
+  top: 50%;
+  z-index: 4;
+  padding: 2.6em 3.2em;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 0.35em;
+  background: #000;
+}
+/* Las opciones de los submenús van más chicas que el menú de modos: del tamaño
+   del "esc para cancelar" de cuando se busca rival (el 0.8em de
+   .game-modo-estado small). */
+.game-salir {
+  gap: 2.4em;
+  font-size: calc(0.8 * clamp(0.7rem, 1.7vmin, 1rem));
+}
+/* Las dos opciones una al lado de la otra, como los lados de J1 y J2 en el
+   menú: continuar a la izquierda y salir a la derecha. Cada una crece desde su
+   centro al apuntarla. */
+.game-salir .game-modo-opciones {
+  flex-direction: row;
+  justify-content: center;
+  gap: 2.4em;
+}
+.game-salir .game-modo-opcion {
+  justify-content: center;
+  transform-origin: center;
+}
+/* La pregunta sí, del tamaño del menú de modos (1 / 0.8 lo devuelve). */
+.game-salir-pregunta {
+  margin: 0;
+  font-size: 1.25em;
+  font-family: Spaceport, ui-monospace, Consolas, monospace;
+  letter-spacing: 0.2em;
+  color: #fff;
+}
+/* Fin de la partida, si perdiste (ver terminarPartida en esc4-game.js): el
+   fondo y las naves pasan a blanco y negro; el cartel del medio (con el color
+   de quien ganó) no. Si ganaste queda todo a color. No del todo gris: le
+   queda un poco de color (grayscale menor a 1). */
+.game-scene.fin-perdiste::before,
+.game-scene.fin-perdiste > :not(.game-cuadrado),
+.starry-cohete-pair.in-game.fin-perdiste {
+  filter: grayscale(0.6) !important;
+}
 /* Online, buscando rival: solo queda el estado ("buscando rival"...). */
 .game-modo.buscando > :not(.game-modo-estado) {
   display: none;
@@ -798,13 +879,42 @@ html.escenas-listas .salmon-scene {
   font-size: 0.8em;
   color: rgba(255, 255, 255, 0.55);
 }
+/* El renglón de abajo del menú (qué es la opción apuntada, o quién usa qué con
+   dos jugadores) va del tamaño de los submenús: el del "esc para cancelar". */
 .game-modo-controles {
+  display: grid;
   margin: 1em 0 0;
+  font-size: 0.8em;
   font-family: Spaceport, ui-monospace, Consolas, monospace;
   letter-spacing: 0.2em;
   line-height: 2;
   text-align: center;
   color: rgba(255, 255, 255, 0.55);
+}
+/* El ancho del menú es siempre el que tiene con el tutorial apuntado: un
+   renglón invisible con ese texto (data-ancho) da el ancho, y el texto de
+   verdad, encima, no suma nada (width: 0) y se acomoda a ese ancho (si fuera
+   más largo, baja de renglón en vez de ensanchar el menú). */
+.game-modo-controles::before {
+  content: attr(data-ancho);
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+.game-modo-controles > span {
+  grid-area: 1 / 1;
+  display: flex;
+  justify-content: center;
+  gap: 1.6em;
+  width: 0;
+  min-width: 100%;
+}
+/* Con dos jugadores: J1 a la izquierda y J2 a la derecha, cada uno del ancho
+   de su texto y sin cortarse (los renglones los corta el <br /> de PIE_MODO).
+   Sin joystick los dos juntos pasan apenas el ancho del renglón: se comen un
+   poco del margen del recuadro, que sobra. */
+.game-modo-lado {
+  flex: none;
+  white-space: nowrap;
 }
 /* Contra la PC el segundero es el marcador: tus goles en azul y los de la PC en
    rojo, los mismos colores del borde de las piedras de cada una y de los halos
