@@ -278,6 +278,19 @@
     "5- final/siii.m4a",
   ];
   const VOZ_REEMPLAZA = 0.5; // probabilidad de que reemplace al "1" (si no, suena después)
+  // Momentos de la partida con voz propia, con VOZ_HITO_CHANCE de sonar cada
+  // vez: el gol número 9 de cualquiera de los dos ("uno más", en ultimopunto) y
+  // el 9 a 9 ("empate"; ahí no suena la de "uno más", que ya no vale: el que
+  // sigue decide).
+  const VOZ_ULTIMO_PUNTO = [
+    "ultimopunto/unomasmp3.m4a",
+    "ultimopunto/unomas2.m4a",
+    "ultimopunto/unomas3mp3.m4a",
+    "ultimopunto/unomas4mp3.m4a",
+  ];
+  const VOZ_EMPATE = ["empate/peleadisimo.m4a", "empate/sedefine.m4a"];
+  const VOZ_HITO_GOL = 9;
+  const VOZ_HITO_CHANCE = 0.5;
   // Conteo regresivo: cada vez que la nave entra a un agujero de gusano suena
   // el número que sigue, del 10 al 1 (un pasaje por número: CUMULOS_PARA_COLOR
   // tiene que ser igual a la cantidad de números). De cada número hay una o
@@ -627,6 +640,8 @@
   const vocesAnimo = VOZ_ANIMO.map((f) => crearVoz(VOZ_URL + f));
   const vocesCansado = VOZ_CANSADO.map((f) => crearVoz(VOZ_URL + f));
   const vocesFelicita = VOZ_FELICITA.map((f) => crearVoz(VOZ_URL + f));
+  const vocesUltimoPunto = VOZ_ULTIMO_PUNTO.map((f) => crearVoz(VOZ_URL + f));
+  const vocesEmpate = VOZ_EMPATE.map((f) => crearVoz(VOZ_URL + f));
   const vocesAyuda = AYUDA_VOCES.map((paso) =>
     paso.map((f) => crearVoz(VOZ_URL + f)),
   ); // un elemento por paso de las instrucciones, con sus variantes
@@ -944,8 +959,8 @@
     // Con dos jugadores y contra la PC los costados dan la vuelta (script.js
     // para la nave propia, moverRival para la del rival); online y en el
     // tutorial frenan como siempre.
-    window.vueltaCostados = m === "dos" || m === "pc";
-    window.vueltaAlBorde = m === "pc"; // ver margenVuelta
+    window.vueltaCostados = m === "dos" || m === "pc" || m === "online";
+    window.vueltaAlBorde = m === "pc" || m === "online"; // ver margenVuelta
     actualizarControles();
     if (menuEl) menuEl.hidden = false;
     if (m === "online") {
@@ -1378,6 +1393,8 @@
       ...vocesAnimo,
       ...vocesCansado,
       ...vocesFelicita,
+      ...vocesUltimoPunto,
+      ...vocesEmpate,
       ...vocesAyuda.flat(),
       ...vocesAyudaJoystick.flat(),
       ...vocesListo,
@@ -1451,16 +1468,42 @@
   // después del "1" y a veces en su lugar.
   // La voz del gol n (1..10). conteo va de "10" a "1", así que el gol n es
   // conteo[10 - n]; en el último, además, felicita.
-  function decirGol(n) {
+  // luego (opcional): otra voz que sigue al número (ver vozDeHito).
+  function decirGol(n, luego) {
     const variantes = conteo[CUMULOS_PARA_COLOR - n];
-    if (!variantes) return;
+    if (!variantes) {
+      if (luego) decirVoz(luego);
+      return;
+    }
     const numero = alAzar(variantes);
     if (n < CUMULOS_PARA_COLOR) {
-      decirVoz(numero);
+      decirVoz(numero, luego ? () => decirVoz(luego) : undefined);
       return;
     }
     const felicita = alAzar(vocesFelicita);
     decirVoz(numero, () => decirVoz(felicita));
+  }
+
+  // La voz de un momento clave (o null, porque no toca o porque no hay nada
+  // que decir) después de un gol, con el marcador ya actualizado: el 9 a 9, o
+  // el gol número 9 de quien lo hizo (anotoMio: si fue el jugador de esta
+  // pantalla; si no, el rival, sea la PC, el jugador 2 u online).
+  function vozDeHito(anotoMio) {
+    const mios = cumulosTomados;
+    const suyos = golesRival;
+    if (Math.random() >= VOZ_HITO_CHANCE) return null;
+    if (mios === VOZ_HITO_GOL && suyos === VOZ_HITO_GOL)
+      return alAzar(vocesEmpate);
+    if ((anotoMio ? mios : suyos) === VOZ_HITO_GOL)
+      return alAzar(vocesUltimoPunto);
+    return null;
+  }
+
+  // Lo mismo para un gol del rival que no tiene voz de número (contra la PC y
+  // online): si toca, dice solo la del momento.
+  function decirHitoRival() {
+    const hito = vozDeHito(false);
+    if (hito) decirVoz(hito);
   }
 
   function sonarConteo(i) {
@@ -2286,6 +2329,12 @@
   // segundero de siempre, que se tiñe con la nave. Spaceport no tiene tildes:
   // "GANO".
   function mostrarTiempo() {
+    // El azul es siempre el jugador 1 y va a la izquierda; el rojo, a la
+    // derecha. Online a vos te puede tocar el rojo (ver esAzul): tus goles
+    // salen con el color que te tocó y el marcador sigue con el azul primero.
+    const claseMia = esAzul() ? "marcador-jugador" : "marcador-rival";
+    const claseRival = esAzul() ? "marcador-rival" : "marcador-jugador";
+    const celda = (clase, n) => '<span class="' + clase + '">' + n + "</span>";
     // En el tutorial, el segundero del sitio (y GANASTE al completar los 10).
     const texto = esTutorial()
       ? fin
@@ -2295,22 +2344,22 @@
         ? fin.ganador === "abandono"
           ? "EL RIVAL SE FUE"
           : fin.ganador === "vos"
-            ? '<span class="marcador-jugador">' +
-              (modo === "dos" ? "GANO J1" : "GANASTE") +
-              "</span>"
-            : '<span class="marcador-rival">' +
-              (modo === "dos"
-                ? "GANO J2"
-                : enLinea()
-                  ? "GANO EL RIVAL"
-                  : "GANO LA PC") +
-              "</span>"
-        : '<span class="marcador-jugador">' +
-          cumulosTomados +
-          '</span><span class="marcador-separador"></span>' +
-          '<span class="marcador-rival">' +
-          golesRival +
-          "</span>";
+            ? celda(claseMia, modo === "dos" ? "GANO J1" : "GANASTE")
+            : celda(
+                claseRival,
+                modo === "dos"
+                  ? "GANO J2"
+                  : enLinea()
+                    ? "GANO EL RIVAL"
+                    : "GANO LA PC",
+              )
+        : esAzul()
+          ? celda(claseMia, cumulosTomados) +
+            '<span class="marcador-separador"></span>' +
+            celda(claseRival, golesRival)
+          : celda(claseRival, golesRival) +
+            '<span class="marcador-separador"></span>' +
+            celda(claseMia, cumulosTomados);
     if (texto === ultimoTexto) return;
     ultimoTexto = texto;
     timerEl.innerHTML = texto;
@@ -2692,7 +2741,7 @@
         // Del color que le tocó al jugador (el mismo del halo de su nave).
         crearNumeroEstrellas(salida.x, salida.y, cumulosTomados, colorPropio());
         sonarCruce();
-        decirGol(cumulosTomados);
+        decirGol(cumulosTomados, vozDeHito(true));
         mostrarTiempo();
         actualizarColor();
         if (enLinea()) avisarGolAnfitrion(entrado, salida);
@@ -2847,7 +2896,7 @@
   // y lo que se sale queda fuera de la vista, donde solo la IA sabe qué pasa
   // (ventaja para ella), así que ahí dan la vuelta justo en el borde.
   function margenVuelta() {
-    return modo === "pc" ? 0 : MUNDO_VUELTA_MARGEN;
+    return modo === "pc" || modo === "online" ? 0 : MUNDO_VUELTA_MARGEN;
   }
 
   // La diferencia horizontal dx llevada al camino más corto de los dos (entre
@@ -2858,7 +2907,7 @@
   }
 
   function moverPoligonos(lista, centro, busqueda, dt) {
-    const vuelta = modo === "dos" || modo === "pc";
+    const vuelta = modo === "dos" || modo === "pc" || modo === "online";
     const W = window.innerWidth;
     const margen = margenVuelta();
     const largo = W + margen * 2;
@@ -3335,7 +3384,8 @@
     actualizarColor();
     sonarCruce();
     // Con dos jugadores la voz también le cuenta los goles al jugador 2.
-    if (modo === "dos") decirGol(golesRival);
+    if (modo === "dos") decirGol(golesRival, vozDeHito(false));
+    else decirHitoRival();
     mostrarTiempo();
     if (golesRival >= CUMULOS_PARA_COLOR) terminarPartida("pc");
   }
@@ -3427,7 +3477,7 @@
     cumulosTomados++;
     crearNumeroEstrellas(salida.x, salida.y, cumulosTomados, colorPropio());
     sonarCruce();
-    decirGol(cumulosTomados);
+    decirGol(cumulosTomados, vozDeHito(true));
     mostrarTiempo();
     actualizarColor();
   }
@@ -4015,6 +4065,7 @@
     crearNumeroEstrellas(salida.x, salida.y, golesRival, colorRival());
     actualizarColor();
     sonarCruce();
+    decirHitoRival();
     mostrarTiempo();
     enviarOnline({
       tipo: "gol",
@@ -4062,13 +4113,14 @@
       // Gol mío: salgo por el otro agujero, como siempre.
       if (window.shipPlace) window.shipPlace(s.x, s.y, true);
       crearNumeroEstrellas(s.x, s.y, cumulosTomados, colorPropio());
-      decirGol(cumulosTomados);
+      decirGol(cumulosTomados, vozDeHito(true));
       sonarCruce();
     } else {
       // Gol del anfitrión: del lado del invitado es el rival.
       chispas(s.x, s.y);
       crearNumeroEstrellas(s.x, s.y, golesRival, colorRival());
       sonarCruce();
+      decirHitoRival();
     }
     actualizarColor();
     mostrarTiempo();
@@ -4491,8 +4543,8 @@
       Math.max(0, Math.min(1, colorNave)),
     );
     // En el tutorial, con el borde blanco del sitio (no hay otra lluvia).
-    dibujarPoligonos(poligonos, esTutorial() ? "#fff" : BORDE_JUGADOR);
-    dibujarPoligonos(poligonosRival, BORDE_RIVAL);
+    dibujarPoligonos(poligonos, esTutorial() ? "#fff" : colorPropio());
+    dibujarPoligonos(poligonosRival, colorRival());
     dibujarRival();
     dibujarFinal();
     // Lo que sigue va en pantalla, sin el zoom de la cámara.
@@ -4528,13 +4580,13 @@
       puntero(
         aPantalla(rival.x, cam.ox),
         aPantalla(rival.y, cam.oy),
-        BORDE_RIVAL,
+        colorRival(),
       );
     // Y la del jugador. shipPose viene en pantalla y pegada a la izquierda de
     // su caja (ver circulosNave), así que el centro es media caja más allá.
     const p = window.shipPose;
     if (p && p.listo && !ship.classList.contains("fuera-de-juego"))
-      puntero(p.x + cajaNave / 2, p.y + cajaNave / 2, BORDE_JUGADOR);
+      puntero(p.x + cajaNave / 2, p.y + cajaNave / 2, colorPropio());
   }
 
   // Del mundo a la pantalla: la inversa de lo que hace circulosNave, y lo mismo
