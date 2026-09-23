@@ -266,6 +266,10 @@
   ];
   const VOZ_CANSADO_DESDE = 30;
   const VOZ_CANSADO_CADA = 15;
+  // "Un poco más" (la de cansancio que dice que falta poco) solo puede sonar
+  // cuando alguien, sea quien sea, ya metió VOZ_UN_POCO_MAS_GOLES goles.
+  const VOZ_UN_POCO_MAS = "cansancio/unpocomasmp3.m4a";
+  const VOZ_UN_POCO_MAS_GOLES = 8;
   // Felicitación: en el último portal, después del "1" o en lugar del "1".
   const VOZ_FELICITA = [
     "5- final/bien.m4a",
@@ -1486,8 +1490,15 @@
     }
     if (tiempo >= proxCansado) {
       proxCansado += VOZ_CANSADO_CADA;
-      if (!vozPendiente && Math.random() < VOZ_CHANCE)
-        vozPendiente = alAzar(vocesCansado);
+      if (!vozPendiente && Math.random() < VOZ_CHANCE) {
+        const enJuego = Math.max(cumulosTomados, golesRival);
+        const idxPocoMas = VOZ_CANSADO.indexOf(VOZ_UN_POCO_MAS);
+        vozPendiente = alAzar(
+          vocesCansado.filter(
+            (_, i) => i !== idxPocoMas || enJuego >= VOZ_UN_POCO_MAS_GOLES,
+          ),
+        );
+      }
     }
     if (vozPendiente && !vozSonando) {
       const s = vozPendiente;
