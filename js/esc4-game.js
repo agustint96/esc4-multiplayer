@@ -196,6 +196,7 @@
   // pasos.
   const PAD_CRUCETA = { up: 12, down: 13, left: 14, right: 15 };
   const PAD_RB = 5;
+  const PAD_LB = 4; // con RB, en el menú cambian quién usa qué (ver cambiarControles)
   const PAD_LT = 6;
   const AYUDA_STICK_UMBRAL = 0.5; // cuánto hay que empujar el stick para que cuente una dirección (0 a 1)
   const AYUDA_STICK_RECORRIDO = 0.6; // em que se corre la palanca dibujada con el stick a fondo (ver .game-stick en styles.css)
@@ -321,6 +322,10 @@
   ];
 
   const POSICION_Y_INICIAL = 0.85; // dónde reaparece la nave: centrada en x, a esta fracción del alto (0 = arriba)
+  // Con rival (PC, dos jugadores u online) cada nave arranca en su esquina de
+  // abajo -la azul a la izquierda, la roja a la derecha- en vez de en el medio
+  // (ver xEsquinaJugador/xEsquinaRival). Fracción del ancho desde cada borde.
+  const ESQUINA_X = 0.25;
   const DURACION_CHOQUE = 1.5; // segundos que la nave cae, golpeada, antes de reiniciar
   const GRAVEDAD = 500; // px/s² del mundo con los que cae la nave golpeada
   const GOLPE_LATERAL = 120; // px/s del mundo: empujón de costado que le da la piedra
@@ -342,7 +347,11 @@
   const ESCALA_MUNDO = 0.55; // tamaño/velocidad del mundo respecto del juego "sin zoom"
   const MARGEN_SPAWN = 60; // px del mundo: los polígonos nacen un poco más allá de lo visible
   const LUZ_RADIO = 280; // px del mundo: alcance de la luz de la nave
-  const LUZ_RGB_INICIO = [255, 255, 255]; // color de la luz con la nave en blanco y negro...
+  const LUZ_RGB_INICIO = [255, 255, 255]; // color de la luz con la nave en blanco y negro (tutorial, sin equipo)...
+  // ...azul bien clarito o rojo bien clarito, para distinguir a quién le
+  // pertenece cada linterna en los modos con rival (ver dibujarLuz).
+  const LUZ_RGB_INICIO_JUGADOR = [197, 225, 255];
+  const LUZ_RGB_INICIO_RIVAL = [255, 197, 197];
   const LUZ_RGB_FIN = [255, 159, 154]; // ...y con todo su color (el salmón del sitio, el de siempre)
   const LUZ_INTENSIDAD = 0.12; // opacidad del salmón en el centro de la luz (la misma que el ::before de la nave en styles.css)
 
@@ -355,12 +364,24 @@
   const CUMULO_COLOR_INICIO = "#ffffff";
   const CUMULO_COLOR_FIN = "#cb681a";
   const CUMULO_BRILLO = 6; // px del mundo: resplandor de cada estrella (se arma una sola vez en el sprite)
+  // Cuántas veces se repinta cada estrella al armar el sprite: sube el brillo
+  // sin tocar el tamaño (el resplandor llega igual de lejos, solo es más
+  // intenso). Va junto con el "lighter" de dibujarAnilloSprite.
+  const CUMULO_BRILLO_PASADAS = 3;
   const SPRITE_ESCALA = 4; // px de sprite por px del mundo (nítido con zoom y pantallas densas)
   const CUMULO_ANILLO = 16; // px del mundo: radio del circulito de estrellas (chico)
   const CUMULO_RADIO = 26; // px del mundo: zona de entrada (un poco más que el anillo)
   const CUMULO_ESTRELLAS = 28; // estrellas del anillo de afuera
   const CUMULO_INTERIOR = 14; // estrellas del anillo de adentro (giran para el otro lado)
   const CUMULO_ESTRELLA_R = 1.7; // px del mundo: radio de cada estrella. Todas iguales y casi pegadas: 28 x 3,4 px de diámetro ~ el perímetro del círculo (100 px)
+  // El disco negro del medio, más grande que el anillo (antes medía justo
+  // CUMULO_ANILLO y el resplandor del anillo de afuera asomaba la mitad para
+  // afuera, sobre el fondo del juego: ahora el anillo entero queda sobre negro).
+  const CUMULO_DISCO_RADIO = 1.15; // por CUMULO_ANILLO
+  // El anillo de adentro, más lejos del centro que antes (era 0,55): así el
+  // negro sin nada encima -el "fondo negro del medio"- es un círculo más grande
+  // y se nota más, en vez de quedar tapado enseguida por el anillo chico.
+  const CUMULO_INTERIOR_RADIO = 0.72; // por CUMULO_ANILLO
   const CUMULO_GIRO = 9; // radianes por segundo: giran muy rápido (más de una vuelta por segundo)
   const CUMULO_VIDA = 14; // segundos que dura el par de agujeros si no entran
   const CUMULO_DISTANCIA_PAR = 260; // px del mundo: separación mínima entre los dos agujeros del par
@@ -369,8 +390,15 @@
   const CUMULO_DISTANCIA_MIN = 160; // px del mundo: no aparecen encima de la nave
   // Pulso: el agujero se estira y vuelve a su tamaño una vez por compás de la
   // música (los dos del par a la vez). Solo es visual: la zona de entrada no
-  // cambia.
-  const CUMULO_PULSO_AMPLITUD = 0.4; // cuánto crece de más en lo más alto (0,4 = 40 %)
+  // cambia. Importante: el pico (el disco en lo más alto del pulso) no puede
+  // superar la zona real de entrada (CUMULO_RADIO, 26 px) -si no, se ve el
+  // dibujo entrando en la piedra antes de que en verdad se pueda cruzar-. Por
+  // eso no es un número suelto: CUMULO_PULSO_AMPLITUD sale de CUMULO_PICO_ORIGINAL
+  // (el crecimiento de pulso de toda la vida, 1,4 = +40 %) dividido
+  // CUMULO_DISCO_RADIO, así el pico queda siempre en los mismos 22,4 px de
+  // siempre (16 × 1,4), lo agrande o no el disco.
+  const CUMULO_PICO_ORIGINAL = 1.4;
+  const CUMULO_PULSO_AMPLITUD = CUMULO_PICO_ORIGINAL / CUMULO_DISCO_RADIO - 1;
   const CUMULO_PULSO_TIEMPOS = 1.25; // lo que dura cada pulso (estirar y volver), en tiempos de la música
   const CUMULO_PULSO_ATAQUE = 0.25; // fracción del pulso que se dedica a estirar (el resto es volver)
   // La música del juego (nivel4.ogg) está en 5 tiempos: 145,6 BPM y el bucle son
@@ -386,7 +414,13 @@
   // una grilla de puntos ni como una masa.
   const NUMERO_ALTO = 52; // px del mundo: alto de los dígitos
   const NUMERO_ESPACIO = 5.6; // px del mundo: distancia mínima entre estrellas (más chico = más estrellas)
-  const NUMERO_RADIO = [1.3, 2.3]; // px del mundo: radio de cada estrella, al azar en este rango (las chispas: 2)
+  // Mismo radio que ESTRELLAS_FONDO (0,6 a 1,1 + hasta 1,1 más): así el número
+  // se ve hecho de las mismas estrellas que decoran el fondo, no de puntos más
+  // grandes y aparte.
+  const NUMERO_RADIO = [0.6, 1.7];
+  // Titilan igual que las de fondo (ver dibujarEstrellas): cada una con su
+  // propia velocidad y fase, siguiendo el mismo reloj.
+  const NUMERO_TITILAR_VEL = [0.7, 2.1];
   // Que no quede perfecto, como dibujado a mano con estrellas: cada vez el número
   // sale con su propia inclinación y cada estrella se corre un poco de su lugar.
   const NUMERO_TEMBLOR = 1.7; // px del mundo: cuánto se corre cada estrella (al azar)
@@ -454,6 +488,25 @@
   const RIVAL_EMPUJE = 0.36;
   const RIVAL_EMPUJE_BOOST = 0.72; // GAMEPAD_THRUST_BOOST 0.6 × 1.2: el jugador 2 con Shift derecho
   const RIVAL_FRENO = 0.9;
+  // La PC acelera (como el jugador con Shift) cuando el agujero está a más de
+  // RIVAL_BOOST_DIST px y no hay piedras encima, pero con una energía que se
+  // gasta a RIVAL_BOOST_GASTO por segundo y vuelve a RIVAL_BOOST_RECUPERA; para
+  // volver a acelerar tiene que juntar RIVAL_BOOST_MIN, así no es un motor
+  // infinito y no le gana a cualquiera.
+  const RIVAL_BOOST_DIST = 320;
+  const RIVAL_BOOST_GASTO = 0.4;
+  const RIVAL_BOOST_RECUPERA = 0.25;
+  const RIVAL_BOOST_MIN = 0.4;
+  // Presión de la lluvia contra el que da vueltas al mapa (ver actualizar):
+  // cada vuelta suma PRESION_POR_VUELTA (tope 1) y baja PRESION_BAJA por
+  // segundo, así que dando una vuelta cada ~5 s o menos se mantiene alta.
+  const PRESION_POR_VUELTA = 0.5;
+  const PRESION_BAJA = 0.1;
+  // Además, cada vez que una nave da la vuelta le caen VUELTA_PIEDRAS piedras
+  // apuntadas a ella, VUELTA_PIEDRA_RAPIDEZ veces más rápidas que las normales.
+  const VUELTA_PIEDRAS = 2;
+  const VUELTA_PIEDRA_RAPIDEZ = 1.4;
+  const BUSQUEDA_VUELTA_EXTRA = 0.6; // con presión 1, las piedras corrigen 60 % más rápido de costado
   const RIVAL_PELIGRO = 170; // px del mundo: desde acá una piedra la espanta
   const FIN_DURA = 4; // segundos con el cartel del ganador
   // Repulsión entre naves, medida en largos de nave (el dibujo, no la hitbox,
@@ -476,8 +529,17 @@
   const COLOR_MAXIMO = 0.7;
   // La nave de la PC se ve semitransparente, para no confundirla con la tuya.
   const RIVAL_OPACIDAD = 0.55;
-  // Halo de la PC (el del jugador es CSS, .starry-cohete-pair.in-game).
-  const HALO_RIVAL = "drop-shadow(0 0 5px rgba(255, 90, 90, 0.95)) drop-shadow(0 0 14px rgba(255, 90, 90, 0.55))";
+  // Las dos naves se ven igual que en el tutorial (mismo blanco y negro, sin
+  // ningún tinte de color): lo único que las diferencia en los modos con rival
+  // es el halo -azul el que le toca al jugador (ver .multijugador en
+  // styles.css), rojo el que le toca al rival-. Contra la PC y con dos
+  // jugadores el rival siempre es el rojo; online puede ser cualquiera de los
+  // dos según quién entró primero (ver esAzul), así que acá se elige entre
+  // los dos halos en vez de tener uno fijo.
+  const HALO_ROJO =
+    "drop-shadow(0 0 5px rgba(255, 90, 90, 0.95)) drop-shadow(0 0 14px rgba(255, 90, 90, 0.55))";
+  const HALO_AZUL =
+    "drop-shadow(0 0 5px rgba(90, 169, 255, 0.95)) drop-shadow(0 0 14px rgba(90, 169, 255, 0.55))";
 
   const scene = document.getElementById("game-scene");
   const canvas = document.getElementById("game-canvas");
@@ -690,7 +752,13 @@
   // "Online" más abajo). null mientras se elige, al arrancar.
   let modo = null;
   const esTutorial = () => modo === "tutorial";
-  const teclasJ2 = { up: false, down: false, left: false, right: false, boost: false };
+  const teclasJ2 = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    boost: false,
+  };
   const TECLAS_J2 = {
     ArrowUp: "up",
     ArrowDown: "down",
@@ -704,6 +772,15 @@
       const MODOS = { 1: "tutorial", 2: "pc", 3: "dos", 4: "online" };
       const n = /^(?:Digit|Numpad)([1-4])$/.exec(ev.code);
       if (n) elegirModo(MODOS[n[1]]);
+      else if (ev.code === "ArrowUp" || ev.code === "ArrowDown") {
+        apuntarOpcion(opcionApuntada + (ev.code === "ArrowDown" ? 1 : -1));
+        ev.preventDefault(); // que no scrollee la página detrás
+      } else if (
+        ev.code === "Enter" ||
+        ev.code === "NumpadEnter" ||
+        ev.code === "KeyE"
+      )
+        elegirApuntada();
     } else if (activo && modo && ev.code === "Escape") {
       salirAlMenu();
     }
@@ -717,6 +794,25 @@
   function salirAlMenu() {
     location.reload();
   }
+
+  // Lo mismo desde el joystick: el botón de menú (el de la derecha de los dos
+  // del medio, el start de toda la vida) o el X (el de la izquierda de los
+  // cuatro). Los números son los del mapeo estándar del navegador, que es el
+  // que usan los joysticks de hoy. Por flanco, para que no se dispare en cada
+  // cuadro mientras se lo tiene apretado, y vale tenga el joystick quien lo
+  // tenga: con dos jugadores es del segundo, pero salir es salir.
+  const PAD_START = 9;
+  const PAD_X = 2;
+  let padSalirAntes = false;
+  const padSalirApretado = () => {
+    const gp = primerJoystick();
+    return !!gp && (botonPad(gp, PAD_START) || botonPad(gp, PAD_X));
+  };
+  function salirConJoystick() {
+    const apretado = padSalirApretado();
+    if (apretado && !padSalirAntes) salirAlMenu();
+    padSalirAntes = apretado;
+  }
   document.addEventListener("keyup", (ev) => {
     if (TECLAS_J2[ev.code]) teclasJ2[TECLAS_J2[ev.code]] = false;
   });
@@ -725,42 +821,198 @@
     for (const k in teclasJ2) teclasJ2[k] = false;
   });
 
+  // El menú de modo se puede recorrer de tres maneras, todas sobre el mismo
+  // estado (opcionApuntada): las flechas, el stick o la cruceta del joystick y
+  // el mouse. Se elige con enter, con E, con el botón A del joystick, con click
+  // o con el número de la opción (eso último es el atajo de siempre, que saltea
+  // el apuntado). El botón A y la E también son la tecla de acción del sitio
+  // (triggerAction en script.js), pero en este escenario no hay nada que
+  // accionar, así que no se pisan.
+  const PAD_A = 0;
+  const opcionesModo = modoEl
+    ? [...modoEl.querySelectorAll("[data-elegir]")]
+    : [];
+  // Sosteniendo el stick el menú sigue corriendo solo, como una tecla apretada:
+  // un paso apenas se empuja, y si se lo sigue sosteniendo arranca a repetir.
+  const MENU_PAD_ESPERA = 0.4; // s sostenido antes de empezar a repetir
+  const MENU_PAD_REPITE = 0.11; // s entre paso y paso mientras se sostiene
+  let opcionApuntada = 0;
+  let padMenuY = 0; // hacia dónde está empujado el stick
+  let padMenuT = 0; // lo que falta para el próximo paso, en s
+  let padMenuA = false; // si el botón A venía apretado
+  let padMenuLR = false; // si LB o RB venían apretados
+  let padMenuLRT = 0; // lo que falta para el próximo cambio, en s
+  // Con dos jugadores y un joystick conectado: false = el jugador 1 al teclado
+  // y el 2 al joystick (como siempre), true = al revés. Se cambia en el menú
+  // con LB o RB, parado en "dos jugadores" (ver cambiarControles).
+  let controlesCambiados = false;
+
+  // Apunta una opción; da la vuelta en los dos sentidos (de la última a la
+  // primera y al revés).
+  function apuntarOpcion(i) {
+    const n = opcionesModo.length;
+    if (!n) return;
+    opcionApuntada = ((i % n) + n) % n;
+    opcionesModo.forEach((el, j) =>
+      el.classList.toggle("elegida", j === opcionApuntada),
+    );
+  }
+
+  function elegirApuntada() {
+    const el = opcionesModo[opcionApuntada];
+    if (el) elegirModo(el.dataset.elegir);
+  }
+
+  // LB y RB dan vuelta quién usa el joystick y quién el teclado. Solo tiene
+  // sentido parado en "dos jugadores" (es la única opción con dos controles) y
+  // con un joystick conectado: sin joystick no habría con qué apretar LB ni RB.
+  // El renglón de abajo del menú lo muestra solo en el próximo cuadro
+  // (mostrarControles).
+  function cambiarControles() {
+    const opcion = opcionesModo[opcionApuntada];
+    if (!opcion || opcion.dataset.elegir !== "dos") return;
+    controlesCambiados = !controlesCambiados;
+  }
+
+  opcionesModo.forEach((el, i) => {
+    el.addEventListener("click", () => {
+      apuntarOpcion(i);
+      elegirApuntada();
+    });
+    // El mouse manda: lo que toca pasa a ser lo apuntado, así las flechas y el
+    // joystick siguen desde donde quedó el cursor y no desde otro lado.
+    el.addEventListener("pointerenter", () => apuntarOpcion(i));
+  });
+  apuntarOpcion(0);
+
+  // Joystick en el menú, un cuadro a la vez (lo llama cuadro() mientras no hay
+  // modo elegido). El stick se comporta como una tecla: un paso al empujarlo y
+  // después repite solo, dando la vuelta sin fin. El botón A no repite: cuenta
+  // una vez por apretada y no en cada cuadro.
+  function navegarMenuJoystick(dt) {
+    const gp = primerJoystick();
+    if (!gp) {
+      padMenuY = 0;
+      padMenuA = false;
+      padMenuLR = false;
+      return;
+    }
+    const joy = leerJoystick(); // ya trae la zona muerta y la cruceta
+    const dir = joy.teclas.has("down") ? 1 : joy.teclas.has("up") ? -1 : 0;
+    if (dir !== padMenuY) {
+      // Recién empujado (o recién soltado): un paso ya, y a esperar lo largo.
+      padMenuY = dir;
+      padMenuT = MENU_PAD_ESPERA;
+      if (dir) apuntarOpcion(opcionApuntada + dir);
+    } else if (dir) {
+      padMenuT -= dt;
+      if (padMenuT <= 0) {
+        apuntarOpcion(opcionApuntada + dir);
+        padMenuT = MENU_PAD_REPITE;
+      }
+    }
+    // LB o RB: cambian de lado los controles, y también repiten si se los deja
+    // apretados.
+    const lr = botonPad(gp, PAD_LB) || botonPad(gp, PAD_RB);
+    if (lr !== padMenuLR) {
+      padMenuLR = lr;
+      padMenuLRT = MENU_PAD_ESPERA;
+      if (lr) cambiarControles();
+    } else if (lr) {
+      padMenuLRT -= dt;
+      if (padMenuLRT <= 0) {
+        cambiarControles();
+        padMenuLRT = MENU_PAD_REPITE;
+      }
+    }
+    const a = botonPad(gp, PAD_A);
+    if (a && !padMenuA) elegirApuntada();
+    padMenuA = a;
+  }
+
   function elegirModo(m) {
     modo = m;
+    // Si el botón de salir ya venía apretado (se volvió al menú con él y se
+    // eligió sin soltarlo), que no cuente como una apretada nueva y se salga
+    // de nuevo apenas arranca.
+    padSalirAntes = padSalirApretado();
     window.dosJugadores = m === "dos";
+    // Con dos jugadores y contra la PC los costados dan la vuelta (script.js
+    // para la nave propia, moverRival para la del rival); online y en el
+    // tutorial frenan como siempre.
+    window.vueltaCostados = m === "dos" || m === "pc";
+    window.vueltaAlBorde = m === "pc"; // ver margenVuelta
     actualizarControles();
     if (menuEl) menuEl.hidden = false;
-    // Con dos naves la del jugador lleva su halo azul (ver styles.css).
-    ship.classList.toggle("multijugador", m !== "tutorial");
     if (m === "online") {
+      // El color (azul o rojo) y la esquina se saben recién cuando el
+      // servidor asigna el rol: ver "emparejado" en recibirOnline.
+      ship.classList.remove("multijugador", "color-rival");
       // La elección queda en pantalla con el estado hasta que aparece un rival.
       conectarOnline();
       return;
     }
+    // Contra la PC y con dos jugadores siempre sos el azul (ver
+    // .multijugador en styles.css) y arrancás en tu esquina de abajo.
+    ship.classList.toggle("multijugador", m !== "tutorial");
+    ship.classList.remove("color-rival");
+    centrarNave();
     if (modoEl) modoEl.hidden = true;
   }
 
   // Con dos jugadores, quién usa qué (lo lee script.js cada cuadro):
   // - con un joystick conectado, el jugador 1 tiene todo el teclado (como en el
-  //   sitio) y el jugador 2 el joystick (window.j2Joystick);
+  //   sitio) y el jugador 2 el joystick (window.j2Joystick), o al revés si se
+  //   cambiaron los lados en el menú con LB o RB (controlesCambiados): ahí el
+  //   joystick pasa a ser del jugador 1 y el 2 se queda con las flechas;
   // - sin joystick, el jugador 1 WASD y Shift izquierdo, y el jugador 2 las
   //   flechas y Shift derecho (window.j2Teclado).
   // Se revisa en cada cuadro: si el joystick se conecta o se desconecta en el
   // medio de la partida, cambia solo.
   function actualizarControles() {
-    const joystick = modo === "dos" && !!primerJoystick();
-    window.j2Joystick = joystick;
-    window.j2Teclado = modo === "dos" && !joystick;
+    const hayPad = modo === "dos" && !!primerJoystick();
+    window.j2Joystick = hayPad && !controlesCambiados;
+    window.j2Teclado = modo === "dos" && (!hayPad || controlesCambiados);
+    // Para la luz del jugador 2 por teclado (ver toggleLuzRival en
+    // script.js): con Q si el joystick se lo llevó el jugador 1 (ahí Q le
+    // queda libre, no prende la suya), o con L si los dos están en el
+    // teclado (ahí Q sigue siendo la del jugador 1).
+    window.j1Joystick = hayPad && controlesCambiados;
   }
 
-  // Los mismos textos de controles que la elección muestra, según haya o no un
-  // joystick conectado (Spaceport no tiene tildes ni puntuación).
-  const CONTROLES_TECLADO = "J1 WASD y shift izquierdo<br />J2 flechas y shift derecho";
+  // El renglón de abajo del menú dice de qué se trata la opción apuntada. Solo
+  // dos jugadores necesita explicar los controles, y ahí cambian según haya o
+  // no un joystick conectado.
+  //
+  // Spaceport no tiene vocales con tilde ni eñe: con una tilde esa letra sola
+  // cae a otra fuente y la palabra se ve partida al medio. Por eso los textos
+  // van en infinitivo -"aprender", no "aprendé"-, que no lleva tilde y no
+  // cambia de significado al sacársela (tampoco tiene comas ni paréntesis).
+  const CONTROLES_TECLADO =
+    "J1 WASD y shift izquierdo<br />J2 flechas y shift derecho";
   const CONTROLES_JOYSTICK = "J1 teclado<br />J2 joystick";
+  const CONTROLES_JOYSTICK_AL_REVES = "J1 joystick<br />J2 teclado";
+  const PIE_MODO = {
+    tutorial: () => "Aprender a jugar y practicar",
+    // Contra la PC juega uno solo, y el teclado y el joystick andan los dos a la
+    // vez: el renglón dice con qué está jugando. El navegador solo devuelve un
+    // joystick después de que se lo tocó, así que si aparece es porque se lo
+    // está usando de verdad.
+    pc: () => (primerJoystick() ? "J1 joystick" : "J1 teclado"),
+    dos: () =>
+      !primerJoystick()
+        ? CONTROLES_TECLADO
+        : controlesCambiados
+          ? CONTROLES_JOYSTICK_AL_REVES
+          : CONTROLES_JOYSTICK,
+    online: () => "Encontrar a alguien en red",
+  };
   let controlesMostrados = "";
   function mostrarControles() {
     const el = document.getElementById("game-modo-controles");
-    const texto = primerJoystick() ? CONTROLES_JOYSTICK : CONTROLES_TECLADO;
+    const opcion = opcionesModo[opcionApuntada];
+    const pie = opcion && PIE_MODO[opcion.dataset.elegir];
+    const texto = pie ? pie() : "";
     if (!el || texto === controlesMostrados) return;
     controlesMostrados = texto;
     el.innerHTML = texto;
@@ -795,6 +1047,17 @@
   const cam = { z: 1, ox: window.innerWidth / 2, oy: window.innerHeight / 2 };
   let luz = false; // luz de la nave prendida (la maneja script.js)
   let luzNivel = 0; // 0..1, sigue a luz suavizado
+  // Con dos jugadores, la luz del rival (jugador 2): la prende y apaga él
+  // mismo (Y del joystick, o Q/L del teclado según quién use qué, ver
+  // toggleLuzRival en script.js). Contra la PC y online no hay a quién
+  // prendérsela de verdad: dibujarRival la trata siempre como prendida.
+  let luzRival = false;
+  let luzNivelRival = 0; // 0..1, sigue a luzRival suavizado (como luzNivel)
+  let presionJugador = 0; // 0..1, por dar vueltas al mapa (ver PRESION_POR_VUELTA)
+  let presionRival = 0; // lo mismo, para la nave del rival
+  let vueltasVistas = 0; // window.shipVueltas la última vez que se miró
+  let vueltasRival = 0; // vueltas al mapa que dio la nave del rival (moverRival)
+  let vueltasRivalVistas = 0; // vueltasRival la última vez que se miró
 
   // Rectángulo del mundo que se ve en pantalla. La pantalla lleva un punto
   // del mundo a ox + (p - ox) * z, así que la esquina (0, 0) es ox * (1 - 1/z).
@@ -813,7 +1076,7 @@
 
   // Polígono irregular "estrellado": los vértices van ordenados por ángulo
   // alrededor del centro, así nunca se cruza consigo mismo.
-  function crearPoligono(objetivo, paraRival) {
+  function crearPoligono(objetivo, paraRival, rapida = false) {
     const d = (50 + Math.random() * 70) * ESCALA_MUNDO;
     const n = 4 + Math.floor(Math.random() * 3);
     const paso = (Math.PI * 2) / n;
@@ -836,7 +1099,8 @@
       x = objetivo.x + (Math.random() - 0.5) * v.w;
     // Las de la PC nacen arriba de ella, aunque esté fuera de lo que se ve
     // (nunca más abajo del borde de arriba de la vista: no aparecen de la nada).
-    const y = paraRival && objetivo ? Math.min(v.y, objetivo.y - v.h * 0.6) : v.y;
+    const y =
+      paraRival && objetivo ? Math.min(v.y, objetivo.y - v.h * 0.6) : v.y;
     return {
       id: ++idPoligono,
       x,
@@ -844,7 +1108,7 @@
       vx: 0, // solo se mueve de costado cuando busca a la nave
       ang: Math.random() * Math.PI * 2,
       giro: (Math.random() - 0.5) * 3,
-      vy: vel * (0.75 + Math.random() * 0.55),
+      vy: vel * (0.75 + Math.random() * 0.55) * (rapida ? VUELTA_PIEDRA_RAPIDEZ : 1),
       radio: d * 0.6,
       verts,
       pts: [], // vértices en el mundo, se recalculan en cada cuadro
@@ -976,6 +1240,16 @@
     tQuieta = 0;
     navePrev = null;
     golpeadora = null;
+    // Nueva partida (no un mero recoloque tras un choque): la luz del
+    // jugador 2 vuelve a apagada.
+    if (conIntro) {
+      luzRival = false;
+      presionJugador = 0;
+      presionRival = 0;
+      vueltasVistas = window.shipVueltas || 0;
+      vueltasRival = 0;
+      vueltasRivalVistas = 0;
+    }
     // Nueva partida: sin cúmulos y la nave vuelve a blanco y negro.
     cumulos = [];
     particulas = [];
@@ -1539,6 +1813,19 @@
     };
   }
 
+  // PC, dos jugadores y online: sin las instrucciones de moverse (ya se sabe
+  // jugar) ni acercarse a ningún lado -las dos naves quedan en su esquina, ya
+  // movibles-, pero con el mismo cierre que el tutorial: un "listo" y recién
+  // ahí arranca la música y el resto del juego (caen los polígonos y aparecen
+  // los agujeros, ver terminarAyuda). Reusa el mismo estado `ayuda` -por eso
+  // esas dos cosas quedan en pausa mientras dura, ver actualizarAyuda-, ya en
+  // su fase final.
+  function empezarArranque() {
+    if (!rival && !esTutorial()) crearRival();
+    ayuda = { modo: null, paso: 0, fase: "listo", t: 0, hechas: new Set() };
+    decirVoz(alAzar(vocesListo));
+  }
+
   function activarPaso() {
     ayuda.fase = "activa";
     ayuda.t = 0;
@@ -1635,9 +1922,12 @@
   }
 
   function centrarNave() {
+    // Sin rival (todavía sin modo elegido, o tutorial) va al medio, como
+    // siempre; con rival (PC, dos jugadores u online) a su esquina.
+    const conRival = modo && modo !== "tutorial";
     if (window.shipPlace)
       window.shipPlace(
-        window.innerWidth / 2,
+        conRival ? xEsquinaJugador() : window.innerWidth / 2,
         window.innerHeight * POSICION_Y_INICIAL,
       );
   }
@@ -1980,8 +2270,10 @@
   }
 
   // Contra la PC el cuadrado del medio muestra el marcador en vez del
-  // segundero: tus goles en blanco (se tiñen como siempre) y los de la PC en
-  // rojo. Spaceport no tiene tildes: "GANO".
+  // segundero: tus goles en azul y los de la PC en rojo, los colores de cada
+  // nave (ver .marcador-jugador en styles.css). En el tutorial sigue siendo el
+  // segundero de siempre, que se tiñe con la nave. Spaceport no tiene tildes:
+  // "GANO".
   function mostrarTiempo() {
     // En el tutorial, el segundero del sitio (y GANASTE al completar los 10).
     const texto = esTutorial()
@@ -1989,23 +2281,25 @@
         ? "GANASTE"
         : tiempo.toFixed(1)
       : fin
-      ? fin.ganador === "abandono"
-        ? "EL RIVAL SE FUE"
-        : fin.ganador === "vos"
-          ? modo === "dos"
-            ? "GANO J1"
-            : "GANASTE"
-          : '<span class="marcador-rival">' +
-            (modo === "dos"
-              ? "GANO J2"
-              : enLinea()
-                ? "GANO EL RIVAL"
-                : "GANO LA PC") +
-            "</span>"
-      : cumulosTomados +
-        '<span class="marcador-separador"></span><span class="marcador-rival">' +
-        golesRival +
-        "</span>";
+        ? fin.ganador === "abandono"
+          ? "EL RIVAL SE FUE"
+          : fin.ganador === "vos"
+            ? '<span class="marcador-jugador">' +
+              (modo === "dos" ? "GANO J1" : "GANASTE") +
+              "</span>"
+            : '<span class="marcador-rival">' +
+              (modo === "dos"
+                ? "GANO J2"
+                : enLinea()
+                  ? "GANO EL RIVAL"
+                  : "GANO LA PC") +
+              "</span>"
+        : '<span class="marcador-jugador">' +
+          cumulosTomados +
+          '</span><span class="marcador-separador"></span>' +
+          '<span class="marcador-rival">' +
+          golesRival +
+          "</span>";
     if (texto === ultimoTexto) return;
     ultimoTexto = texto;
     timerEl.innerHTML = texto;
@@ -2185,7 +2479,10 @@
       if (libre) puntos.push({ px, py });
     }
     return (numerosGuardados[numero] = {
-      puntos: puntos.map((p) => ({ dx: (p.px - w / 2) / K, dy: (p.py - h / 2) / K })),
+      puntos: puntos.map((p) => ({
+        dx: (p.px - w / 2) / K,
+        dy: (p.py - h / 2) / K,
+      })),
       ancho: w / K,
       alto: h / K,
     });
@@ -2204,7 +2501,7 @@
   // (antes, sin el número, ahí mismo chorreaban las chispas de siempre; ver
   // chispas() y su llamado en el de entrada). El clamp solo evita que el
   // número se recorte si el agujero queda pegado al borde de lo que se ve.
-  function crearNumeroEstrellas(x, y, numero) {
+  function crearNumeroEstrellas(x, y, numero, color = "#ffffff") {
     const { puntos, ancho, alto } = puntosNumero(numero);
     const v = vista();
     const margen = 14;
@@ -2219,7 +2516,8 @@
     // Cada número sale distinto: gira un poco, se tumba un poco y se corre un poco.
     const giro = (Math.random() * 2 - 1) * NUMERO_GIRO;
     const cursiva =
-      NUMERO_CURSIVA[0] + Math.random() * (NUMERO_CURSIVA[1] - NUMERO_CURSIVA[0]);
+      NUMERO_CURSIVA[0] +
+      Math.random() * (NUMERO_CURSIVA[1] - NUMERO_CURSIVA[0]);
     const cos = Math.cos(giro);
     const sen = Math.sin(giro);
     const desx = (Math.random() - 0.5) * 6;
@@ -2241,9 +2539,17 @@
         vy: Math.sin(ang) * vel,
         tx: cx + desx + rx + Math.cos(ta) * td,
         ty: cy + desy + ry + Math.sin(ta) * td,
-        r: NUMERO_RADIO[0] + Math.random() * (NUMERO_RADIO[1] - NUMERO_RADIO[0]),
+        r:
+          NUMERO_RADIO[0] + Math.random() * (NUMERO_RADIO[1] - NUMERO_RADIO[0]),
         t: -Math.random() * 0.08, // salen apenas escalonadas
         cae: false,
+        color, // del jugador que hizo el gol (ver dibujarCumulos)
+        // Para titilar como las de fondo (ver dibujarEstrellas): cada una a su
+        // propia velocidad y arrancando en un punto distinto del seno.
+        titVel:
+          NUMERO_TITILAR_VEL[0] +
+          Math.random() * (NUMERO_TITILAR_VEL[1] - NUMERO_TITILAR_VEL[0]),
+        titFase: Math.random() * Math.PI * 2,
       });
     }
   }
@@ -2296,7 +2602,12 @@
     acumCumulo += dt;
     // Online los crea solo el anfitrión: el invitado los recibe.
     const creaAgujeros = !enLinea() || soyAnfitrion();
-    if (creaAgujeros && cumulos.length === 0 && !ganado && acumCumulo >= proxCumulo) {
+    if (
+      creaAgujeros &&
+      cumulos.length === 0 &&
+      !ganado &&
+      acumCumulo >= proxCumulo
+    ) {
       acumCumulo = 0;
       proxCumulo =
         CUMULO_INTERVALO[0] +
@@ -2348,10 +2659,17 @@
         // pasaje, 10 en el primero ... 1 en el último (como la voz), y la nave
         // se pinta 1/10 por pasaje. Con el último, en vez del final de las
         // navecitas, GANASTE (con la nota) y después al menú.
+        // Blancas al principio y, a medida que se cuentan pasajes, cada vez más
+        // salmón (el del sitio), como el segundero.
         crearNumeroEstrellas(
           salida.x,
           salida.y,
           CUMULOS_PARA_COLOR - cumulosTomados + 1,
+          mezclarHex(
+            "#ffffff",
+            TIMER_COLOR_FIN,
+            (cumulosTomados - 1) / (CUMULOS_PARA_COLOR - 1),
+          ),
         );
         sonarCruce();
         sonarConteo(cumulosTomados - 1);
@@ -2360,7 +2678,8 @@
       } else {
         // En el de salida las estrellas del cierre forman el número de goles:
         // con dos naves se cuentan para arriba, 1 en el primero ... 10 en el último.
-        crearNumeroEstrellas(salida.x, salida.y, cumulosTomados);
+        // Del color que le tocó al jugador (el mismo del halo de su nave).
+        crearNumeroEstrellas(salida.x, salida.y, cumulosTomados, colorPropio());
         sonarCruce();
         decirGol(cumulosTomados);
         mostrarTiempo();
@@ -2387,7 +2706,7 @@
     if (!ganado) tiempo += dt; // al ganar el segundero queda parado
     if (!ganado) actualizarVoces();
 
-    if (!rival && !ganado && !esTutorial()) crearRival(circulos);
+    if (!rival && !ganado && !esTutorial()) crearRival();
 
     // En el tutorial es una sola lluvia, como en el sitio.
     const intervalo =
@@ -2423,14 +2742,46 @@
       0,
       Math.min(1, (tQuieta - QUIETA_SEG) / BUSQUEDA_RAMPA),
     );
-    const busqueda = BUSQUEDA_BASE + (1 - BUSQUEDA_BASE) * quieta;
+    // Dar la vuelta al mapa una y otra vez no es una forma de esconderse: cada
+    // vuelta suma presión (baja sola con el tiempo) y, mientras la haya, la
+    // lluvia de esa nave busca como si estuviera quieta y además corrige más
+    // rápido de costado (ver BUSQUEDA_VUELTA_EXTRA).
+    const vueltas = window.shipVueltas || 0;
+    // Y cada vuelta trae piedras extra, apuntadas a esa nave y más rápidas
+    // (a la del jugador, si no está fuera de juego; a la del rival, ídem).
+    const nuevasJugador = Math.max(0, vueltas - vueltasVistas);
+    const nuevasRival = Math.max(0, vueltasRival - vueltasRivalVistas);
+    vueltasRivalVistas = vueltasRival;
+    if (circulos[1] && stunJugador <= 0)
+      for (let i = 0; i < nuevasJugador * VUELTA_PIEDRAS; i++)
+        poligonos.push(crearPoligono(circulos[1], false, true));
+    if (rival && rival.stun <= 0)
+      for (let i = 0; i < nuevasRival * VUELTA_PIEDRAS; i++)
+        poligonosRival.push(crearPoligono(rival, true, true));
+    if (vueltas !== vueltasVistas) {
+      presionJugador = Math.min(
+        1,
+        presionJugador + PRESION_POR_VUELTA * Math.max(0, vueltas - vueltasVistas),
+      );
+      vueltasVistas = vueltas;
+    }
+    presionJugador = Math.max(0, presionJugador - PRESION_BAJA * dt);
+    presionRival = Math.max(0, presionRival - PRESION_BAJA * dt);
+    const busqueda =
+      (BUSQUEDA_BASE + (1 - BUSQUEDA_BASE) * Math.max(quieta, presionJugador)) *
+      (1 + BUSQUEDA_VUELTA_EXTRA * presionJugador);
+    const busquedaRival =
+      (BUSQUEDA_BASE + (1 - BUSQUEDA_BASE) * presionRival) *
+      (1 + BUSQUEDA_VUELTA_EXTRA * presionRival);
     // Fuera de juego o parpadeando, la nave no es el foco de su lluvia: las
     // que ya venían dejan de corregir y siguen derecho.
-    const focoJugador = stunJugador > 0 || invulJugador > 0 ? null : circulos[1];
-    const focoRival = rival && rival.stun <= 0 && rival.invul <= 0 ? rival : null;
+    const focoJugador =
+      stunJugador > 0 || invulJugador > 0 ? null : circulos[1];
+    const focoRival =
+      rival && rival.stun <= 0 && rival.invul <= 0 ? rival : null;
     moverPoligonos(poligonos, focoJugador, busqueda, dt);
     if (enLinea()) seguirRivalOnline(dt);
-    else moverPoligonos(poligonosRival, focoRival, BUSQUEDA_BASE, dt);
+    else moverPoligonos(poligonosRival, focoRival, busquedaRival, dt);
     // Se descartan los que ya salieron por abajo, compactando el mismo array.
     // Nunca antes de haber pasado la nave, aunque esté más abajo de lo que se ve
     // (la nave puede salirse un poco de la pantalla): así no se puede esconder
@@ -2438,7 +2789,10 @@
     const suelo = circulos.reduce((m, c) => Math.max(m, c.y + c.r), abajo);
     descartarPasados(poligonos, suelo);
     if (!enLinea())
-      descartarPasados(poligonosRival, rival ? Math.max(abajo, rival.y + 80) : abajo);
+      descartarPasados(
+        poligonosRival,
+        rival ? Math.max(abajo, rival.y + 80) : abajo,
+      );
 
     actualizarRival(dt, circulos);
 
@@ -2470,17 +2824,48 @@
   // Mueve una lluvia: se desvían hacia su nave mientras estén más arriba que
   // COMPROMISO; más cerca ya no corrigen (siguen con el rumbo que traen, se
   // puede esquivar) y las que ya pasaron siguen derecho.
+  // Contra la PC y con dos jugadores el mapa es un cilindro: las naves dan la
+  // vuelta por los costados (ver script.js y moverRival), así que las piedras
+  // también: te buscan por el camino más corto de costado (aunque sea cruzando
+  // el borde) y, si lo cruzan, reaparecen del otro lado. Si no, salirse por un
+  // costado alcanzaba para que nunca te llegaran. El largo de la vuelta es el
+  // mismo que el de la nave (el ancho más el margen de cada lado).
+  const MUNDO_VUELTA_MARGEN = 100;
+  // Cuánto se pueden salir del mapa antes de dar la vuelta: con dos jugadores se
+  // ve el mapa entero y pueden pasar el borde; contra la PC la cámara hace zoom
+  // y lo que se sale queda fuera de la vista, donde solo la IA sabe qué pasa
+  // (ventaja para ella), así que ahí dan la vuelta justo en el borde.
+  function margenVuelta() {
+    return modo === "pc" ? 0 : MUNDO_VUELTA_MARGEN;
+  }
+
+  // La diferencia horizontal dx llevada al camino más corto de los dos (entre
+  // -largo/2 y largo/2) en el mapa que da la vuelta.
+  function difVuelta(dx) {
+    const largo = window.innerWidth + margenVuelta() * 2;
+    return ((((dx + largo / 2) % largo) + largo) % largo) - largo / 2;
+  }
+
   function moverPoligonos(lista, centro, busqueda, dt) {
+    const vuelta = modo === "dos" || modo === "pc";
+    const W = window.innerWidth;
+    const margen = margenVuelta();
+    const largo = W + margen * 2;
     for (const p of lista) {
       let objetivo = p.vx;
       if (centro && p.y < centro.y - COMPROMISO) {
         const max = p.vy * BUSQUEDA_MAX * busqueda;
-        objetivo = Math.max(-max, Math.min(max, (centro.x - p.x) * 2));
+        const dx = vuelta ? difVuelta(centro.x - p.x) : centro.x - p.x;
+        objetivo = Math.max(-max, Math.min(max, dx * 2));
       } else if (!centro || p.y >= centro.y) {
         objetivo = 0;
       }
       p.vx += (objetivo - p.vx) * Math.min(1, dt * BUSQUEDA_AGIL);
       p.x += p.vx * dt;
+      if (vuelta) {
+        if (p.x < -margen) p.x += largo;
+        else if (p.x > W + margen) p.x -= largo;
+      }
       p.y += p.vy * dt;
       p.ang += p.giro * dt;
       actualizarPuntos(p);
@@ -2600,15 +2985,13 @@
 
   // --- La PC -----------------------------------------------------------------
 
-  function crearRival(circulos) {
-    const c = circulos[1];
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    // Arranca del otro lado de la pantalla que el jugador.
-    const x = c && c.x < w / 2 ? w * 0.75 : w * 0.25;
+  function crearRival() {
+    // En su esquina de abajo, la contraria a la del jugador (ver
+    // xEsquinaRival): online la pisa enseguida la posición real que llega del
+    // rival, pero hasta que llega el primer estado que se vea en su lugar.
     rival = {
-      x,
-      y: h * POSICION_Y_INICIAL,
+      x: xEsquinaRival(),
+      y: window.innerHeight * POSICION_Y_INICIAL,
       vx: 0,
       vy: 0,
       rot: 0,
@@ -2618,6 +3001,8 @@
       cae: null,
       hx: 0, // donde la golpearon (ahí reaparece)
       hy: 0,
+      energia: 1, // para acelerar, solo la PC (ver RIVAL_BOOST_*)
+      boosteando: false,
     };
   }
 
@@ -2658,7 +3043,7 @@
     let dx = 0;
     let dy = 0;
     const huir = (p) => {
-      const ddx = rival.x - p.x;
+      const ddx = difVuelta(rival.x - p.x);
       const ddy = rival.y - p.y;
       // Las que ya pasaron por debajo no asustan.
       if (ddy < -p.radio) return;
@@ -2672,32 +3057,49 @@
     };
     for (const p of poligonos) huir(p);
     for (const p of poligonosRival) huir(p);
-    if (Math.hypot(dx, dy) > 0.25) return { x: dx, y: dy };
+    if (Math.hypot(dx, dy) > 0.25) return { x: dx, y: dy, boost: false };
 
-    let meta = null;
+    // El agujero más cercano contando también el camino por el costado (el
+    // mapa da la vuelta): va por el más corto de los dos.
+    let mx = 0;
+    let my = 0;
     let mejor = Infinity;
+    let hayMeta = false;
     for (const c of cumulos) {
-      const d = Math.hypot(c.x - rival.x, c.y - rival.y);
+      const cx = difVuelta(c.x - rival.x);
+      const cy = c.y - rival.y;
+      const d = Math.hypot(cx, cy);
       if (d < mejor) {
         mejor = d;
-        meta = c;
+        mx = cx;
+        my = cy;
+        hayMeta = true;
       }
     }
-    if (!meta) {
+    if (!hayMeta) {
       const c = circulos[1];
-      if (!c) return { x: 0, y: 0 };
-      const lado = rival.x >= c.x ? 1 : -1;
-      meta = { x: c.x + lado * 220, y: c.y - 40 };
-      if (Math.hypot(meta.x - rival.x, meta.y - rival.y) < 60)
-        return { x: dx, y: dy };
+      if (!c) return { x: 0, y: 0, boost: false };
+      const lado = difVuelta(rival.x - c.x) >= 0 ? 1 : -1;
+      mx = difVuelta(c.x + lado * 220 - rival.x);
+      my = c.y - 40 - rival.y;
+      if (Math.hypot(mx, my) < 60) return { x: dx, y: dy, boost: false };
+      mejor = Infinity; // volver a su lado no corre
     }
-    return { x: meta.x - rival.x + dx * 40, y: meta.y - rival.y + dy * 40 };
+    return {
+      x: mx + dx * 40,
+      y: my + dy * 40,
+      // Con un agujero lejos y sin piedras encima, acelera (ver RIVAL_BOOST_DIST).
+      boost: hayMeta && mejor > RIVAL_BOOST_DIST,
+    };
   }
 
   function actualizarRival(dt, circulos) {
     if (!rival) return;
     if (enLinea()) return; // ver seguirRivalOnline
 
+    // La luz de la PC: prendida mientras haya agujeros en juego (cuando hay
+    // algo que buscar), apagada el resto del tiempo. Es solo lo que se ve.
+    if (modo === "pc") luzRival = cumulos.length > 0;
     const antesX = rival.x;
     const antesY = rival.y;
     moverRival(dt, circulos);
@@ -2745,10 +3147,23 @@
       const dy = FUEGO_TOP + (sy - FUEGO_TOP) * largo;
       const dh = sh * largo + 0.6;
       const vaiven =
-        amp * 8 * p * p *
+        amp *
+        8 *
+        p *
+        p *
         (Math.sin(s * 14 - p * 7) * 0.7 + Math.sin(s * 23 - p * 11 + 1) * 0.3);
       const dx = FUEGO_CX + (FUEGO_X - FUEGO_CX) * ancho + vaiven;
-      c.drawImage(imgFuego, FUEGO_X, sy, FUEGO_W, sh, dx, dy, FUEGO_W * ancho, dh);
+      c.drawImage(
+        imgFuego,
+        FUEGO_X,
+        sy,
+        FUEGO_W,
+        sh,
+        dx,
+        dy,
+        FUEGO_W * ancho,
+        dh,
+      );
     }
   }
 
@@ -2806,6 +3221,14 @@
       const m = Math.hypot(r.x, r.y);
       gx = m > 1e-3 ? r.x / m : 0;
       gy = m > 1e-3 ? r.y / m : 0;
+      // Acelera con energía limitada (ver RIVAL_BOOST_*): arranca si tiene la
+      // mínima y sigue mientras le quede.
+      let e = rival.energia ?? 1;
+      const quiere = r.boost && (rival.boosteando ? e > 0 : e >= RIVAL_BOOST_MIN);
+      rival.boosteando = quiere;
+      e += (quiere ? -RIVAL_BOOST_GASTO : RIVAL_BOOST_RECUPERA) * dt;
+      rival.energia = Math.max(0, Math.min(1, e));
+      if (quiere) empuje = RIVAL_EMPUJE_BOOST;
     }
     const cuadros = dt * 60;
     const subpasos = Math.max(1, Math.round(cuadros));
@@ -2820,7 +3243,24 @@
       rival.y += rival.vy * paso;
     }
     const margen = 40;
-    rival.x = Math.max(margen, Math.min(window.innerWidth - margen, rival.x));
+    if (modo === "dos" || modo === "pc") {
+      // Los costados no frenan, dan la vuelta (igual que la nave del
+      // jugador, ver el clamp de script.js): reaparece del otro lado con la
+      // misma velocidad, más allá del viewport y no pegada a su borde.
+      const minX = -margenVuelta();
+      const maxX = window.innerWidth + margenVuelta();
+      if (rival.x < minX) {
+        rival.x = maxX - (minX - rival.x);
+        vueltasRival++;
+        presionRival = Math.min(1, presionRival + PRESION_POR_VUELTA);
+      } else if (rival.x > maxX) {
+        rival.x = minX + (rival.x - maxX);
+        vueltasRival++;
+        presionRival = Math.min(1, presionRival + PRESION_POR_VUELTA);
+      }
+    } else {
+      rival.x = Math.max(margen, Math.min(window.innerWidth - margen, rival.x));
+    }
     rival.y = Math.max(margen, Math.min(window.innerHeight - margen, rival.y));
 
     // Gira igual que la nave del jugador con las flechas en script.js: hacia
@@ -2878,6 +3318,9 @@
     rival.y = salida.y;
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     golesRival++;
+    // Igual que el gol propio, pero del color que le tocó al rival (PC o
+    // jugador 2: el mismo del halo de esa nave).
+    crearNumeroEstrellas(salida.x, salida.y, golesRival, colorRival());
     actualizarColor();
     sonarCruce();
     // Con dos jugadores la voz también le cuenta los goles al jugador 2.
@@ -2954,7 +3397,8 @@
   // Los dos agujeros de cada par ya cerrado acá, para no volver a mostrarlos.
   function idsPredichos() {
     const ids = new Set();
-    for (const g of golesPredichos.values()) for (const id of g.ids) ids.add(id);
+    for (const g of golesPredichos.values())
+      for (const id of g.ids) ids.add(id);
     return ids;
   }
 
@@ -2970,7 +3414,7 @@
     chispas(entrado.x, entrado.y);
     if (window.shipPlace) window.shipPlace(salida.x, salida.y, true);
     cumulosTomados++;
-    crearNumeroEstrellas(salida.x, salida.y, cumulosTomados);
+    crearNumeroEstrellas(salida.x, salida.y, cumulosTomados, colorPropio());
     sonarCruce();
     decirGol(cumulosTomados);
     mostrarTiempo();
@@ -2980,7 +3424,12 @@
   // del rival, cuántos llegaron y el hueco más largo entre dos (los pone en 0
   // el medidor), y la ida y vuelta de un ping.
   const infoRed = (window.esc4Red = {
-    via: "-", recibidos: 0, huecoMax: 0, ultimo: 0, ping: null, retraso: 0,
+    via: "-",
+    recibidos: 0,
+    huecoMax: 0,
+    ultimo: 0,
+    ping: null,
+    retraso: 0,
   });
   let acumPing = 0;
   // El latido mantiene despierto el WebSocket cuando la conexión directa se
@@ -2995,9 +3444,33 @@
   let acumLatido = 0;
   const soyAnfitrion = () => !!red && red.rol === "anfitrion";
   const enLinea = () => modo === "online";
+  // Contra la PC y con dos jugadores el azul es siempre el jugador. Online el
+  // color lo decide quién entró primero: el anfitrión (el que esperaba) es el
+  // azul, el invitado el rojo -mismo color en las dos pantallas, ver
+  // "emparejado" en recibirOnline-.
+  function esAzul() {
+    return !enLinea() || soyAnfitrion();
+  }
+  // Esquina de abajo que le toca a cada nave (ver ESQUINA_X): la azul a la
+  // izquierda, la roja a la derecha.
+  function xEsquinaJugador() {
+    return window.innerWidth * (esAzul() ? ESQUINA_X : 1 - ESQUINA_X);
+  }
+  function xEsquinaRival() {
+    return window.innerWidth * (esAzul() ? 1 - ESQUINA_X : ESQUINA_X);
+  }
+  // El color de cada uno (piedras, número de goles): el propio y el del
+  // rival, según a quién le toque el azul.
+  function colorPropio() {
+    return esAzul() ? BORDE_JUGADOR : BORDE_RIVAL;
+  }
+  function colorRival() {
+    return esAzul() ? BORDE_RIVAL : BORDE_JUGADOR;
+  }
   // Buscando rival o sin conexión: la partida todavía no arranca.
   const esperandoRival = () =>
-    enLinea() && (!red || (red.estado !== "jugando" && red.estado !== "se-fue"));
+    enLinea() &&
+    (!red || (red.estado !== "jugando" && red.estado !== "se-fue"));
 
   const r4 = (v) => Math.round(v * 1e4) / 1e4; // fracciones de pantalla
   const r1 = (v) => Math.round(v * 10) / 10; // px y ángulos
@@ -3051,7 +3524,8 @@
   // otro enseguida) y el resto (goles) por el que sí. Si no, por el servidor.
   function enviarOnline(m) {
     if (!red) return;
-    const canal = red.canales && red.canales[m.tipo === "estado" ? "estado" : "eventos"];
+    const canal =
+      red.canales && red.canales[m.tipo === "estado" ? "estado" : "eventos"];
     if (canal && canal.readyState === "open") canal.send(JSON.stringify(m));
     else if (red.ws && red.ws.readyState === 1) red.ws.send(JSON.stringify(m));
   }
@@ -3083,7 +3557,10 @@
     // esperar a que el otro los anuncie.
     red.canales = {
       estado: pc.createDataChannel("estado", {
-        negotiated: true, id: 0, ordered: false, maxRetransmits: 0,
+        negotiated: true,
+        id: 0,
+        ordered: false,
+        maxRetransmits: 0,
       }),
       eventos: pc.createDataChannel("eventos", { negotiated: true, id: 1 }),
     };
@@ -3099,12 +3576,14 @@
         recibirOnline(m);
       };
     }
-    red.canales.eventos.onopen = () => console.info("[online] conexión directa con el rival");
+    red.canales.eventos.onopen = () =>
+      console.info("[online] conexión directa con el rival");
     pc.onicecandidate = (ev) => {
       if (ev.candidate) enviarPorServidor({ tipo: "rtc", ice: ev.candidate });
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState !== "failed" && pc.connectionState !== "closed") return;
+      if (pc.connectionState !== "failed" && pc.connectionState !== "closed")
+        return;
       // Si el servidor sigue ahí, se vuelve a pasar todo por él (ver
       // enviarOnline); si tampoco está, no queda camino: el rival se fue.
       if (red && red.ws && red.ws.readyState === 1)
@@ -3114,13 +3593,16 @@
     if (soyAnfitrion()) {
       pc.createOffer()
         .then((oferta) => pc.setLocalDescription(oferta))
-        .then(() => enviarPorServidor({ tipo: "rtc", sdp: pc.localDescription }))
+        .then(() =>
+          enviarPorServidor({ tipo: "rtc", sdp: pc.localDescription }),
+        )
         .catch(() => {});
     }
   }
 
   function enviarPorServidor(m) {
-    if (red && red.ws && red.ws.readyState === 1) red.ws.send(JSON.stringify(m));
+    if (red && red.ws && red.ws.readyState === 1)
+      red.ws.send(JSON.stringify(m));
   }
 
   function recibirRtc(m) {
@@ -3129,13 +3611,16 @@
     if (m.sdp) {
       pc.setRemoteDescription(m.sdp)
         .then(() => {
-          for (const c of red.iceEnEspera) pc.addIceCandidate(c).catch(() => {});
+          for (const c of red.iceEnEspera)
+            pc.addIceCandidate(c).catch(() => {});
           red.iceEnEspera = [];
           if (m.sdp.type !== "offer") return;
           return pc
             .createAnswer()
             .then((respuesta) => pc.setLocalDescription(respuesta))
-            .then(() => enviarPorServidor({ tipo: "rtc", sdp: pc.localDescription }));
+            .then(() =>
+              enviarPorServidor({ tipo: "rtc", sdp: pc.localDescription }),
+            );
         })
         .catch(() => {});
     } else if (m.ice) {
@@ -3153,7 +3638,8 @@
     const textos = {
       conectando: "conectando",
       esperando: "buscando rival<br /><small>esc para cancelar</small>",
-      "sin-conexion": "sin conexion con el servidor<br /><small>esc para volver</small>",
+      "sin-conexion":
+        "sin conexion con el servidor<br /><small>esc para volver</small>",
     };
     el.innerHTML = textos[red.estado] || "";
   }
@@ -3166,6 +3652,11 @@
       red.rol = m.rol;
       red.estado = "jugando";
       if (modoEl) modoEl.hidden = true;
+      // Recién acá se sabe el color: el anfitrión (el que esperaba) es el
+      // azul, el invitado el rojo (ver esAzul) -y con él, la esquina.
+      ship.classList.toggle("multijugador", soyAnfitrion());
+      ship.classList.toggle("color-rival", !soyAnfitrion());
+      centrarNave();
       conectarDirecto();
     } else if (m.tipo === "rtc") {
       recibirRtc(m);
@@ -3199,7 +3690,8 @@
   function vigilarRival() {
     if (!infoRed.ultimo || !red || red.estado !== "jugando") return;
     if (red.ws && red.ws.readyState === 1) return;
-    if (performance.now() - infoRed.ultimo > SILENCIO_RIVAL * 1000) rivalSeFue();
+    if (performance.now() - infoRed.ultimo > SILENCIO_RIVAL * 1000)
+      rivalSeFue();
   }
 
   function rivalSeFue() {
@@ -3232,13 +3724,24 @@
       tc: r1(tChoque * 10) / 10,
       inv: r1(invulJugador * 10) / 10,
       p: poligonos.map((p) => [
-        p.id, r4(p.x / W), r4(p.y / H), r4(p.vx / W), r4(p.vy / H),
-        r1(p.ang * 100) / 100, r1(p.giro * 100) / 100,
+        p.id,
+        r4(p.x / W),
+        r4(p.y / H),
+        r4(p.vx / W),
+        r4(p.vy / H),
+        r1(p.ang * 100) / 100,
+        r1(p.giro * 100) / 100,
       ]),
     };
     enviarFormas();
     if (soyAnfitrion()) {
-      m.c = cumulos.map((c) => [c.id, r4(c.x / W), r4(c.y / H), r1(c.t * 10) / 10, c.par ? c.par.id : 0]);
+      m.c = cumulos.map((c) => [
+        c.id,
+        r4(c.x / W),
+        r4(c.y / H),
+        r1(c.t * 10) / 10,
+        c.par ? c.par.id : 0,
+      ]);
       m.g = [cumulosTomados, golesRival]; // goles del anfitrión y del invitado
     }
     enviarOnline(m);
@@ -3255,7 +3758,9 @@
     enviarOnline({
       tipo: "formas",
       f: nuevas.map((p) => [
-        p.id, r1(p.radio), p.verts.map((v) => [r1(v.x), r1(v.y)]),
+        p.id,
+        r1(p.radio),
+        p.verts.map((v) => [r1(v.x), r1(v.y)]),
       ]),
     });
   }
@@ -3267,7 +3772,14 @@
     for (const [id, radio, verts] of m.f) {
       if (piedrasRival.has(id)) continue;
       piedrasRival.set(id, {
-        id, x: 0, y: 0, vx: 0, vy: 0, ang: 0, giro: 0, radio,
+        id,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        ang: 0,
+        giro: 0,
+        radio,
         verts: verts.map(([a, b]) => ({ x: a, y: b })),
         pts: [],
       });
@@ -3285,7 +3797,10 @@
     const ahora = performance.now();
     const faltan = [];
     for (const [id] of m.p) {
-      if (piedrasRival.has(id) || ahora - (formasPedidas.get(id) || -1e9) < 1000)
+      if (
+        piedrasRival.has(id) ||
+        ahora - (formasPedidas.get(id) || -1e9) < 1000
+      )
         continue;
       formasPedidas.set(id, ahora);
       faltan.push(id);
@@ -3303,16 +3818,18 @@
   function recibirEstadoRival(m) {
     const W = window.innerWidth;
     const H = window.innerHeight;
-    if (!rival) crearRival(circulosNave());
+    if (!rival) crearRival();
     const ahora = performance.now();
-    if (infoRed.ultimo) infoRed.huecoMax = Math.max(infoRed.huecoMax, ahora - infoRed.ultimo);
+    if (infoRed.ultimo)
+      infoRed.huecoMax = Math.max(infoRed.huecoMax, ahora - infoRed.ultimo);
     infoRed.ultimo = ahora;
     infoRed.recibidos++;
     const t = m.ts / 1000;
     // El desfase de relojes es el más chico visto (el de un mensaje que llegó
     // sin demoras de más); sube despacito por si la conexión se vuelve más lenta.
     const d = performance.now() / 1000 - t;
-    desfaseReloj = desfaseReloj == null ? d : Math.min(d, desfaseReloj + 0.0005);
+    desfaseReloj =
+      desfaseReloj == null ? d : Math.min(d, desfaseReloj + 0.0005);
     // Cuánto más tarde que el más rápido llegó este (se olvida a la mitad en
     // unos 2 s, a 20 mensajes por segundo).
     atrasoRed = Math.max(d - desfaseReloj, atrasoRed * 0.983);
@@ -3323,15 +3840,23 @@
     const ultimo = estadosRival[estadosRival.length - 1];
     if (ultimo && t <= ultimo.t) return; // llegó desordenado: ya hay uno más nuevo
     estadosRival.push({
-      t, x: m.x * W, y: m.y * H, rot: m.rot,
-      stun: m.stun, tc: m.tc, inv: m.inv, p,
+      t,
+      x: m.x * W,
+      y: m.y * H,
+      rot: m.rot,
+      stun: m.stun,
+      tc: m.tc,
+      inv: m.inv,
+      p,
     });
     if (!soyAnfitrion() && m.c) {
       // Los agujeros del anfitrión (conservando el giro de los que ya estaban,
       // para que no salten). Si aparece uno nuevo, suena como siempre.
       vencerPredichos();
       const ocultos = idsPredichos(); // los de un par ya cerrado acá
-      const crudos = ocultos.size ? m.c.filter(([id]) => !ocultos.has(id)) : m.c;
+      const crudos = ocultos.size
+        ? m.c.filter(([id]) => !ocultos.has(id))
+        : m.c;
       const previos = new Map(cumulos.map((c) => [c.id, c]));
       let nuevo = false;
       const lista = crudos.map(([id, x, y, t]) => {
@@ -3375,7 +3900,8 @@
     retrasoRed += Math.max(-0.1 * dt, Math.min(0.5 * dt, meta - retrasoRed));
     const t = performance.now() / 1000 - desfaseReloj - retrasoRed;
     infoRed.retraso = retrasoRed;
-    while (estadosRival.length > 2 && estadosRival[1].t <= t) estadosRival.shift();
+    while (estadosRival.length > 2 && estadosRival[1].t <= t)
+      estadosRival.shift();
     let a = estadosRival[0];
     let b = estadosRival[1];
     if (b && b.t <= t) {
@@ -3425,7 +3951,9 @@
       sonarPerder();
       chispas(rival.x, rival.y);
     }
-    const dist = primera ? 0 : Math.hypot(rival.x - antesX, rival.y - antesY) * cam.z;
+    const dist = primera
+      ? 0
+      : Math.hypot(rival.x - antesX, rival.y - antesY) * cam.z;
     actualizarFuegoRival(dt, dt > 0 && dist < 250 ? dist / dt : 0);
 
     // Las piedras: las que están en el mensaje más nuevo (las que ya no están
@@ -3471,6 +3999,9 @@
     chispas(salida.x, salida.y);
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     golesRival++;
+    // El gol del invitado, del lado del anfitrión: del color que le tocó al
+    // rival (acá siempre el rojo: el anfitrión es siempre el azul).
+    crearNumeroEstrellas(salida.x, salida.y, golesRival, colorRival());
     actualizarColor();
     sonarCruce();
     mostrarTiempo();
@@ -3519,11 +4050,13 @@
     } else if (m.quien === "invitado") {
       // Gol mío: salgo por el otro agujero, como siempre.
       if (window.shipPlace) window.shipPlace(s.x, s.y, true);
-      crearNumeroEstrellas(s.x, s.y, cumulosTomados);
+      crearNumeroEstrellas(s.x, s.y, cumulosTomados, colorPropio());
       decirGol(cumulosTomados);
       sonarCruce();
     } else {
+      // Gol del anfitrión: del lado del invitado es el rival.
       chispas(s.x, s.y);
+      crearNumeroEstrellas(s.x, s.y, golesRival, colorRival());
       sonarCruce();
     }
     actualizarColor();
@@ -3537,13 +4070,15 @@
     if (enLinea() && !rival.visto) return; // todavía no llegó dónde está
     if (rival.stun > 0 && rival.t >= DURACION_CHOQUE) return; // fuera de juego: no se ve
     if (!imgRivalTop.complete || !imgRivalTop.naturalWidth) return;
+    const w = lienzoRival.width;
+    const h = lienzoRival.height;
     // Las tres capas juntas (atrás, fuego, adelante), como la nave del jugador.
     const c = lienzoRival.getContext("2d");
-    c.clearRect(0, 0, lienzoRival.width, lienzoRival.height);
+    c.clearRect(0, 0, w, h);
     if (imgRivalFondo.complete && imgRivalFondo.naturalWidth)
-      c.drawImage(imgRivalFondo, 0, 0, lienzoRival.width, lienzoRival.height);
+      c.drawImage(imgRivalFondo, 0, 0, w, h);
     c.drawImage(lienzoFuegoRival, 0, 0);
-    c.drawImage(imgRivalTop, 0, 0, lienzoRival.width, lienzoRival.height);
+    c.drawImage(imgRivalTop, 0, 0, w, h);
 
     const k = escalaNaveMundo();
     const lado = cajaNave;
@@ -3560,12 +4095,20 @@
       (modo === "dos" ? 1 : RIVAL_OPACIDAD) *
       (rival.invul > 0 ? parpadeo(rival.invul) : 1);
     // Igual que la nave del jugador en el juego: en blanco y negro, con el
-    // levantado de brillo de la luz prendida (#nave-gris-luz), y se va tiñendo
-    // con sus goles. Encima, su halo rojo.
+    // levantado de brillo de la luz prendida (0,35, el mismo de siempre). Con
+    // dos jugadores lo prende y apaga el jugador 2 y contra la PC lo decide la
+    // IA (luzRival, ver actualizarRival); online la nave del rival queda
+    // siempre "iluminada". Se va tiñendo con sus goles y, encima, su halo: rojo o
+    // azul según le haya tocado (ver esAzul).
     const gris = 1 - Math.min(1, colorNave);
+    const iluminada = modo === "dos" || modo === "pc" ? luzRival : true;
     ctx.filter =
-      "grayscale(" + gris.toFixed(3) + ") brightness(" +
-      (1 + 0.35 * gris).toFixed(3) + ") " + HALO_RIVAL;
+      "grayscale(" +
+      gris.toFixed(3) +
+      ") brightness(" +
+      (1 + (iluminada ? 0.35 : 0) * gris).toFixed(3) +
+      ") " +
+      (esAzul() ? HALO_ROJO : HALO_AZUL);
     // El sprite va pegado a la izquierda de su caja.
     ctx.drawImage(lienzoRival, -lado / 2, -lado / 2, ancho, lado);
     ctx.restore();
@@ -3630,8 +4173,9 @@
     c.shadowBlur = CUMULO_BRILLO * K;
     for (let i = 0; i < cantidad; i++) {
       const a = (i / cantidad) * Math.PI * 2;
-      // Dos pasadas: el resplandor se refuerza y se nota más.
-      for (let k = 0; k < 2; k++) {
+      // Varias pasadas: el resplandor se refuerza y se nota más, sin correrse
+      // ni un píxel (el sprite mide lo mismo, ver CUMULO_BRILLO_PASADAS).
+      for (let k = 0; k < CUMULO_BRILLO_PASADAS; k++) {
         c.beginPath();
         c.arc(
           Math.cos(a) * radio * K,
@@ -3655,7 +4199,7 @@
       ),
       adentro: [CUMULO_COLOR_INICIO, CUMULO_COLOR_FIN].map((color) =>
         armarAnillo(
-          CUMULO_ANILLO * 0.55,
+          CUMULO_ANILLO * CUMULO_INTERIOR_RADIO,
           CUMULO_INTERIOR,
           CUMULO_ESTRELLA_R * 0.75,
           color,
@@ -3663,11 +4207,14 @@
       ),
     };
     // La luz de la nave: el mismo degradado que el resto de la página (el
-    // ::before de .starry-cohete-pair en styles.css), dibujado una vez en blanco
-    // y una en salmón; en cada cuadro solo se estiran a su tamaño y se mezclan
+    // ::before de .starry-cohete-pair en styles.css). Se arranca en un color
+    // según de quién es (blanco en el tutorial, que no tiene equipo; azul o
+    // rojo bien clarito con rival, para distinguir de quién es cada linterna,
+    // ver dibujarLuz) y termina en salmón, como la nave se va coloreando; en
+    // cada cuadro los dos sprites solo se estiran a su tamaño y se mezclan
     // según el color de la nave, con la intensidad.
     const n = 256;
-    luzSprites = [LUZ_RGB_INICIO, LUZ_RGB_FIN].map((rgb) => {
+    const armarLuzSprite = (rgb) => {
       const sprite = document.createElement("canvas");
       sprite.width = sprite.height = n;
       const c = sprite.getContext("2d");
@@ -3679,7 +4226,13 @@
       c.fillStyle = g;
       c.fillRect(0, 0, n, n);
       return sprite;
-    });
+    };
+    luzSprites = {
+      blanco: armarLuzSprite(LUZ_RGB_INICIO),
+      azul: armarLuzSprite(LUZ_RGB_INICIO_JUGADOR),
+      rojo: armarLuzSprite(LUZ_RGB_INICIO_RIVAL),
+      fin: armarLuzSprite(LUZ_RGB_FIN),
+    };
   }
 
   // Dibuja un sprite de anillo rotado. Como los anillos de estrellas son
@@ -3688,6 +4241,10 @@
     if (alfa <= 0.01) return;
     const lado = (sprite.width / SPRITE_ESCALA) * esc;
     ctx.save();
+    // Los anillos son luz: se suman a lo que hay detrás en vez de taparlo
+    // ("lighter"). El agujero se ve bastante más luminoso sin ocupar ni un
+    // píxel más -lo que crece es el brillo, no el tamaño-.
+    ctx.globalCompositeOperation = "lighter";
     ctx.translate(x, y);
     ctx.rotate(giro);
     ctx.globalAlpha = alfa;
@@ -3703,6 +4260,42 @@
     const canal = (sh) =>
       Math.round(((a >> sh) & 255) * (1 - k) + ((b >> sh) & 255) * k);
     return "rgb(" + canal(16) + "," + canal(8) + "," + canal(0) + ")";
+  }
+
+  // El resplandor de una luz de nave prendida (ver luzNivel/luzNivelRival),
+  // centrado en (x, y), con esa intensidad (0..1). Empieza blanca y pasa al
+  // salmón con el color de la nave -un fundido entre los dos sprites, como en
+  // los agujeros-.
+  function dibujarLuz(x, y, nivel, inicio) {
+    if (nivel <= 0.01 || !luzSprites) return;
+    const k = Math.max(0, Math.min(1, colorNave));
+    const sprites = [luzSprites[inicio], luzSprites.fin];
+    for (let v = 0; v < 2; v++) {
+      const alfa = LUZ_INTENSIDAD * nivel * (v === 0 ? 1 - k : k);
+      // El que no se ve (opacidad casi 0) no se dibuja: es una imagen grande y
+      // rellenarla cada cuadro cuesta.
+      if (alfa < 0.002) continue;
+      ctx.globalAlpha = alfa;
+      ctx.drawImage(
+        sprites[v],
+        x - LUZ_RADIO,
+        y - LUZ_RADIO,
+        LUZ_RADIO * 2,
+        LUZ_RADIO * 2,
+      );
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Lo mismo que mezclarColores pero devuelve "#rrggbb" (para poder seguir
+  // mezclándolo, como el color de las estrellas de los números). Los hex tienen
+  // que venir de seis dígitos: parseInt("fff", 16) no es blanco.
+  function mezclarHex(desde, hasta, k) {
+    const a = parseInt(desde.slice(1), 16);
+    const b = parseInt(hasta.slice(1), 16);
+    const canal = (sh) =>
+      Math.round(((a >> sh) & 255) * (1 - k) + ((b >> sh) & 255) * k);
+    return "#" + ((1 << 24) | (canal(16) << 16) | (canal(8) << 8) | canal(0)).toString(16).slice(1);
   }
 
   function mezclaAgujeros(k) {
@@ -3745,10 +4338,16 @@
           CUMULO_PULSO_AMPLITUD *
             pulsoCumulo(pos, compas / MUSICA_TIEMPOS_COMPAS));
       // El agujero: un disco negro que tapa lo que hay detrás (la luz, las
-      // estrellas del fondo).
+      // estrellas del fondo) y deja bien visible el "pozo" del medio.
       ctx.fillStyle = "#000";
       ctx.beginPath();
-      ctx.arc(c.x, c.y, CUMULO_ANILLO * esc, 0, Math.PI * 2);
+      ctx.arc(
+        c.x,
+        c.y,
+        CUMULO_ANILLO * CUMULO_DISCO_RADIO * esc,
+        0,
+        Math.PI * 2,
+      );
       ctx.fill();
       for (let v = 0; v < 2; v++) {
         // v = 0: blanco (se apaga con k); v = 1: naranja (aparece con k).
@@ -3783,19 +4382,36 @@
       ctx.fill();
     }
     if (numeroEstrellas.length) {
-      // Igual que las chispas: círculos sólidos del color de los agujeros, que se
-      // achican al caer (no se desvanecen), todos en un solo trazo.
-      ctx.fillStyle = mezclaAgujeros(k);
-      ctx.beginPath();
+      // Titilan igual que las estrellas de fondo (ver dibujarEstrellas): por
+      // eso no van todas en un solo trazo como las chispas, cada una necesita
+      // su propia opacidad. Las más prendidas (brillo alto) quedan blanco
+      // puro; las apagadas se van tiñendo del color del jugador que hizo el
+      // gol (en el tutorial, que no tiene rival, del blanco al salmón a medida
+      // que se cuentan pasajes). Al caer dejan de titilar: quedan fijas en su
+      // opacidad y en el color que tenían justo antes de caer (se achican pero
+      // no se desvanecen, como siempre).
       for (const e of numeroEstrellas) {
         if (e.t < 0) continue;
         const cayendo = e.t - NUMERO_CAE_A;
-        const r = e.r * (cayendo > 0 ? Math.max(0, 1 - cayendo / NUMERO_CAIDA) : 1);
+        const r =
+          e.r * (cayendo > 0 ? Math.max(0, 1 - cayendo / NUMERO_CAIDA) : 1);
         if (r <= 0.05) continue;
+        // Cayendo, el reloj se congela en el instante en que empezó la caída.
+        const brillo =
+          0.5 +
+          0.5 * Math.sin((reloj - Math.max(0, cayendo)) * e.titVel + e.titFase);
+        // El blanco puro queda solo para el pico del brillo (elevado a una
+        // potencia): la mayoría del tiempo, aun bastante prendidas, se ven
+        // del color del gol.
+        const prendida = brillo * brillo * brillo * brillo;
+        ctx.globalAlpha = cayendo > 0 ? 1 : 0.3 + 0.6 * brillo;
+        ctx.fillStyle = mezclarColores("#ffffff", e.color, 1 - prendida);
+        ctx.beginPath();
         ctx.moveTo(e.x + r, e.y);
         ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+        ctx.fill();
       }
-      ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -3831,26 +4447,23 @@
     // La luz de la nave sobre el fondo, debajo de los polígonos: como son
     // negros y opacos, contra ese resplandor se ven como siluetas. Solo en el
     // juego: en la intro y en el final la nave prendida se ve como en el index
-    // (sin esta luz grande; ver game-color y game-luz-index en styles.css).
-    if (luzNivel > 0.01 && centro && luzSprites && negro && !final) {
-      // Empieza blanca y pasa al salmón con el color de la nave (un fundido
-      // entre los dos sprites, como en los agujeros).
-      const k = Math.max(0, Math.min(1, colorNave));
-      for (let v = 0; v < 2; v++) {
-        const alfa = LUZ_INTENSIDAD * luzNivel * (v === 0 ? 1 - k : k);
-        // El que no se ve (opacidad casi 0) no se dibuja: es una imagen grande y
-        // rellenarla cada cuadro cuesta.
-        if (alfa < 0.002) continue;
-        ctx.globalAlpha = alfa;
-        ctx.drawImage(
-          luzSprites[v],
-          centro.x - LUZ_RADIO,
-          centro.y - LUZ_RADIO,
-          LUZ_RADIO * 2,
-          LUZ_RADIO * 2,
+    // (sin esta luz grande; ver game-color y game-luz-index en styles.css). Con
+    // dos jugadores, la del jugador 2 (rival) es la misma luz, en su nave.
+    if (negro && !final) {
+      if (centro)
+        dibujarLuz(
+          centro.x,
+          centro.y,
+          luzNivel,
+          esTutorial() ? "blanco" : esAzul() ? "azul" : "rojo",
         );
-      }
-      ctx.globalAlpha = 1;
+      if (rival && (modo === "dos" || modo === "pc"))
+        dibujarLuz(
+          rival.x,
+          rival.y,
+          luzNivelRival,
+          esAzul() ? "rojo" : "azul",
+        );
     }
 
     dibujarCumulos();
@@ -3873,6 +4486,77 @@
     dibujarFinal();
     // Lo que sigue va en pantalla, sin el zoom de la cámara.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    dibujarPunteros();
+  }
+
+  // --- Punteros de las naves que quedaron fuera de la pantalla -------------
+  // Contra la PC y online la cámara va pegada a la nave del jugador, así que la
+  // del rival puede irse de la pantalla y uno se queda sin saber dónde está.
+  // Entonces se la marca con una flecha del color de esa nave, pegada al borde
+  // por el que se fue y en la posición donde estaría: si se fue por el costado,
+  // a la altura que tiene; si se fue por arriba o por abajo, a lo ancho donde
+  // está. Si se fue en diagonal queda en la esquina, apuntando a ella.
+  //
+  // (Con dos jugadores esto no llega a pasar: ahí la cámara se abre al mapa
+  // completo justo para que las dos entren, ver camera.zoom en script.js. La
+  // flecha azul igual está hecha, por si la cámara alguna vez cambia.)
+  const PUNTERO_BORDE = 24; // px del borde de la pantalla a la punta del triángulo
+  const PUNTERO_LADO = 22; // px: lado del triángulo equilátero
+
+  function dibujarPunteros() {
+    // Ni en el tutorial (no hay rival), ni con la intro corriendo (la nave
+    // entra desde afuera), ni con el final en curso.
+    if (esTutorial() || ganado || final || introT >= 0) return;
+    // El rival, cuando está en juego: las mismas condiciones que dibujarRival,
+    // así la flecha aparece exactamente cuando la nave se vería.
+    if (
+      rival &&
+      !(enLinea() && !rival.visto) &&
+      !(rival.stun > 0 && rival.t >= DURACION_CHOQUE)
+    )
+      puntero(
+        aPantalla(rival.x, cam.ox),
+        aPantalla(rival.y, cam.oy),
+        BORDE_RIVAL,
+      );
+    // Y la del jugador. shipPose viene en pantalla y pegada a la izquierda de
+    // su caja (ver circulosNave), así que el centro es media caja más allá.
+    const p = window.shipPose;
+    if (p && p.listo && !ship.classList.contains("fuera-de-juego"))
+      puntero(p.x + cajaNave / 2, p.y + cajaNave / 2, BORDE_JUGADOR);
+  }
+
+  // Del mundo a la pantalla: la inversa de lo que hace circulosNave, y lo mismo
+  // que el transform del canvas (ver dibujar).
+  const aPantalla = (v, origen) => origen + (v - origen) * cam.z;
+
+  function puntero(sx, sy, color) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    if (sx >= 0 && sx <= W && sy >= 0 && sy <= H) return; // se ve: no hay nada que marcar
+    const m = PUNTERO_BORDE;
+    const px = Math.max(m, Math.min(W - m, sx));
+    const py = Math.max(m, Math.min(H - m, sy));
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(Math.atan2(sy - py, sx - px)); // mira hacia donde quedó la nave
+    // Rellena sólida y con su resplandor, el mismo de los halos de las naves.
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = color;
+    // Equilátero: los tres lados miden PUNTERO_LADO (la punta y la base
+    // quedan a 2/3 y 1/3 de la altura del centroide, que es el punto que se
+    // clava en el borde).
+    const alto = PUNTERO_LADO * (Math.sqrt(3) / 2);
+    const punta = (alto * 2) / 3;
+    const base = -alto / 3;
+    ctx.beginPath();
+    ctx.moveTo(punta, 0);
+    ctx.lineTo(base, -PUNTERO_LADO / 2);
+    ctx.lineTo(base, PUNTERO_LADO / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   function cuadro(ahora) {
@@ -3890,10 +4574,15 @@
     if (!modo) {
       // Eligiendo el modo: todo espera, con la nave quieta en el medio abajo.
       if (window.shipMove) window.shipMove(0, 0);
+      navegarMenuJoystick(dt);
       mostrarControles();
       dibujar(circulos[1]);
       return;
     }
+    // Con un modo ya elegido, el joystick puede volver al menú en cualquier
+    // momento (jugando, buscando rival o con el cartel del final), igual que
+    // Escape y que el botón de arriba a la izquierda.
+    salirConJoystick();
     if (esperandoRival()) {
       // Online, buscando rival: igual que eligiendo, hasta que el emparejador
       // junta a los dos.
@@ -3983,12 +4672,14 @@
         // control del jugador; empiezan las instrucciones.
         levantarTapa(false);
         if (window.shipLightSet) window.shipLightSet(true);
-        // En celulares se saltea el tutorial (ver esCelular arriba): arranca
-        // el juego directo, como si ya hubiera terminado.
-        // Las instrucciones son solo del tutorial: contra la PC, con dos
-        // jugadores y online arranca el juego directo.
-        if (esCelular() || !esTutorial()) terminarAyuda();
-        else empezarAyuda();
+        // En celulares se saltea todo esto (ver esCelular arriba): arranca el
+        // juego directo, como si ya hubiera terminado. Las instrucciones de
+        // moverse son solo del tutorial; contra la PC, con dos jugadores y
+        // online no hacen falta, pero las dos naves igual se acercan al medio
+        // y dicen "listo" antes de arrancar (ver empezarArranque).
+        if (esCelular()) terminarAyuda();
+        else if (esTutorial()) empezarAyuda();
+        else empezarArranque();
       }
       if (ayuda) actualizarAyuda(dt);
       if (ayuda) {
@@ -4035,6 +4726,9 @@
       }
     }
     luzNivel += ((luz ? 1 : 0) - luzNivel) * Math.min(1, dt * 6);
+    luzNivelRival +=
+      (((modo === "dos" || modo === "pc") && luzRival ? 1 : 0) - luzNivelRival) *
+      Math.min(1, dt * 6);
     dibujar(circulos[1]); // la luz sale del cuerpo de la nave
     // Online: lo que ve el rival de esta nave, 20 veces por segundo.
     if (enLinea() && red && red.estado === "jugando") {
@@ -4091,6 +4785,12 @@
     setLight(valor) {
       luz = valor;
     },
+    // script.js: con dos jugadores, el jugador 2 prende/apaga su luz (Y del
+    // joystick, o Q/L del teclado; ver toggleLuzRival en script.js). Solo
+    // tiene efecto en dibujarRival mientras modo === "dos".
+    toggleLuzRival() {
+      luzRival = !luzRival;
+    },
     // script.js: ¿se muestra la barra de aviso de que la nave se va del escenario?
     // No durante la intro (la nave entra desde afuera) ni en el final.
     avisoSalida() {
@@ -4116,9 +4816,17 @@
         saltearIntro();
         modo = null; // se elige de nuevo cada vez que se entra
         window.dosJugadores = false;
+        window.vueltaCostados = false;
+        window.vueltaAlBorde = false;
         window.j2Joystick = false;
         window.j2Teclado = false;
         if (modoEl) modoEl.hidden = false;
+        apuntarOpcion(0); // el menú arranca de nuevo en la primera opción
+        padMenuY = 0;
+        padMenuT = 0;
+        padMenuA = false;
+        padMenuLR = false;
+        controlesCambiados = false;
         ultimo = performance.now();
         raf = requestAnimationFrame(cuadro);
       } else {

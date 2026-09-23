@@ -1472,8 +1472,12 @@ function drawStars() {
       // y negro, 0 = a color) en la nave, que esc4-game.js baja a medida que se
       // colorea.
       light: {
-        off: "grayscale(var(--nave-gris, 1))",
-        filter: "grayscale(var(--nave-gris, 1)) var(--nave-luz-halo)",
+        // --nave-tinte es el tinte azul de los modos con rival (vacío en el
+        // tutorial): acá va en línea porque el filtro de este sprite lo escribe
+        // este archivo y no el CSS (ver .multijugador en styles.css).
+        off: "grayscale(var(--nave-gris, 1)) var(--nave-tinte, )",
+        filter:
+          "grayscale(var(--nave-gris, 1)) var(--nave-tinte, ) var(--nave-luz-halo)",
         // Más fuerte que en los otros escenarios: el sonido de luz on marca el
         // momento en que empieza el juego y tiene que oírse bien.
         volume: 0.9,
@@ -2159,14 +2163,38 @@ function drawStars() {
           minY = -edgeMargin(scene, "top", FLIGHT_MARGIN_TOP),
           maxY =
             window.innerHeight + edgeMargin(scene, "bottom", FLIGHT_MARGIN);
+        // Con dos jugadores y contra la PC, en el escenario 4 los costados no
+        // frenan, dan la vuelta (window.vueltaCostados, lo pone esc4-game.js):
+        // el que se sale por uno reaparece por el otro con la misma
+        // velocidad, así ninguno queda arrinconado contra el borde. Arriba y
+        // abajo siguen frenando como siempre.
+        const daVuelta = window.vueltaCostados && currentSceneId === "game";
+        // Límites de la vuelta: con dos jugadores los mismos de siempre (más
+        // allá del viewport); contra la PC (window.vueltaAlBorde) justo en el
+        // borde, cuando el centro de la nave lo cruza (e es la esquina de su
+        // caja de 130 px, el centro está 65 px más allá): si no, la nave
+        // queda afuera de la vista mientras la IA sí sabe dónde está.
+        const alBorde = daVuelta && window.vueltaAlBorde;
+        const vMin = alBorde ? -65 : minX;
+        const vMax = alBorde ? window.innerWidth - 65 : maxX;
         let touchedEdge = null;
-        if (e < minX) {
-          e = minX;
-          n = 0;
+        if (e < vMin) {
+          if (daVuelta) {
+            e = vMax - (vMin - e);
+            window.shipVueltas = (window.shipVueltas || 0) + 1; // esc4-game.js las cuenta
+          } else {
+            e = minX;
+            n = 0;
+          }
           touchedEdge = "left";
-        } else if (e > maxX) {
-          e = maxX;
-          n = 0;
+        } else if (e > vMax) {
+          if (daVuelta) {
+            e = vMin + (e - vMax);
+            window.shipVueltas = (window.shipVueltas || 0) + 1;
+          } else {
+            e = maxX;
+            n = 0;
+          }
           touchedEdge = "right";
         }
         if (a < minY) {
@@ -2544,6 +2572,10 @@ function drawStars() {
         document.addEventListener(
           "click",
           (ev) => {
+            // Los botones del escenario 4 (el menú de modo) van por encima de
+            // la nave: un click ahí es del menú y no de la luz. Este listener
+            // es de captura, así que se descarta acá o no hay forma.
+            if (ev.target.closest(".game-modo-opcion, .game-menu")) return;
             if (hitCohete(ev.clientX, ev.clientY)) toggleLight();
           },
           true,
@@ -2776,9 +2808,17 @@ function drawStars() {
         const gp = pads[idx];
         if (!gp) continue;
         hayJoystick = true;
-        // El joystick es del jugador 2 (escenario 4): sus botones no prenden la
-        // luz de esta nave ni tocan nada del escenario.
-        if (window.j2Joystick) continue;
+        // El joystick es del jugador 2 (escenario 4): sus botones no tocan
+        // nada de esta nave ni del escenario, salvo su propia luz (Y, igual
+        // que prende la suya el jugador 1, ver toggleLuzRival).
+        if (window.j2Joystick) {
+          const lightButton = gp.buttons[BTN_LIGHT];
+          const lightPressed = !!(lightButton && lightButton.pressed);
+          if (lightPressed && !prevLightPressed[idx] && window.esc4Game)
+            window.esc4Game.toggleLuzRival();
+          prevLightPressed[idx] = lightPressed;
+          continue;
+        }
 
         const actionButton = gp.buttons[BTN_ACTION];
         const actionPressed = !!(actionButton && actionButton.pressed);
@@ -2806,7 +2846,18 @@ function drawStars() {
   document.addEventListener("keydown", (ev) => {
     if (ev.repeat) return;
     if (ev.code === "KeyE") triggerAction();
-    else if (ev.code === "KeyQ" && toggleShipLight) toggleShipLight();
+    else if (ev.code === "KeyQ") {
+      // Con dos jugadores y el joystick en el jugador 1, Q le queda libre
+      // (no la usa para moverse): pasa a prender la luz del jugador 2 (ver
+      // toggleLuzRival). Si no, sigue siendo la luz de siempre, de esta nave.
+      if (window.j1Joystick) {
+        if (window.esc4Game) window.esc4Game.toggleLuzRival();
+      } else if (toggleShipLight) toggleShipLight();
+    } else if (ev.code === "KeyL" && window.j2Teclado && !window.j1Joystick) {
+      // Los dos jugadores en el teclado (sin joystick): Q sigue siendo la
+      // del jugador 1, L es la del jugador 2.
+      if (window.esc4Game) window.esc4Game.toggleLuzRival();
+    }
   });
 })();
 

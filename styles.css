@@ -702,6 +702,61 @@ html.escenas-listas .salmon-scene {
 .game-modo[hidden] {
   display: none;
 }
+/* Cada opción del menú. La escena entera no recibe clicks (pointer-events:
+   none), las opciones sí. Van apagadas menos la apuntada, que lleva .elegida:
+   la mueven las flechas, el stick o la cruceta del joystick y el mouse al pasar
+   por encima (ver apuntarOpcion en esc4-game.js).
+
+   El selector lleva .game-modo adelante para ganarle a .game-ayuda-paso, que es
+   la que da la tipografía y está más abajo en este archivo. Del botón solo hace
+   falta apagar lo que el navegador le pone de fábrica; el tamaño de letra se
+   hereda de .game-modo. */
+/* Las opciones van una abajo de la otra, todas del ancho de la más larga y
+   arrancando a la misma altura (align-items: stretch más justify-content:
+   flex-start más abajo). El ancho sale de la más larga y no del texto de
+   controles, que cambia si hay un joystick conectado. */
+.game-modo-opciones {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.8em;
+}
+.game-modo .game-modo-opcion {
+  justify-content: flex-start;
+  padding: 0.15em 1.1em;
+  /* La apuntada se agranda (ver .elegida más abajo) desde el punto exacto donde
+     arranca el número, que es el mismo valor que el padding de la izquierda: si
+     se agrandara desde el borde de la caja, el padding escalaría también y el
+     número se correría un par de px. Así la columna queda clavada y lo que
+     crece se va para la derecha. */
+  transform-origin: 1.1em center;
+  border: 0;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.35, 0.64, 1),
+    color 0.12s ease,
+    opacity 0.6s ease;
+}
+/* El recuadro del número sigue al texto (blanco el apuntado, apagado el resto). */
+.game-modo .game-modo-opcion .game-tecla {
+  border-color: currentColor;
+  color: inherit;
+  transition: inherit;
+}
+/* La apuntada se acerca: crece un poco y se enciende, como si se adelantara
+   hacia el que mira. Va por transform, así que no empuja a las demás, y la
+   curva se pasa apenas de largo antes de acomodarse para que el acercarse se
+   sienta. */
+.game-modo .game-modo-opcion.elegida {
+  transform: scale(1.14);
+  color: #fff;
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.45);
+}
 /* Botón para volver a la elección del modo, arriba a la izquierda. La escena
    no recibe clicks (pointer-events: none), el botón sí. */
 .game-menu {
@@ -751,8 +806,12 @@ html.escenas-listas .salmon-scene {
   text-align: center;
   color: rgba(255, 255, 255, 0.55);
 }
-/* Contra la PC el segundero es el marcador: tus goles y los de la PC (rojo,
-   el mismo del borde de sus piedras en esc4-game.js). */
+/* Contra la PC el segundero es el marcador: tus goles en azul y los de la PC en
+   rojo, los mismos colores del borde de las piedras de cada una y de los halos
+   de las dos naves (ver esc4-game.js). */
+.marcador-jugador {
+  color: #5aa9ff;
+}
 .marcador-rival {
   color: #ff5a5a;
 }
@@ -765,13 +824,19 @@ html.escenas-listas .salmon-scene {
 .starry-cohete-pair.fuera-de-juego {
   visibility: hidden;
 }
-/* Contra la PC la nave del jugador lleva un halo azul (el de la PC es rojo, lo
-   dibuja esc4-game.js). Va en la caja y no en los sprites: sus filtros los
-   escriben script.js y las reglas de arriba, y el drop-shadow en la caja
-   sigue la forma de la nave entera, fuego incluido. */
+/* En los modos con rival la nave del jugador es igual que en el tutorial
+   (blanco y negro, sin ningún tinte): lo único que la diferencia es este halo,
+   azul o rojo según el color que le haya tocado (contra la PC y con dos
+   jugadores siempre es el azul; online lo decide quién entró primero, ver
+   esAzul en esc4-game.js, que dibuja del otro color al rival). Va en la caja y
+   no en los sprites: sigue la forma de la nave entera, fuego incluido. */
 .starry-cohete-pair.in-game.multijugador {
   filter: drop-shadow(0 0 5px rgba(90, 169, 255, 0.95))
     drop-shadow(0 0 14px rgba(90, 169, 255, 0.55));
+}
+.starry-cohete-pair.in-game.color-rival {
+  filter: drop-shadow(0 0 5px rgba(255, 90, 90, 0.95))
+    drop-shadow(0 0 14px rgba(255, 90, 90, 0.55));
 }
 /* Recién vuelta de un golpe: parpadea bajando la opacidad (invulnerable). Va en
    los hijos porque la opacidad de la caja la escribe script.js en cada cuadro. */
