@@ -551,6 +551,38 @@
             <small>enter para buscar<br />esc para volver</small>
           </p>
         </div>
+        <!-- Contra la PC, antes de arrancar: qué tan difícil (ver
+             abrirDificultad en esc4-game.js). Spaceport no tiene tildes. -->
+        <div class="game-modo-dificultad" id="game-modo-dificultad" hidden>
+          <p class="game-modo-estado">dificultad</p>
+          <div class="game-modo-opciones">
+            <button
+              class="game-ayuda-paso game-modo-opcion visible"
+              type="button"
+              tabindex="-1"
+              data-dificultad="facil"
+            >
+              <kbd class="game-tecla">1</kbd><span>facil</span>
+            </button>
+            <button
+              class="game-ayuda-paso game-modo-opcion visible"
+              type="button"
+              tabindex="-1"
+              data-dificultad="regular"
+            >
+              <kbd class="game-tecla">2</kbd><span>regular</span>
+            </button>
+            <button
+              class="game-ayuda-paso game-modo-opcion visible"
+              type="button"
+              tabindex="-1"
+              data-dificultad="dificil"
+            >
+              <kbd class="game-tecla">3</kbd><span>dificil</span>
+            </button>
+          </div>
+          <p class="game-modo-estado"><small>esc para volver</small></p>
+        </div>
         <!-- Online: mientras se conecta y busca rival (lo escribe esc4-game.js). -->
         <p class="game-modo-estado" id="game-modo-estado" hidden></p>
         <!-- Que dice esta opcion: lo escribe esc4-game.js en el span segun

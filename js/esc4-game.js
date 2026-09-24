@@ -517,15 +517,43 @@
   // es window.naveFisica, la misma ficha con la que script.js mueve la del
   // jugador 1 (empuje, boost, freno, stick y cuánto se puede salir de la
   // pantalla). Ver moverRival.
-  // La PC acelera (como el jugador con Shift) cuando el agujero está a más de
-  // RIVAL_BOOST_DIST px y no hay piedras encima, pero con una energía que se
-  // gasta a RIVAL_BOOST_GASTO por segundo y vuelve a RIVAL_BOOST_RECUPERA; para
-  // volver a acelerar tiene que juntar RIVAL_BOOST_MIN, así no es un motor
-  // infinito y no le gana a cualquiera.
+  // La dificultad de la PC (se elige antes de jugar, ver abrirDificultad). Se
+  // mueve siempre con la misma física que el jugador: lo que cambia es cómo
+  // decide (ver rumboRival y moverRival).
+  // - reflejos: s que tarda en darse cuenta de una piedra que se le acerca.
+  // - peligro: px del mundo desde los que una piedra la espanta.
+  // - error: qué tan seguido se equivoca: va al agujero más lejano del par (el
+  //   gol vale igual, pero tarda más) o duda un momento (DUDA_*).
+  // - boost: acelera (como el jugador con Shift) cuando el agujero está a más
+  //   de RIVAL_BOOST_DIST px y no hay piedras encima, con una energía que se
+  //   gasta a "gasto" por segundo y vuelve a "recupera"; para volver a
+  //   acelerar tiene que juntar RIVAL_BOOST_MIN. null: sin límite, como el
+  //   jugador.
+  const DIFICULTADES = {
+    facil: {
+      reflejos: 0.45,
+      peligro: 110,
+      error: 0.35,
+      boost: { gasto: 0.8, recupera: 0.12 },
+    },
+    regular: {
+      reflejos: 0.25,
+      peligro: 140,
+      error: 0.12,
+      boost: { gasto: 0.4, recupera: 0.25 },
+    },
+    dificil: { reflejos: 0, peligro: 170, error: 0, boost: null },
+  };
   const RIVAL_BOOST_DIST = 320;
-  const RIVAL_BOOST_GASTO = 0.4;
-  const RIVAL_BOOST_RECUPERA = 0.25;
   const RIVAL_BOOST_MIN = 0.4;
+  const DUDA_POR_SEG = 0.5; // con error 1, dudas por segundo (con 0,35, una cada ~6 s)
+  const DUDA_SEG = 0.5; // s que dura una duda
+  // Sin agujeros la PC pasea (ver rumboRival): va a un punto al azar del mapa
+  // y a los PASEO_SEG (o al llegar, a PASEO_LLEGO px) elige otro; los últimos
+  // PASEO_FRENO px va frenando.
+  const PASEO_SEG = [3, 6];
+  const PASEO_LLEGO = 60;
+  const PASEO_FRENO = 120;
   // Presión de la lluvia contra el que da vueltas al mapa (ver actualizar):
   // cada vuelta suma PRESION_POR_VUELTA (tope 1) y baja PRESION_BAJA por
   // segundo, así que dando una vuelta cada ~5 s o menos se mantiene alta.
@@ -536,7 +564,6 @@
   const VUELTA_PIEDRAS = 2;
   const VUELTA_PIEDRA_RAPIDEZ = 1.4;
   const BUSQUEDA_VUELTA_EXTRA = 0.6; // con presión 1, las piedras corrigen 60 % más rápido de costado
-  const RIVAL_PELIGRO = 170; // px del mundo: desde acá una piedra la espanta
   const FIN_DURA = 4; // segundos con el cartel del ganador
   // Apenas alguien llega a 10 el juego no se frena de golpe: sigue FIN_LENTO_DURA
   // segundos más en cámara lenta (a FIN_LENTO de la velocidad normal), ya sin
@@ -822,6 +849,8 @@
   let desfaseReloj = null; // reloj propio - reloj del rival, en s (sin la demora de más)
   let acumSpawnRival = 0;
   let golesRival = 0;
+  let golDeOroHasta = 0; // hasta qué segundo de la partida se ve el cartel de GOL DE ORO (ver revisarFin)
+  let cierres = []; // online, anfitrión: los pares cerrados hace poco (ver "Goles online")
   let stunJugador = 0; // segundos que le quedan fuera de juego a la nave del jugador
   let invulJugador = 0; // segundos que le quedan parpadeando (invulnerable)
   let reaparecer = null; // centro de la caja de la nave (pantalla) donde la golpearon
@@ -890,6 +919,29 @@
       // Ni Escape ni una tecla que se repite por tenerla apretada cuentan como
       // toque para el navegador: no desbloquean el audio.
       if (ev.code !== "Escape" && !ev.repeat) tocarEspera();
+      return;
+    }
+    if (dificultadAbierta()) {
+      // Eligiendo la dificultad: flechas (o W y S), 1 a 3, enter o E, y
+      // Escape para volver al menú.
+      const f = FLECHA_DE[ev.code];
+      const n = /^(?:Digit|Numpad)([1-3])$/.exec(ev.code);
+      if (f === "ArrowUp" || f === "ArrowDown") {
+        apuntarDificultad(dificultadApuntada + (f === "ArrowDown" ? 1 : -1));
+        ev.preventDefault();
+      } else if (n) {
+        apuntarDificultad(Number(n[1]) - 1, true);
+        elegirDificultad();
+      } else if (
+        ev.code === "Enter" ||
+        ev.code === "NumpadEnter" ||
+        ev.code === "KeyE"
+      ) {
+        elegirDificultad();
+      } else if (ev.code === "Escape") {
+        sonarMenu("selector");
+        cerrarDificultad();
+      }
       return;
     }
     if (claveAbierta()) {
@@ -1514,6 +1566,107 @@
     } catch (e) {}
   }
 
+  // --- Dificultad de la PC ------------------------------------------------------
+  // Al elegir "contra la PC" se elige qué tan difícil (ver DIFICULTADES), en
+  // una pantalla como la del menú: flechas, stick o cruceta, mouse o 1 a 3, y
+  // enter, E, A o click. Escape o B vuelven al menú. Arranca en la última que
+  // se eligió (en este navegador), o en regular.
+  const dificultadEl = document.getElementById("game-modo-dificultad");
+  const opcionesDificultad = dificultadEl
+    ? [...dificultadEl.querySelectorAll("[data-dificultad]")]
+    : [];
+  const DIFICULTAD_GUARDADA = "esc4-dificultad";
+  let dificultad = "regular";
+  try {
+    const guardada = localStorage.getItem(DIFICULTAD_GUARDADA);
+    if (DIFICULTADES[guardada]) dificultad = guardada;
+  } catch (e) {}
+  let dificultadElegida = false;
+  let dificultadApuntada = 1;
+  let padDificultadY = 0; // hacia dónde venía empujado el stick
+  const dificultadAbierta = () => !!dificultadEl && !dificultadEl.hidden;
+
+  function apuntarDificultad(i, callado) {
+    const n = opcionesDificultad.length;
+    if (!n) return;
+    const nueva = ((i % n) + n) % n;
+    if (nueva !== dificultadApuntada && !callado) sonarMenu("selector");
+    dificultadApuntada = nueva;
+    opcionesDificultad.forEach((el, j) =>
+      el.classList.toggle("elegida", j === dificultadApuntada),
+    );
+  }
+
+  function abrirDificultad() {
+    if (!dificultadEl || !opcionesDificultad.length) {
+      dificultadElegida = true;
+      elegirModo("pc");
+      return;
+    }
+    modoEl.classList.add("con-dificultad");
+    dificultadEl.hidden = false;
+    apuntarDificultad(
+      Math.max(
+        0,
+        opcionesDificultad.findIndex((el) => el.dataset.dificultad === dificultad),
+      ),
+      true,
+    );
+    // Los botones del joystick que abrieron esta pantalla no cuentan de nuevo.
+    const gp = primerJoystick();
+    padMenuA = !!gp && botonPad(gp, PAD_A);
+    padMenuB = !!gp && botonPad(gp, PAD_B);
+    padDificultadY = 0;
+  }
+
+  function cerrarDificultad() {
+    if (!dificultadAbierta()) return;
+    dificultadEl.hidden = true;
+    modoEl.classList.remove("con-dificultad");
+  }
+
+  function elegirDificultad() {
+    const el = opcionesDificultad[dificultadApuntada];
+    if (!el) return;
+    sonarMenu("seleccion");
+    dificultad = el.dataset.dificultad;
+    try {
+      localStorage.setItem(DIFICULTAD_GUARDADA, dificultad);
+    } catch (e) {}
+    dificultadElegida = true;
+    cerrarDificultad();
+    elegirModo("pc");
+  }
+
+  opcionesDificultad.forEach((el, i) => {
+    el.addEventListener("click", () => {
+      apuntarDificultad(i, true);
+      elegirDificultad();
+    });
+    el.addEventListener("pointerenter", () => apuntarDificultad(i));
+  });
+
+  // Joystick en la pantalla de la dificultad: stick o cruceta para arriba y
+  // abajo (un paso por empujón), A elige y B vuelve al menú.
+  function navegarDificultadJoystick() {
+    const gp = primerJoystick();
+    if (!gp) return;
+    const joy = leerJoystick();
+    const dir = joy.teclas.has("down") ? 1 : joy.teclas.has("up") ? -1 : 0;
+    if (dir && dir !== padDificultadY)
+      apuntarDificultad(dificultadApuntada + dir);
+    padDificultadY = dir;
+    const a = botonPad(gp, PAD_A);
+    const b = botonPad(gp, PAD_B);
+    if (a && !padMenuA) elegirDificultad();
+    else if (b && !padMenuB) {
+      sonarMenu("selector");
+      cerrarDificultad();
+    }
+    padMenuA = a;
+    padMenuB = b;
+  }
+
   function elegirModo(m) {
     if (m === "volver") {
       volverAlSitio();
@@ -1528,6 +1681,11 @@
     // Online, primero la clave (ver abrirClave): al buscar vuelve acá.
     if (m === "online" && clave === null) {
       abrirClave();
+      return;
+    }
+    // Contra la PC, primero la dificultad (ver abrirDificultad).
+    if (m === "pc" && !dificultadElegida) {
+      abrirDificultad();
       return;
     }
     modo = m;
@@ -2060,6 +2218,8 @@
     atrasoRed = 0;
     acumSpawnRival = 0;
     golesRival = 0;
+    golDeOroHasta = 0;
+    cierres = [];
     stunJugador = 0;
     invulJugador = 0;
     reaparecer = null;
@@ -2319,22 +2479,20 @@
     }
   }
 
-  // La voz del gol n (1..10). conteo va de "10" a "1", así que el gol n es
-  // conteo[10 - n]; en el último, además, felicita.
+  // La voz del gol n (1..10; en el gol de oro no hay número). conteo va de
+  // "10" a "1", así que el gol n es conteo[10 - n]. Si ese gol gana la
+  // partida, además felicita (y no va la de luego).
   // luego (opcional): otra voz que sigue al número (ver vozDeHito).
-  function decirGol(n, luego) {
+  // gana: por defecto, el 10 (en el tutorial y con una sola nave); con dos,
+  // ver ganaria (un 10 que deja 10 a 10 no gana).
+  function decirGol(n, luego, gana = n === CUMULOS_PARA_COLOR) {
+    const despues = gana ? alAzar(vocesFelicita) : luego;
     const variantes = conteo[CUMULOS_PARA_COLOR - n];
     if (!variantes) {
-      if (luego) decirVoz(luego);
+      if (despues) decirVoz(despues);
       return;
     }
-    const numero = alAzar(variantes);
-    if (n < CUMULOS_PARA_COLOR) {
-      decirVoz(numero, luego ? () => decirVoz(luego) : undefined);
-      return;
-    }
-    const felicita = alAzar(vocesFelicita);
-    decirVoz(numero, () => decirVoz(felicita));
+    decirVoz(alAzar(variantes), despues ? () => decirVoz(despues) : undefined);
   }
 
   // La voz de un momento clave (o null, porque no toca o porque no hay nada
@@ -2344,6 +2502,10 @@
   function vozDeHito(anotoMio) {
     const mios = cumulosTomados;
     const suyos = golesRival;
+    // Empate en 10 o más (gol de oro): siempre "uno más". Online no: recién
+    // se sabe al confirmarse el gol (ver revisarFin).
+    if (mios === suyos && mios >= CUMULOS_PARA_COLOR)
+      return enLinea() ? null : alAzar(vocesUltimoPunto);
     if (Math.random() >= VOZ_HITO_CHANCE) return null;
     if (mios === VOZ_HITO_GOL && suyos === VOZ_HITO_GOL)
       return alAzar(vocesEmpate);
@@ -3773,7 +3935,9 @@
                     ? "GANO EL RIVAL"
                     : "GANO LA PC",
               )
-        : esAzul()
+        : golDeOroHasta > tiempo
+          ? celda("marcador-oro", "GOL DE ORO")
+          : esAzul()
           ? celda(claseMia, cumulosTomados) +
             '<span class="marcador-separador"></span>' +
             celda(claseRival, golesRival)
@@ -4095,6 +4259,7 @@
   // Agujeros de gusano: aparecen de a pares cada tanto, giran rápido y se apagan
   // si no entran. Al entrar en uno la nave sale por el otro y gana color.
   function actualizarCumulos(dt, circulos) {
+    if (enLinea() && soyAnfitrion()) resolverCierres();
     acumCumulo += dt;
     // Online los crea solo el anfitrión: el invitado los recibe.
     const creaAgujeros = !enLinea() || soyAnfitrion();
@@ -4134,72 +4299,119 @@
       }
       entrado = null;
     }
-    // Online los goles del rival los avisa él (ver golInvitado).
+    // Online los goles del rival los avisa él (ver golInvitado). Si las dos
+    // llegan en el mismo cuadro al mismo par (al mismo agujero o cada una a
+    // uno de los dos), es gol para las dos (y si queda 10 a 10, gol de oro:
+    // ver revisarFin). A pares distintos, la del rival entra en el cuadro
+    // siguiente.
+    let deRival = null;
     if (!enLinea() && rival && rival.stun <= 0) {
       const circ = circulosRival();
-      const deRival = cumulos.find((c) =>
-        circ.some((n) => Math.hypot(n.x - c.x, n.y - c.y) < n.r + CUMULO_RADIO),
-      );
-      // Si las dos llegan en el mismo cuadro al mismo par (al mismo agujero o
-      // cada una a uno de los dos), se sortea: si no, ganaría siempre la del
-      // jugador, que se revisa primero. A pares distintos, la del rival entra
-      // en el cuadro siguiente.
-      const empate =
-        entrado &&
-        deRival &&
-        (deRival === entrado || deRival === entrado.par);
-      if (deRival && (!entrado || (empate && Math.random() < 0.5))) {
-        entrado = null;
-        golRival(deRival);
-      }
-    }
-    if (entrado) {
-      // La nave desaparece por este agujero y aparece por el otro (ambos se
-      // cierran con chispas), y se pinta un poco más.
-      const salida = entrado.par;
-      chispas(entrado.x, entrado.y);
-      if (window.shipPlace) window.shipPlace(salida.x, salida.y, true);
-      cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
-      cumulosTomados++;
-      if (esTutorial()) {
-        // Como en los otros modos: en el de salida las estrellas forman el
-        // número del pasaje, 1 en el primero ... 10 en el último (como la voz),
-        // y la nave se pinta 1/10 por pasaje. Con el último, en vez del final
-        // de las navecitas, GANASTE (con la nota) y después al menú.
-        // Blancas al principio y, a medida que se cuentan pasajes, cada vez más
-        // salmón (el del sitio), como el segundero.
-        crearNumeroEstrellas(
-          salida.x,
-          salida.y,
-          cumulosTomados,
-          mezclarHex(
-            "#ffffff",
-            TIMER_COLOR_FIN,
-            (cumulosTomados - 1) / (CUMULOS_PARA_COLOR - 1),
+      deRival =
+        cumulos.find((c) =>
+          circ.some(
+            (n) => Math.hypot(n.x - c.x, n.y - c.y) < n.r + CUMULO_RADIO,
           ),
-        );
-        sonarCruce();
-        decirGol(cumulosTomados);
-        colorObjetivo = Math.min(1, cumulosTomados / CUMULOS_PARA_COLOR);
-        if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
-      } else {
-        // En el de salida las estrellas del cierre forman el número de goles:
-        // con dos naves se cuentan para arriba, 1 en el primero ... 10 en el último.
-        // Del color que le tocó al jugador (el mismo del halo de su nave).
-        crearNumeroEstrellas(salida.x, salida.y, cumulosTomados, colorPropio());
-        sonarCruce();
-        decirGol(cumulosTomados, vozDeHito(true));
-        mostrarTiempo();
-        actualizarColor();
-        if (enLinea()) avisarGolAnfitrion(entrado, salida);
-        if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
-      }
+        ) || null;
+      if (deRival && entrado && deRival !== entrado && deRival !== entrado.par)
+        deRival = null;
     }
+    // Online, el anfitrión puede llegar a un par que el invitado cerró hace
+    // menos de EMPATE_MS: también es gol (ver empateTardio).
+    if (!entrado && enLinea() && soyAnfitrion() && stunJugador <= 0)
+      empateTardio(circulos);
+    if (entrado) cumulosTomados++;
+    if (deRival) golesRival++;
+    if (entrado) golPropio(entrado);
+    if (deRival) golRival(deRival, !!entrado); // si fueron juntas, habla la del jugador
+    if (entrado && enLinea()) anotarCierreAnfitrion(entrado);
+    else if ((entrado || deRival) && !esTutorial()) revisarFin();
     moverChispas(dt);
     for (const e of numeroEstrellas) actualizarNumeroEstrella(e, dt);
     numeroEstrellas = numeroEstrellas.filter(
       (e) => e.t < NUMERO_CAE_A + NUMERO_CAIDA,
     );
+  }
+
+  // Un gol de la nave del jugador (ya contado en cumulosTomados): desaparece
+  // por este agujero y aparece por el otro (ambos se cierran con chispas), y
+  // se pinta un poco más.
+  function golPropio(entrado) {
+    const salida = entrado.par || entrado;
+    chispas(entrado.x, entrado.y);
+    if (window.shipPlace) window.shipPlace(salida.x, salida.y, true);
+    cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
+    if (esTutorial()) {
+      // Como en los otros modos: en el de salida las estrellas forman el
+      // número del pasaje, 1 en el primero ... 10 en el último (como la voz),
+      // y la nave se pinta 1/10 por pasaje. Con el último, en vez del final
+      // de las navecitas, GANASTE (con la nota) y después al menú.
+      // Blancas al principio y, a medida que se cuentan pasajes, cada vez más
+      // salmón (el del sitio), como el segundero.
+      crearNumeroEstrellas(
+        salida.x,
+        salida.y,
+        cumulosTomados,
+        mezclarHex(
+          "#ffffff",
+          TIMER_COLOR_FIN,
+          (cumulosTomados - 1) / (CUMULOS_PARA_COLOR - 1),
+        ),
+      );
+      sonarCruce();
+      decirGol(cumulosTomados);
+      colorObjetivo = Math.min(1, cumulosTomados / CUMULOS_PARA_COLOR);
+      if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
+    } else {
+      // En el de salida las estrellas del cierre forman el número de goles:
+      // con dos naves se cuentan para arriba, 1 en el primero ... 10 en el último.
+      // Del color que le tocó al jugador (el mismo del halo de su nave).
+      crearNumeroEstrellas(salida.x, salida.y, cumulosTomados, colorPropio());
+      sonarCruce();
+      // Online el gol todavía se confirma: la voz del final va en revisarFin.
+      decirGol(
+        cumulosTomados,
+        vozDeHito(true),
+        !enLinea() && ganaria(cumulosTomados, golesRival),
+      );
+      mostrarTiempo();
+      actualizarColor();
+    }
+  }
+
+  // --- Empates y gol de oro --------------------------------------------------
+  // Si las dos naves llegan al mismo par casi juntas (menos de EMPATE_MS entre
+  // una y otra), es gol para las dos. Se gana llegando a 10 con más goles que
+  // el otro: si queda 10 a 10, gol de oro (el próximo gol gana; si ese
+  // también es de las dos, se sigue).
+  const EMPATE_MS = 50;
+  const GOL_DE_ORO_AVISO = 2.5; // s con el cartel GOL DE ORO en el marcador
+
+  // ¿Ese gol (con a goles contra b) gana la partida?
+  const ganaria = (a, b) => a >= CUMULOS_PARA_COLOR && a > b;
+
+  // Después de cada gol (o de dos a la vez): si alguien llegó a 10 y va
+  // ganando, termina; si están iguales, gol de oro. Online, el anfitrión
+  // espera a que se resuelvan sus goles a confirmar (ver resolverCierres).
+  function revisarFin() {
+    if (fin || esTutorial()) return;
+    if (enLinea() && soyAnfitrion() && cierres.some((c) => c.pendiente)) return;
+    const mios = cumulosTomados;
+    const suyos = golesRival;
+    if (Math.max(mios, suyos) < CUMULOS_PARA_COLOR) return;
+    if (mios === suyos) {
+      golDeOroHasta = tiempo + GOL_DE_ORO_AVISO;
+      mostrarTiempo();
+      // "Uno más": sin online ya la dijo el gol (ver vozDeHito); online, recién
+      // acá se sabe que es empate. Después de la voz que esté sonando.
+      if (enLinea()) vozPendiente = alAzar(vocesUltimoPunto);
+      return;
+    }
+    const gano = mios > suyos ? "vos" : "pc";
+    // Online la felicitación espera a que el gol quede confirmado (sin online
+    // ya la dijo el gol, ver decirGol).
+    if (enLinea() && gano === "vos") vozPendiente = alAzar(vocesFelicita);
+    terminarPartida(gano);
   }
 
   // Fuerza con la que una lluvia busca a su nave, la misma cuenta para las dos:
@@ -4555,9 +4767,11 @@
 
   // Hacia dónde quiere ir la PC (un vector, no hace falta que mida 1): se
   // escapa de las piedras que se le vienen encima (de cualquiera de las dos
-  // lluvias) y, si no hay peligro, va al agujero más cercano; sin agujeros,
-  // se queda cerca de la nave del jugador (así está en pantalla, a la vista).
-  function rumboRival(circulos) {
+  // lluvias) y, si no hay peligro, va a un agujero; sin agujeros, pasea por el
+  // mapa. Qué tan bien lo hace depende de la dificultad (ver DIFICULTADES).
+  // suave (opcional): desde cuántos px del destino va frenando.
+  function rumboRival(dt) {
+    const dif = DIFICULTADES[dificultad] || DIFICULTADES.regular;
     let dx = 0;
     let dy = 0;
     const huir = (p) => {
@@ -4566,8 +4780,14 @@
       // Las que ya pasaron por debajo no asustan.
       if (ddy < -p.radio) return;
       const dist = Math.hypot(ddx, ddy) || 1;
-      if (dist >= RIVAL_PELIGRO + p.radio) return;
-      const peso = (RIVAL_PELIGRO + p.radio - dist) / RIVAL_PELIGRO;
+      if (dist >= dif.peligro + p.radio) {
+        p.vistaPC = 0;
+        return;
+      }
+      // Reflejos: se da cuenta recién cuando lleva dif.reflejos s cerca.
+      p.vistaPC = (p.vistaPC || 0) + dt;
+      if (p.vistaPC < dif.reflejos) return;
+      const peso = (dif.peligro + p.radio - dist) / dif.peligro;
       // Sobre todo para el costado: esquivar para arriba contra una piedra
       // que cae no sirve de mucho.
       dx += (ddx / dist) * peso * 2;
@@ -4577,46 +4797,66 @@
     for (const p of poligonosRival) huir(p);
     if (Math.hypot(dx, dy) > 0.25) return { x: dx, y: dy, boost: false };
 
-    // El agujero más cercano contando también el camino por el costado (el
-    // mapa da la vuelta): va por el más corto de los dos.
-    let mx = 0;
-    let my = 0;
-    let mejor = Infinity;
-    let hayMeta = false;
-    for (const c of cumulos) {
-      const cx = difVuelta(c.x - rival.x);
-      const cy = c.y - rival.y;
-      const d = Math.hypot(cx, cy);
-      if (d < mejor) {
-        mejor = d;
-        mx = cx;
-        my = cy;
-        hayMeta = true;
+    // Dudas: de vez en cuando (más cuanto más fácil) se queda un momento sin
+    // decidir adónde ir (a las piedras las sigue esquivando).
+    rival.duda = Math.max(0, (rival.duda || 0) - dt);
+    if (!rival.duda && Math.random() < dif.error * DUDA_POR_SEG * dt)
+      rival.duda = DUDA_SEG;
+    if (rival.duda) return { x: dx, y: dy, boost: false };
+
+    // El agujero al que va: el más cercano, contando también el camino por el
+    // costado (el mapa da la vuelta). Con errores, a veces elige el otro del
+    // par, el más lejano. Lo elige una vez y va a ese hasta que se cierra.
+    let meta = cumulos.find((c) => c.id === rival.meta);
+    if (!meta && cumulos.length) {
+      let dMejor = Infinity;
+      for (const c of cumulos) {
+        const d = Math.hypot(difVuelta(c.x - rival.x), c.y - rival.y);
+        if (d < dMejor) {
+          dMejor = d;
+          meta = c;
+        }
       }
+      if (meta.par && Math.random() < dif.error) meta = meta.par;
+      rival.meta = meta.id;
     }
-    if (!hayMeta) {
-      // Sin agujeros se queda a un costado del jugador: el que tiene en la
-      // pantalla, y yendo derecho, sin cruzar el borde. Por el camino más
-      // corto (difVuelta), al arrancar -cada una en su esquina, justo a media
-      // vuelta- el empate a veces la mandaba por el borde de la derecha y
-      // reaparecía a la izquierda. Si ese costado queda fuera de la pantalla
-      // (el jugador pegado al borde), va al otro.
-      const c = circulos[1];
-      if (!c) return { x: 0, y: 0, boost: false };
-      const COSTADO = 220;
-      let lado = rival.x >= c.x ? 1 : -1;
-      const fuera = (x) => x < COSTADO / 2 || x > window.innerWidth - COSTADO / 2;
-      if (fuera(c.x + lado * COSTADO)) lado = -lado;
-      mx = c.x + lado * COSTADO - rival.x;
-      my = c.y - 40 - rival.y;
-      if (Math.hypot(mx, my) < 60) return { x: dx, y: dy, boost: false };
-      mejor = Infinity; // volver a su lado no corre
+    if (meta) {
+      const mx = difVuelta(meta.x - rival.x);
+      const my = meta.y - rival.y;
+      return {
+        x: mx + dx * 40,
+        y: my + dy * 40,
+        // Con el agujero lejos y sin piedras encima, acelera (ver RIVAL_BOOST_DIST).
+        boost: Math.hypot(mx, my) > RIVAL_BOOST_DIST,
+      };
     }
+
+    // Sin agujeros, pasea por su cuenta: va a un punto al azar del mapa (no
+    // muy arriba, de donde vienen las piedras) y al llegar, o a los
+    // PASEO_SEG, elige otro.
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const p = rival.paseo;
+    if (
+      !p ||
+      tiempo > p.hasta ||
+      Math.hypot(difVuelta(p.x - rival.x), p.y - rival.y) < PASEO_LLEGO
+    ) {
+      rival.paseo = {
+        x: W * (0.1 + Math.random() * 0.8),
+        y: H * (0.3 + Math.random() * 0.55),
+        hasta:
+          tiempo +
+          PASEO_SEG[0] +
+          Math.random() * (PASEO_SEG[1] - PASEO_SEG[0]),
+      };
+    }
+    const q = rival.paseo;
     return {
-      x: mx + dx * 40,
-      y: my + dy * 40,
-      // Con un agujero lejos y sin piedras encima, acelera (ver RIVAL_BOOST_DIST).
-      boost: hayMeta && mejor > RIVAL_BOOST_DIST,
+      x: difVuelta(q.x - rival.x) + dx * 40,
+      y: q.y - rival.y + dy * 40,
+      boost: false,
+      suave: PASEO_FRENO,
     };
   }
 
@@ -4752,17 +4992,18 @@
       // A fondo hacia donde quiere ir, como un stick a fondo o las flechas:
       // del círculo al cuadrado (en diagonal, (1, 1) y no (0,7, 0,7)), así en
       // diagonal va tan rápido como el jugador con dos flechas apretadas.
-      const r = rumboRival(circulos);
-      const m = Math.max(Math.abs(r.x), Math.abs(r.y));
+      const r = rumboRival(dt);
+      const m = Math.max(Math.abs(r.x), Math.abs(r.y), r.suave || 0);
       gx = m > 1e-3 ? r.x / m : 0;
       gy = m > 1e-3 ? r.y / m : 0;
       // Acelera con energía limitada (ver RIVAL_BOOST_*): arranca si tiene la
       // mínima y sigue mientras le quede.
+      const boost = (DIFICULTADES[dificultad] || DIFICULTADES.regular).boost;
       let e = rival.energia ?? 1;
       const quiere =
-        r.boost && (rival.boosteando ? e > 0 : e >= RIVAL_BOOST_MIN);
+        r.boost && (!boost || (rival.boosteando ? e > 0 : e >= RIVAL_BOOST_MIN));
       rival.boosteando = quiere;
-      e += (quiere ? -RIVAL_BOOST_GASTO : RIVAL_BOOST_RECUPERA) * dt;
+      if (boost) e += (quiere ? -boost.gasto : boost.recupera) * dt;
       rival.energia = Math.max(0, Math.min(1, e));
       if (quiere) empuje = fisica.empujeBoost;
     }
@@ -4874,24 +5115,29 @@
     }
   }
 
-  function golRival(entrado) {
-    const salida = entrado.par;
+  // Un gol de la nave del rival, PC o jugador 2 (ya contado en golesRival).
+  // callado: si fue a la vez que el del jugador, habla solo la de él.
+  function golRival(entrado, callado) {
+    const salida = entrado.par || entrado;
     chispas(entrado.x, entrado.y);
     chispas(salida.x, salida.y);
     rival.x = salida.x; // sale por el otro, con el rumbo que traía
     rival.y = salida.y;
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
-    golesRival++;
     // Igual que el gol propio, pero del color que le tocó al rival (PC o
     // jugador 2: el mismo del halo de esa nave).
     crearNumeroEstrellas(salida.x, salida.y, golesRival, colorRival());
     actualizarColor();
     sonarCruce();
     // Con dos jugadores la voz también le cuenta los goles al jugador 2.
-    if (modo === "dos") decirGol(golesRival, vozDeHito(false));
-    else decirHitoRival();
+    if (callado) {
+      // (habla la del jugador)
+    } else if (modo === "dos") {
+      decirGol(golesRival, vozDeHito(false), ganaria(golesRival, cumulosTomados));
+    } else {
+      decirHitoRival();
+    }
     mostrarTiempo();
-    if (golesRival >= CUMULOS_PARA_COLOR) terminarPartida("pc");
   }
 
   // El color de la partida (las dos naves, el fondo, las piedras, los agujeros
@@ -4944,6 +5190,12 @@
   // chispas y los números terminan de caer, todo con el dt ya ralentizado. No
   // cae nada nuevo ni golpea nada: la partida ya terminó.
   function animarFin(dt, circulos) {
+    // La voz que quedó en espera (online, la felicitación: ver revisarFin).
+    if (vozPendiente && !vozSonando) {
+      const s = vozPendiente;
+      vozPendiente = null;
+      decirVoz(s);
+    }
     actualizarCumulos(dt, circulos); // ya sin agujeros: solo chispas y números
     moverPoligonos(poligonos, null, 0, dt);
     if (enLinea()) seguirRivalOnline(dt);
@@ -5010,7 +5262,7 @@
     cumulosTomados++;
     crearNumeroEstrellas(salida.x, salida.y, cumulosTomados, colorPropio());
     sonarCruce();
-    decirGol(cumulosTomados, vozDeHito(true));
+    decirGol(cumulosTomados, vozDeHito(true), false); // el final, en revisarFin
     mostrarTiempo();
     actualizarColor();
   }
@@ -5354,7 +5606,7 @@
         r1(c.t * 10) / 10,
         c.par ? c.par.id : 0,
       ]);
-      m.g = [cumulosTomados, golesRival]; // goles del anfitrión y del invitado
+      m.g = golesConfirmados(); // goles del anfitrión y del invitado
     }
     enviarOnline(m);
   }
@@ -5601,85 +5853,213 @@
         if (!estadosRival.some((s) => s.p.has(id))) piedrasRival.delete(id);
   }
 
-  // Anfitrión: el invitado avisa que entró a un agujero. Si todavía existe (si
-  // no, ya lo tomó el anfitrión antes), es gol del invitado.
+  // --- Goles online sin ventaja para el anfitrión -------------------------------
+  // El anfitrión decide los goles, pero su llegada a un agujero se ve al
+  // instante y la del invitado le llega tarde (lo que tarda el mensaje). Para
+  // que eso no le dé ventaja:
+  // - A cada llegada del invitado se le descuenta el viaje del mensaje
+  //   (latenciaRed: la mitad de la ida y vuelta del ping).
+  // - El gol del anfitrión se ve enseguida, pero queda a confirmar un rato
+  //   (lo que tarda un mensaje, más EMPATE_MS y un margen): si en ese rato
+  //   llega el invitado al mismo par, con menos de EMPATE_MS de diferencia es
+  //   gol para los dos, y si llegó claramente antes, es solo suyo.
+  // - Si el invitado cerró un par y el anfitrión llega ahí menos de EMPATE_MS
+  //   después, también es gol para los dos (ver empateTardio).
+  // Cada par cerrado queda anotado un rato en "cierres": { ids, agujeros, t0
+  // (cuándo llegó el primero, en el reloj de acá), anfitrion e invitado
+  // ({ e, s }: por dónde entró y salió cada uno, o null), pendiente, hasta }.
+  const EMPATE_MARGEN = 30; // ms de más por si un mensaje se demora
+
+  function latenciaRed() {
+    return infoRed.ping ? infoRed.ping / 2 : 40; // ms
+  }
+
+  const cierreDe = (id) => cierres.find((c) => c.ids.includes(id));
+
+  // Los goles que ya puede saber el invitado: sin los del anfitrión que
+  // todavía están a confirmar.
+  function golesConfirmados() {
+    const aConfirmar = cierres.filter((c) => c.pendiente && c.anfitrion).length;
+    return [cumulosTomados - aConfirmar, golesRival];
+  }
+
+  // Anfitrión: entró a un agujero (el gol ya se vio, ver golPropio). Queda a
+  // confirmar hasta que ya no pueda llegar un aviso del invitado que cambie algo.
+  function anotarCierreAnfitrion(entrado) {
+    const salida = entrado.par || entrado;
+    const ahora = performance.now();
+    cierres.push({
+      ids: [entrado.id, salida.id],
+      agujeros: [entrado, salida],
+      t0: ahora,
+      anfitrion: { e: entrado, s: salida },
+      invitado: null,
+      pendiente: true,
+      hasta: ahora + latenciaRed() + EMPATE_MS + EMPATE_MARGEN,
+    });
+  }
+
+  // Cada cuadro: los goles del anfitrión que ya pasaron su rato se confirman.
+  function resolverCierres() {
+    const ahora = performance.now();
+    for (const c of cierres) {
+      if (!c.pendiente || ahora < c.hasta) continue;
+      c.pendiente = false;
+      enviarGolOnline(c);
+      revisarFin();
+    }
+    cierres = cierres.filter((c) => c.pendiente || ahora - c.t0 < 5000);
+  }
+
+  // Anfitrión: el invitado avisa que entró a un agujero.
   function golInvitado(id) {
     if (fin || ganado) return;
+    const llego = performance.now() - latenciaRed(); // cuándo entró, en el reloj de acá
+    const cierre = cierreDe(id);
+    if (cierre) {
+      // Un par que ya cerró el anfitrión (si lo cerró el invitado, es un aviso
+      // repetido).
+      if (!cierre.anfitrion || cierre.invitado) return;
+      const dif = llego - cierre.t0; // positivo: el invitado llegó después
+      if (dif > EMPATE_MS) return; // tarde: el par era del anfitrión
+      const entrado = cierre.agujeros.find((h) => h.id === id);
+      const salida = cierre.agujeros.find((h) => h !== entrado) || entrado;
+      cierre.invitado = { e: entrado, s: salida };
+      golesRival++;
+      if (dif < -EMPATE_MS && cierre.pendiente) {
+        // Llegó claramente antes: el gol del anfitrión no cuenta.
+        cierre.anfitrion = null;
+        cumulosTomados--;
+      }
+      mostrarGolInvitado(entrado, salida);
+      // Si el del anfitrión ya estaba confirmado (el aviso se demoró de más),
+      // queda como empate y se avisa ya; si no, al confirmarse.
+      if (!cierre.pendiente) {
+        enviarGolOnline(cierre, "invitado");
+        revisarFin();
+      }
+      return;
+    }
     const entrado = cumulos.find((c) => c.id === id);
     if (!entrado) return;
     const salida = entrado.par || entrado;
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-    chispas(entrado.x, entrado.y);
-    chispas(salida.x, salida.y);
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     golesRival++;
-    // El gol del invitado, del lado del anfitrión: del color que le tocó al
-    // rival (acá siempre el rojo: el anfitrión es siempre el azul).
+    const nuevo = {
+      ids: [entrado.id, salida.id],
+      agujeros: [entrado, salida],
+      t0: llego,
+      anfitrion: null,
+      invitado: { e: entrado, s: salida },
+      pendiente: false,
+      hasta: 0,
+    };
+    cierres.push(nuevo);
+    mostrarGolInvitado(entrado, salida);
+    enviarGolOnline(nuevo);
+    revisarFin();
+  }
+
+  // El gol del invitado, del lado del anfitrión: del color que le tocó al
+  // rival (acá siempre el rojo: el anfitrión es siempre el azul).
+  function mostrarGolInvitado(entrado, salida) {
+    chispas(entrado.x, entrado.y);
+    chispas(salida.x, salida.y);
     crearNumeroEstrellas(salida.x, salida.y, golesRival, colorRival());
     actualizarColor();
     sonarCruce();
     decirHitoRival();
     mostrarTiempo();
-    enviarOnline({
-      tipo: "gol",
-      quien: "invitado",
-      id: entrado.id,
-      e: [r4(entrado.x / W), r4(entrado.y / H)],
-      s: [r4(salida.x / W), r4(salida.y / H)],
-      g: [cumulosTomados, golesRival],
-    });
-    if (golesRival >= CUMULOS_PARA_COLOR) terminarPartida("pc");
   }
 
-  // Anfitrión: metió un gol él (ver actualizarCumulos): se lo cuenta al invitado.
-  function avisarGolAnfitrion(entrado, salida) {
+  // Anfitrión: llega a un par que el invitado cerró hace menos de EMPATE_MS
+  // (acá ya no se ve, pero estaba ahí): gol para los dos.
+  function empateTardio(circulos) {
+    const ahora = performance.now();
+    for (const c of cierres) {
+      if (c.anfitrion || !c.invitado || ahora > c.t0 + EMPATE_MS) continue;
+      const tocado = c.agujeros.find((h) =>
+        circulos.some(
+          (n) => Math.hypot(n.x - h.x, n.y - h.y) < n.r + CUMULO_RADIO,
+        ),
+      );
+      if (!tocado) continue;
+      c.anfitrion = { e: tocado, s: tocado.par || tocado };
+      cumulosTomados++;
+      golPropio(tocado);
+      enviarGolOnline(c, "anfitrion");
+      revisarFin();
+      return;
+    }
+  }
+
+  // Le cuenta al invitado cómo quedó un par: de quién fue el gol ("anfitrion",
+  // "invitado" o "ambos"), por dónde entró y salió cada uno y el marcador.
+  function enviarGolOnline(
+    c,
+    quien = c.anfitrion && c.invitado
+      ? "ambos"
+      : c.anfitrion
+        ? "anfitrion"
+        : "invitado",
+  ) {
     const W = window.innerWidth;
     const H = window.innerHeight;
-    enviarOnline({
-      tipo: "gol",
-      quien: "anfitrion",
-      id: entrado.id,
-      e: [r4(entrado.x / W), r4(entrado.y / H)],
-      s: [r4(salida.x / W), r4(salida.y / H)],
-      g: [cumulosTomados, golesRival],
-    });
+    const pos = (h) => [r4(h.x / W), r4(h.y / H)];
+    const m = { tipo: "gol", quien, g: golesConfirmados() };
+    if (quien !== "anfitrion") {
+      m.id = c.invitado.e.id;
+      m.e = pos(c.invitado.e);
+      m.s = pos(c.invitado.s);
+    }
+    if (quien !== "invitado") {
+      m.a = [pos(c.anfitrion.e), pos(c.anfitrion.s)];
+      if (quien === "anfitrion") {
+        m.id = c.anfitrion.e.id;
+        m.e = m.a[0];
+        m.s = m.a[1];
+      }
+    }
+    enviarOnline(m);
   }
 
-  // Invitado: el anfitrión confirma un gol (de cualquiera de los dos).
+  // Invitado: el anfitrión confirma un gol, del invitado ("invitado"), suyo
+  // ("anfitrion") o de los dos a la vez ("ambos", ver "Goles online").
   function recibirGol(m) {
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const e = { x: m.e[0] * W, y: m.e[1] * H };
-    const s = { x: m.s[0] * W, y: m.s[1] * H };
-    // Si es el gol que ya se adelantó (ver predecirGolPropio), esto solo lo
-    // confirma: la nave ya salió y el par ya se cerró, no se hace de nuevo.
-    const adelantado = m.quien === "invitado" && golesPredichos.delete(m.id);
-    if (!adelantado) chispas(e.x, e.y);
+    const aPx = (p) => ({ x: p[0] * W, y: p[1] * H });
     // Se cierra el par acá mismo (el próximo estado del anfitrión igual lo saca).
     const cerca = (c, p) => Math.hypot(c.x - p.x, c.y - p.y) < 2;
-    cumulos = cumulos.filter((c) => !cerca(c, e) && !cerca(c, s));
+    const puntos = [m.e, m.s, ...(m.a || [])].filter(Boolean).map(aPx);
+    cumulos = cumulos.filter((c) => !puntos.some((p) => cerca(c, p)));
     cumulosTomados = m.g[1];
     golesRival = m.g[0];
-    if (adelantado) {
-      // Nada que mostrar: ya se mostró al entrar.
-    } else if (m.quien === "invitado") {
-      // Gol mío: salgo por el otro agujero, como siempre.
-      if (window.shipPlace) window.shipPlace(s.x, s.y, true);
-      crearNumeroEstrellas(s.x, s.y, cumulosTomados, colorPropio());
-      decirGol(cumulosTomados, vozDeHito(true));
-      sonarCruce();
-    } else {
+    if (m.quien !== "anfitrion") {
+      // Gol mío. Si es el que ya se adelantó (ver predecirGolPropio), esto
+      // solo lo confirma: la nave ya salió y el par ya se cerró.
+      if (!golesPredichos.delete(m.id)) {
+        const e = aPx(m.e);
+        const s = aPx(m.s);
+        chispas(e.x, e.y);
+        if (window.shipPlace) window.shipPlace(s.x, s.y, true);
+        crearNumeroEstrellas(s.x, s.y, cumulosTomados, colorPropio());
+        decirGol(cumulosTomados, vozDeHito(true), false); // el final, en revisarFin
+        sonarCruce();
+      }
+    }
+    if (m.quien !== "invitado") {
       // Gol del anfitrión: del lado del invitado es el rival.
+      const [e, s] = (m.a || [m.e, m.s]).map(aPx);
+      chispas(e.x, e.y);
       chispas(s.x, s.y);
       crearNumeroEstrellas(s.x, s.y, golesRival, colorRival());
       sonarCruce();
-      decirHitoRival();
+      if (m.quien === "anfitrion") decirHitoRival();
     }
     actualizarColor();
     mostrarTiempo();
-    if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
-    else if (golesRival >= CUMULOS_PARA_COLOR) terminarPartida("pc");
+    revisarFin();
   }
 
   function dibujarRival() {
@@ -6303,6 +6683,7 @@
       // Eligiendo el modo: todo espera, con la nave quieta en el medio abajo.
       if (window.shipMove) window.shipMove(0, 0);
       if (claveAbierta()) navegarClaveJoystick();
+      else if (dificultadAbierta()) navegarDificultadJoystick();
       else navegarMenuJoystick(dt);
       mostrarControles();
       dibujar(circulos[1]);

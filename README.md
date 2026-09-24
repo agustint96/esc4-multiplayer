@@ -29,7 +29,12 @@ también en la pausa y en el cartel de salir del online. Durante el juego, el bo
   todo. Al completar los 10 agujeros, GANASTE y de vuelta al menú.
 - **2 · contra la PC**: vos con WASD o flechas (Shift acelera, Espacio aleja
   la cámara), sin tutorial: arranca el juego directo. La nave de la PC se ve
-  semitransparente.
+  semitransparente. Antes se elige la **dificultad** (fácil, regular o
+  difícil; queda recordada la última). La PC se mueve siempre con la misma
+  física que vos: la dificultad solo cambia cómo decide (qué tan rápido se da
+  cuenta de una piedra, desde qué distancia la esquiva, cuánto se equivoca
+  de agujero o duda, y si su boost tiene límite). Ver `DIFICULTADES` en
+  `js/esc4-game.js`. Cuando no hay agujeros pasea por el mapa por su cuenta.
 - **3 · dos jugadores**: sin tutorial, y la cámara muestra el mapa entero para
   que nadie quede fuera de pantalla.
   - Con un **joystick** conectado: el jugador 1 tiene todo el teclado (como en
@@ -97,6 +102,13 @@ hace en el momento y el anfitrión se lo confirma después. Si el anfitrión no
 lo confirma (llegó él primero a ese par), a los pocos segundos el marcador y
 los agujeros vuelven a ser los suyos.
 
+Que decida el anfitrión no le da ventaja en los empates: a cada aviso del
+invitado se le descuenta lo que tardó en viajar (la mitad del ping), y el gol
+del anfitrión se ve al instante pero queda a confirmar un momento (lo que
+tarda un mensaje, más 50 ms). Si en ese rato llega el invitado al mismo par
+con menos de 50 ms de diferencia, es gol para los dos; si llegó claramente
+antes, es solo suyo. Ver "Goles online" en `js/esc4-game.js`.
+
 Una vez emparejados, el servidor solo los presenta: el juego va directo de
 una PC a la otra (WebRTC), porque la sala quedó lejos, en Miami (se le pide
 Sudamérica, pero Cloudflare no tiene Durable Objects ahí). Si la conexión
@@ -129,6 +141,11 @@ probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
   entra a uno suma un gol y sale por el otro.
 - Gana el primero en llegar a **10**. El marcador está en el cuadrado del
   medio (tus goles en blanco, los de la PC en rojo) y la voz cuenta 1, 2, 3…
+- Si las dos naves llegan al mismo par de agujeros casi juntas (menos de
+  50 ms entre una y otra), es **gol para las dos**. Si eso deja **10 a 10**,
+  es **gol de oro**: aparece el cartel y el próximo gol gana (si ese también
+  es de las dos, se sigue). En cada empate así la voz dice "uno más", y el
+  gol que define, la felicitación.
 - El color de la partida (las dos naves, el fondo, las piedras, los agujeros
   y el marcador) avanza cuando alguno llega primero a un número de goles, y
   como mucho llega al color del agujero 7 del juego original, repartido en
