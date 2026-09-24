@@ -713,6 +713,9 @@
   const estrellasPorGrupo = GRUPOS_ESTRELLAS.map((_, g) =>
     estrellas.filter((e) => e.grupo === g),
   );
+  // px que quedaron corridas las estrellas para la izquierda: las corre la
+  // cámara de la presentación, y quedan así (si no, al terminar saltarían).
+  let estrellasCorridas = 0;
   let gusanoSprites = null; // anillos de los agujeros ya dibujados con brillo (ver armarSprites)
   let luzSprites = null; // la luz de la nave ya dibujada (degradado), en blanco y en salmón
   let cumulos = []; // cúmulos de estrellas azules en el mapa
@@ -1235,6 +1238,8 @@
       return;
     }
     modo = m;
+    // La nave se había ido al terminar la presentación: vuelve con el modo.
+    ship.classList.remove("game-sin-nave");
     // Si el botón de salir ya venía apretado (se volvió al menú con él y se
     // eligió sin soltarlo), que no cuente como una apretada nueva y se salga
     // de nuevo apenas arranca.
@@ -1429,7 +1434,10 @@
       vx: 0, // solo se mueve de costado cuando busca a la nave
       ang: Math.random() * Math.PI * 2,
       giro: (Math.random() - 0.5) * 3,
-      vy: vel * (0.75 + Math.random() * 0.55) * (rapida ? VUELTA_PIEDRA_RAPIDEZ : 1),
+      vy:
+        vel *
+        (0.75 + Math.random() * 0.55) *
+        (rapida ? VUELTA_PIEDRA_RAPIDEZ : 1),
       radio: d * 0.6,
       verts,
       pts: [], // vértices en el mundo, se recalculan en cada cuadro
@@ -2289,38 +2297,60 @@
   }
 
   // --- Presentación -----------------------------------------------------------
-  // Al abrir la página, antes del menú: pantalla negra que se aclara (no del
-  // todo: el fondo queda como con 4 agujeros tomados) y deja ver el planeta del
-  // escenario 2 en el medio, apagado. Llega la nave desde la izquierda, a color,
-  // y se queda mirándolo; el planeta se prende como allá (planetBulbBlow, con el
-  // mismo sonido) y la nave se va. Se funde a negro y aparece el menú. Cualquier
-  // tecla, un click o el botón A la saltean. Una sola vez por página.
+  // Al abrir la página, antes del menú, en tres pantallas:
+  // 1. Logo: el dibujo de "logo agus.png" en el medio de la pantalla negra, que
+  //    aparece y se va.
+  // 2. Entrada: el negro se aclara (no del todo: el fondo queda como con
+  //    PRESENTA_FONDO) y en el medio se abre un agujero de gusano. Llega la nave
+  //    desde la izquierda, a color, lo mira y se mete: entra en espiral
+  //    achicándose hasta desaparecer en el centro, con las chispas y el sonido
+  //    de cruzar. Se funde a negro.
+  // 3. Salida: otra pantalla, ya la del menú (fondo negro con sus estrellas).
+  //    Se abre otro agujero a la izquierda, la nave sale de él y se va hacia la
+  //    derecha, y la cámara la sigue (las estrellas y el agujero se corren para
+  //    la izquierda y el menú entra desde la derecha) hasta que el menú queda
+  //    en el medio. Ahí la cámara se queda y la nave sigue de largo hasta salir
+  //    por la derecha. No vuelve a verse hasta que se elige un modo.
+  // Cualquier tecla, un click o el botón A la saltean. Una sola vez por página.
   //
   // Los navegadores no dejan sonar nada hasta que la persona toca la página (una
-  // tecla o un click). Si todavía no se tocó, la pantalla negra dice "presiona
-  // cualquier tecla" y la presentación arranca recién con ese toque, así el
-  // planeta se prende con su sonido. Si ya se puede sonar, arranca sola.
-  const PRESENTA_NEGRO = 0.6; // s de negro antes de empezar a aclarar
-  const PRESENTA_ACLARA = 2.4; // lo que tarda en aclarar
-  const PRESENTA_FONDO = 4 / CUMULOS_PARA_COLOR; // el fondo como con 4 agujeros
-  const PRESENTA_LLEGA_EN = 2.2; // cuándo empieza a entrar la nave
+  // tecla o un click). Si todavía no se tocó, al irse el logo la pantalla negra
+  // dice "presiona cualquier tecla" y sigue recién con ese toque, así los
+  // agujeros suenan. Si ya se puede sonar, sigue sola.
+  //
+  // Todo lo de la presentación se dibuja en coordenadas de pantalla, corridas
+  // por la cámara (presenta.cam, px hacia la derecha): con la cámara en 0, el
+  // mundo y la pantalla coinciden.
+  const PRESENTA_LOGO_ENTRA = 0.8; // s que tarda en aparecer el logo
+  const PRESENTA_LOGO_QUEDA = 1.8; // s que se queda a la vista
+  const PRESENTA_LOGO_SALE = 0.8; // s que tarda en irse
+  const PRESENTA_ACLARA = 2.4; // lo que tarda en aclarar la pantalla de entrada
+  const PRESENTA_FONDO = 2 / CUMULOS_PARA_COLOR; // el fondo como con 2 agujeros
+  const PRESENTA_AGUJERO_ESC = 2.6; // tamaño de los agujeros, por el del juego
+  const PRESENTA_AGUJERO_COLOR = 1; // 0 = blancos, 1 = naranjas (como al final del juego)
+  const PRESENTA_ABRE = 0.5; // s que tarda un agujero en abrirse (o en cerrarse)
+  const PRESENTA_AGUJERO_EN = 0.9; // cuándo se abre el agujero de entrada
+  const PRESENTA_LLEGA_EN = 1.8; // cuándo empieza a entrar la nave
   const PRESENTA_LLEGADA = 2.6; // lo que tarda en llegar
-  const PRESENTA_PRENDE_EN = 6.2; // cuándo se prende el planeta
-  const PRESENTA_PRENDIDO = 3; // lo que dura planetBulbBlow (styles.css)
-  const PRESENTA_SALE_EN = PRESENTA_PRENDE_EN + 1.7; // se va con el planeta prendido
-  const PRESENTA_GIRO = 0.4; // s que gira antes de arrancar
-  const PRESENTA_VUELO = 1.5; // s desde que arranca hasta salir por la derecha
-  const PRESENTA_CAE_EN = PRESENTA_PRENDE_EN + PRESENTA_PRENDIDO + 0.5;
-  const PRESENTA_CAIDA = 1; // lo que tarda en fundirse a negro al final
-  const PRESENTA_CAIDA_SALTEO = 0.35; // lo mismo, al saltearla
-  const PRESENTA_ESPERA_MAX = 3; // s de negro esperando la imagen, como mucho
-  const presentaEl = document.getElementById("game-presenta");
-  const presentaPlaneta = document.getElementById("game-presenta-planeta");
+  const PRESENTA_ENTRA_EN = 5.4; // cuándo se mete en el agujero
+  const PRESENTA_ENTRADA = 1.1; // lo que tarda en meterse
+  const PRESENTA_ESPIRAL = 1.6; // radianes que da la vuelta mientras se mete
+  const PRESENTA_FUNDE = 0.7; // fundido a negro entre la entrada y la salida
+  const PRESENTA_NEGRO_ENTRE = 0.3; // s de negro entre las dos pantallas
+  const PRESENTA_LEVANTA = 0.6; // lo que tarda en verse la pantalla de salida
+  const PRESENTA_SALE_EN = 0.9; // cuándo sale la nave del segundo agujero
+  const PRESENTA_SALIDA = 0.5; // lo que tarda en salir (crece de 0 a su tamaño)
+  const PRESENTA_VELOCIDAD = 0.6; // pantallas por segundo que vuela hacia la derecha
+  const PRESENTA_ARRANQUE = 0.8; // s que tarda en llegar a esa velocidad
+  const PRESENTA_PARALAJE = 0.4; // lo que se corren las estrellas por lo que se corre la cámara
+  const PRESENTA_CAIDA_SALTEO = 0.35; // fundido a negro al saltearla
+  const PRESENTA_ESPERA_MAX = 3; // s de negro esperando el logo, como mucho
+  const presentaLogo = document.getElementById("game-presenta-logo");
   const presentaToque = document.getElementById("game-presenta-toque");
   // Un WAV mudo de 8 muestras: para probar si el navegador deja sonar.
   const SILENCIO =
     "data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YRAAAAAAAAAAAAAAAAAAAAAAAAAA";
-  let presenta = null; // en curso: { t, cae, toque, ... }
+  let presenta = null; // en curso: { fase, f, toque, agujeros, ... }
   let presentada = false;
 
   // ¿Puede sonar algo ya, sin que se haya tocado la página? (Promise de true o
@@ -2348,49 +2378,52 @@
   const rumbo = (dx, dy) => (Math.atan2(dy, dx) * 180) / Math.PI + 90;
 
   function empezarPresentacion() {
-    if (!presentaEl || !presentaPlaneta || !tapa) return;
+    if (!presentaLogo || !tapa) return;
     presentada = true;
-    // toque: null mientras se averigua si puede sonar, false esperando que
-    // toquen algo, true en marcha.
+    // fase: "logo", "espera" (el toque para poder sonar), "entrada" o
+    // "salida"; f: segundos desde que empezó la fase. toque: null mientras se
+    // averigua si puede sonar, false esperando que toquen algo, true si ya
+    // puede sonar. cae: cuándo termina el fundido a negro de salteo (null si
+    // no se salteó).
     presenta = {
-      t: 0,
+      fase: "logo",
+      f: 0,
       espera: 0,
       listo: false,
-      cae: null,
-      pos: null,
       toque: null,
+      cae: null,
+      cam: 0,
+      agujeros: [],
+      pos: null,
     };
     const gp = primerJoystick();
     presenta.padA = !!gp && botonPad(gp, PAD_A);
-    // Arranca en negro, por encima de todo (la nave incluida), y abajo ya está
-    // armado lo que se va a ver al aclarar.
+    // Arranca en negro, por encima de todo (la nave incluida).
     tapa.style.transition = "none";
     tapa.classList.add("cae");
     void tapa.offsetWidth;
     if (modoEl) modoEl.hidden = true;
-    presentaEl.hidden = false;
-    fondoDeGolpe(() =>
-      scene.style.setProperty("--fondo-color", PRESENTA_FONDO.toFixed(3)),
-    );
     ship.classList.add("game-color"); // a color toda la presentación
     window.shipLibre = true; // puede estar fuera de la pantalla
-    moverNavePresentacion();
-    // Que el planeta no aparezca a medio cargar: se espera a que esté listo.
+    tamanoNave(0); // todavía no se la ve
+    particulas = [];
+    // Que el logo no aparezca a medio cargar: se espera a que esté listo.
     const listo = () => {
       if (presenta) presenta.listo = true;
     };
-    if (presentaPlaneta.decode) presentaPlaneta.decode().then(listo, listo);
-    else if (presentaPlaneta.complete) listo();
-    else presentaPlaneta.addEventListener("load", listo);
+    if (presentaLogo.decode) presentaLogo.decode().then(listo, listo);
+    else if (presentaLogo.complete) listo();
+    else presentaLogo.addEventListener("load", listo);
+    presentaLogo.hidden = false;
     puedeSonar().then((puede) => {
       if (!presenta || presenta.toque !== null) return; // ya tocaron
       presenta.toque = puede;
-      if (!puede && presentaToque) presentaToque.hidden = false;
     });
   }
 
-  // Una tecla, un click o el botón A durante la presentación: si estaba
-  // esperando el toque, arranca; si ya estaba en marcha, la saltea.
+  // Una tecla, un click o el botón A durante la presentación: si todavía no
+  // se podía sonar, ahora sí (y si estaba esperando el toque, sigue); si ya se
+  // podía, la saltea.
   function tocarPresentacion() {
     if (!presenta) return;
     if (presenta.toque === true) {
@@ -2401,121 +2434,295 @@
     if (presentaToque) presentaToque.hidden = true;
   }
 
+  // Tamaño de la nave (1 = el de siempre). Nunca 0 del todo: script.js toma
+  // un shipZoom de 0 como si no hubiera (window.shipZoom || 1).
+  function tamanoNave(z) {
+    window.shipZoom = Math.max(0.001, z);
+  }
+
+  function pasarFase(fase) {
+    presenta.fase = fase;
+    presenta.f = 0;
+  }
+
+  // Un agujero de la presentación en (x, y) del mundo, que se abre en abre
+  // (segundos de la fase).
+  function agujeroPresentacion(x, y, abre) {
+    const a = { x, y, abre, cierra: null, ang: Math.random() * Math.PI * 2 };
+    presenta.agujeros.push(a);
+    return a;
+  }
+
   function actualizarPresentacion(dt) {
     const p = presenta;
-    // Botón A del joystick: arranca o saltea (solo al apretarlo, no si venía
+    // Botón A del joystick: como una tecla (solo al apretarlo, no si venía
     // apretado).
     const gp = primerJoystick();
     const a = !!gp && botonPad(gp, PAD_A);
     if (a && !p.padA) tocarPresentacion();
     p.padA = a;
-    if (p.toque !== true && p.cae === null) return; // esperando el toque
-    if (!p.listo && p.cae === null) {
-      p.espera += dt;
-      if (p.espera < PRESENTA_ESPERA_MAX) return;
-      p.listo = true;
-    }
-    p.t += dt;
-    if (!p.aclara && p.cae === null && p.t >= PRESENTA_NEGRO) {
-      p.aclara = true;
-      tapa.style.transition = `opacity ${PRESENTA_ACLARA}s ease`;
-      tapa.classList.remove("cae");
-    }
-    if (!p.prende && p.cae === null && p.t >= PRESENTA_PRENDE_EN) {
-      p.prende = true;
-      presentaPlaneta.classList.add("encendido");
-      if (typeof sfxPlay === "function") sfxPlay("planeta");
-    }
-    if (p.cae === null && p.t >= PRESENTA_CAE_EN)
-      caerPresentacion(PRESENTA_CAIDA);
-    if (p.cae !== null && p.t >= p.cae) {
-      terminarPresentacion();
+    if (p.cae !== null) {
+      // Salteada: se funde a negro con todo quieto y, ya en negro, termina.
+      p.cae -= dt;
+      if (p.cae <= 0) terminarPresentacion();
       return;
     }
-    moverNavePresentacion();
+    if (p.fase === "logo") {
+      if (!p.listo) {
+        p.espera += dt;
+        if (p.espera < PRESENTA_ESPERA_MAX) return;
+        p.listo = true;
+      }
+      if (p.f === 0) {
+        presentaLogo.style.transition = `opacity ${PRESENTA_LOGO_ENTRA}s ease`;
+        presentaLogo.classList.add("visible");
+      }
+      p.f += dt;
+      const sale = PRESENTA_LOGO_ENTRA + PRESENTA_LOGO_QUEDA;
+      if (!p.logoSale && p.f >= sale) {
+        p.logoSale = true;
+        presentaLogo.style.transition = `opacity ${PRESENTA_LOGO_SALE}s ease`;
+        presentaLogo.classList.remove("visible");
+      }
+      if (p.f >= sale + PRESENTA_LOGO_SALE) {
+        presentaLogo.hidden = true;
+        pasarFase("espera");
+      }
+      return;
+    }
+    if (p.fase === "espera") {
+      if (p.toque !== true) {
+        // Todavía no puede sonar: lo pide (si todavía se está averiguando,
+        // espera en negro sin decir nada).
+        if (p.toque === false && presentaToque) presentaToque.hidden = false;
+        return;
+      }
+      if (presentaToque) presentaToque.hidden = true;
+      empezarEntrada();
+    }
+    p.f += dt;
+    for (const h of p.agujeros) h.ang += CUMULO_GIRO * dt;
+    moverChispas(dt);
+    if (p.fase === "entrada") actualizarEntrada();
+    else actualizarSalida();
+    if (presenta) dibujarPresentacion(); // (si la nave ya se fue, terminó)
   }
 
-  // Dónde está la nave (centro, en px de la pantalla) y hacia dónde mira: llega
-  // desde afuera por la izquierda frenando hasta quedar abajo a la izquierda del
-  // planeta, flota mirándolo y después gira y se va acelerando.
-  function moverNavePresentacion() {
+  // Pantalla de entrada: el starry apenas prendido, el agujero en el medio.
+  function empezarEntrada() {
     const p = presenta;
-    if (!window.shipPlace || !window.shipFace) return;
+    pasarFase("entrada");
+    fondoDeGolpe(() =>
+      scene.style.setProperty("--fondo-color", PRESENTA_FONDO.toFixed(3)),
+    );
+    tapa.style.transition = `opacity ${PRESENTA_ACLARA}s ease`;
+    tapa.classList.remove("cae");
     const w = window.innerWidth;
     const h = window.innerHeight;
-    // El dibujo del planeta ocupa el 67 % del ancho de la imagen y el 42 % del
-    // alto, centrado.
-    const lado = presentaPlaneta.offsetWidth || 400;
-    const planeta = { x: w / 2, y: h / 2 };
-    const medioAncho = lado * 0.34;
-    let destino = {
-      x: planeta.x - medioAncho - 110,
-      y: planeta.y + lado * 0.12,
-    };
-    // Si a la izquierda no entra (celular parado), abajo del planeta.
-    if (destino.x < 70)
-      destino = {
-        x: planeta.x - medioAncho * 0.6,
-        y: planeta.y + lado * 0.21 + 95,
-      };
-    const desde = { x: -160, y: destino.y + 60 };
+    const hueco = agujeroPresentacion(w / 2, h / 2, PRESENTA_AGUJERO_EN);
+    // La nave se queda abajo a la izquierda del agujero, mirándolo.
+    const lejos = Math.min(260, w * 0.3);
+    p.destino = { x: hueco.x - lejos, y: hueco.y + lejos * 0.35 };
+    p.desde = { x: -160, y: p.destino.y + 60 };
+    window.shipZoom = 1;
+    window.shipPlace(p.desde.x, p.desde.y);
+  }
+
+  function actualizarEntrada() {
+    const p = presenta;
+    const f = p.f;
+    const hueco = p.agujeros[0];
+    if (!p.abrio && f >= hueco.abre) {
+      p.abrio = true;
+      sonarPortal();
+    }
     let pos;
     let mira;
-    if (p.t < PRESENTA_SALE_EN || !p.pos) {
+    if (f < PRESENTA_ENTRA_EN) {
+      // Llega rápido y frena suave; ya casi llegando, mira al agujero.
       const u = Math.max(
         0,
-        Math.min(1, (p.t - PRESENTA_LLEGA_EN) / PRESENTA_LLEGADA),
+        Math.min(1, (f - PRESENTA_LLEGA_EN) / PRESENTA_LLEGADA),
       );
-      const suave = 1 - Math.pow(1 - u, 3); // llega rápido y frena suave
+      const suave = 1 - Math.pow(1 - u, 3);
+      const { desde, destino } = p;
       pos = {
         x:
           desde.x +
           (destino.x - desde.x) * suave +
-          Math.sin(p.t * 1.7) * NAVE_FLOTA.x * suave,
+          Math.sin(f * 1.7) * NAVE_FLOTA.x * suave,
         y:
           desde.y +
           (destino.y - desde.y) * suave +
-          Math.sin(p.t * 2.3 + 1) * NAVE_FLOTA.y * suave,
+          Math.sin(f * 2.3 + 1) * NAVE_FLOTA.y * suave,
       };
-      // Mira hacia donde va y, ya casi llegando, al planeta.
       mira =
         u < 0.7
           ? rumbo(destino.x - desde.x, destino.y - desde.y)
-          : rumbo(planeta.x - pos.x, planeta.y - pos.y);
+          : rumbo(hueco.x - pos.x, hueco.y - pos.y);
       p.pos = pos;
     } else {
-      // Se va por la derecha: gira y recién ahí arranca, acelerando, en una
-      // curva que pasa por debajo del planeta (así no lo tapa) y sale por el
-      // borde derecho. La curva es una Bézier cuadrática: desde donde estaba
-      // (a), bajando por debajo del dibujo (b), hasta afuera a la derecha (c).
-      const a = p.pos;
-      const b = {
-        x: planeta.x - medioAncho,
-        y: planeta.y + lado * 0.21 + 260,
+      // Se mete: en espiral hacia el centro, cada vez más rápido y más chica,
+      // hasta desaparecer justo en el medio del agujero.
+      const u = Math.min(1, (f - PRESENTA_ENTRA_EN) / PRESENTA_ENTRADA);
+      const espiral = (v) => {
+        const k = 1 - v * v; // lo que le falta: acelera hacia el centro
+        const ang = v * PRESENTA_ESPIRAL;
+        const dx = p.pos.x - hueco.x;
+        const dy = p.pos.y - hueco.y;
+        return {
+          x: hueco.x + (dx * Math.cos(ang) - dy * Math.sin(ang)) * k,
+          y: hueco.y + (dx * Math.sin(ang) + dy * Math.cos(ang)) * k,
+        };
       };
-      const c = { x: w + 200, y: planeta.y + lado * 0.1 };
-      const s = Math.max(0, p.t - PRESENTA_SALE_EN - PRESENTA_GIRO);
-      const u = Math.min(1, Math.pow(s / PRESENTA_VUELO, 2)); // acelera
-      const v = 1 - u;
-      pos = {
-        x: v * v * a.x + 2 * v * u * b.x + u * u * c.x,
-        y: v * v * a.y + 2 * v * u * b.y + u * u * c.y,
-      };
-      // Mira hacia donde va (la tangente de la curva).
-      mira = rumbo(
-        v * (b.x - a.x) + u * (c.x - b.x),
-        v * (b.y - a.y) + u * (c.y - b.y),
-      );
+      pos = espiral(u);
+      const sigue = espiral(Math.min(1, u + 0.02));
+      if (u < 1) mira = rumbo(sigue.x - pos.x, sigue.y - pos.y);
+      tamanoNave(1 - Math.pow(u, 1.5));
+      if (u >= 1 && hueco.cierra === null) {
+        // Adentro: el agujero se cierra con sus chispas, como en el juego.
+        hueco.cierra = f;
+        chispas(hueco.x, hueco.y);
+        sonarCruce();
+      }
     }
     window.shipPlace(pos.x, pos.y, true);
-    window.shipFace(mira);
+    if (mira !== undefined) window.shipFace(mira);
+    const negroEn = PRESENTA_ENTRA_EN + PRESENTA_ENTRADA + 0.3;
+    if (!p.funde && f >= negroEn) {
+      p.funde = true;
+      tapa.style.transition = `opacity ${PRESENTA_FUNDE}s ease`;
+      tapa.classList.add("cae");
+    }
+    if (f >= negroEn + PRESENTA_FUNDE + PRESENTA_NEGRO_ENTRE) empezarSalida();
+  }
+
+  // Pantalla de salida: ya la del menú (fondo negro), con el menú todavía
+  // afuera, una pantalla a la derecha.
+  function empezarSalida() {
+    const p = presenta;
+    pasarFase("salida");
+    fondoDeGolpe(() => scene.style.setProperty("--fondo-color", "0"));
+    particulas = [];
+    const w = window.innerWidth;
+    p.agujeros = [];
+    p.cam = 0;
+    p.menuEn = w; // cuánto se corre la cámara hasta que el menú queda en el medio
+    const hueco = agujeroPresentacion(
+      w * 0.2,
+      window.innerHeight * POSICION_Y_INICIAL,
+      0,
+    );
+    sonarPortal();
+    p.x = hueco.x;
+    tamanoNave(0);
+    window.shipPlace(hueco.x, hueco.y);
+    moverMenuPresentacion();
+    if (modoEl) {
+      modoEl.inert = true; // se ve, pero todavía no se lo puede usar
+      modoEl.hidden = false;
+    }
+    tapa.style.transition = `opacity ${PRESENTA_LEVANTA}s ease`;
+    tapa.classList.remove("cae");
+  }
+
+  function actualizarSalida() {
+    const p = presenta;
+    const w = window.innerWidth;
+    const hueco = p.agujeros[0];
+    // Sale creciendo, mirando para la derecha, y acelera hasta
+    // PRESENTA_VELOCIDAD. La cámara la sigue desde que pasa el medio de la
+    // pantalla hasta que el menú queda centrado; de ahí la nave sigue sola.
+    const s = p.f - PRESENTA_SALE_EN;
+    if (s >= 0 && !p.salio) {
+      p.salio = true;
+      chispas(hueco.x, hueco.y);
+      sonarCruce();
+    }
+    if (s >= 0) {
+      tamanoNave(Math.min(1, s / PRESENTA_SALIDA));
+      const v = PRESENTA_VELOCIDAD * w;
+      const recorrido =
+        s < PRESENTA_ARRANQUE
+          ? (v * s * s) / (2 * PRESENTA_ARRANQUE)
+          : v * (s - PRESENTA_ARRANQUE / 2);
+      p.x = hueco.x + recorrido;
+      // Ya afuera, el agujero se cierra.
+      if (hueco.cierra === null && s >= PRESENTA_SALIDA + 0.4)
+        hueco.cierra = p.f;
+    }
+    p.cam = Math.max(0, Math.min(p.menuEn, p.x - w / 2));
+    const y = hueco.y + Math.sin(p.f * 2.3) * NAVE_FLOTA.y;
+    window.shipPlace(p.x - p.cam, y, true);
+    window.shipFace(rumbo(1, 0));
+    moverMenuPresentacion();
+    if (p.x - p.cam > w + 160) terminarPresentacion(); // ya se fue
+  }
+
+  // El menú está una pantalla a la derecha del agujero de salida: se lo corre
+  // con la cámara.
+  function moverMenuPresentacion() {
+    if (!modoEl) return;
+    const x = presenta.menuEn - presenta.cam;
+    modoEl.style.transform = `translate(calc(-50% + ${x.toFixed(1)}px), -50%)`;
+  }
+
+  // Tamaño de un agujero de la presentación ahora: se abre y se cierra
+  // achicándose, como en el juego, y en el medio pulsa con su propio reloj.
+  function escalaAgujeroPresentacion(h, f) {
+    const abierto = Math.min(
+      Math.max(0, (f - h.abre) / PRESENTA_ABRE),
+      h.cierra === null ? 1 : Math.max(0, 1 - (f - h.cierra) / PRESENTA_ABRE),
+    );
+    const compas = MUSICA_COMPAS_RESPALDO;
+    return (
+      PRESENTA_AGUJERO_ESC *
+      abierto *
+      (1 +
+        CUMULO_PULSO_AMPLITUD *
+          pulsoCumulo(f % compas, compas / MUSICA_TIEMPOS_COMPAS))
+    );
+  }
+
+  function dibujarPresentacion() {
+    const p = presenta;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    // Las estrellas, con la cámara que va a tener el menú (ver dibujar): el
+    // zoom del juego, anclado donde espera la nave (centrarNave), y no donde
+    // anda ahora. Si no, al terminar cambiarían de tamaño y de lugar.
+    const ox = window.innerWidth / 2;
+    const oy = window.innerHeight * POSICION_Y_INICIAL;
+    ctx.setTransform(
+      dpr * cam.z,
+      0,
+      0,
+      dpr * cam.z,
+      dpr * ox * (1 - cam.z),
+      dpr * oy * (1 - cam.z),
+    );
+    estrellasCorridas = (p.cam * PRESENTA_PARALAJE) / cam.z;
+    dibujarEstrellas();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.translate(-p.cam, 0);
+    for (const h of p.agujeros) {
+      const esc = escalaAgujeroPresentacion(h, p.f);
+      if (esc > 0.01)
+        dibujarAgujero(h.x, h.y, h.ang, esc, PRESENTA_AGUJERO_COLOR);
+    }
+    dibujarChispas(PRESENTA_AGUJERO_COLOR);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   // Funde a negro (dur segundos) y, ya en negro, termina.
   function caerPresentacion(dur) {
-    presenta.cae = presenta.t + dur;
+    presenta.cae = dur;
     tapa.style.transition = `opacity ${dur}s ease`;
     tapa.classList.add("cae");
+    if (presentaLogo) {
+      presentaLogo.style.transition = `opacity ${dur}s ease`;
+      presentaLogo.classList.remove("visible");
+    }
   }
 
   function saltarPresentacion() {
@@ -2524,19 +2731,29 @@
   }
   document.addEventListener("pointerdown", tocarPresentacion);
 
-  // Ya en negro: todo vuelve a como estaba (fondo negro, nave en blanco y negro
-  // en el medio abajo) y aparece el menú.
+  // Termina (se fue la nave, o ya en negro al saltearla): todo vuelve a como
+  // estaba (fondo negro, nave en blanco y negro en el medio abajo, pero sin
+  // verse hasta que se elija un modo) y queda el menú.
   function terminarPresentacion() {
     presenta = null;
     window.shipLibre = false;
-    presentaEl.hidden = true;
+    window.shipZoom = 1;
+    particulas = [];
+    if (presentaLogo) {
+      presentaLogo.hidden = true;
+      presentaLogo.classList.remove("visible");
+    }
     if (presentaToque) presentaToque.hidden = true;
-    presentaPlaneta.classList.remove("encendido");
     ship.classList.remove("game-color");
+    ship.classList.add("game-sin-nave");
     colorEscalon = -1; // fuerza a aplicar el color (0) a la nave y al fondo
     fondoDeGolpe(aplicarColorNave);
     centrarNave();
-    if (modoEl) modoEl.hidden = false;
+    if (modoEl) {
+      modoEl.style.transform = "";
+      modoEl.inert = false;
+      modoEl.hidden = false;
+    }
     sincronizarPadMenu(); // que el A que la salteó no elija la primera opción
     tapa.style.transition = "";
     levantarTapa(false);
@@ -3223,6 +3440,18 @@
     }
   }
 
+  // Las chispas salen disparadas, se frenan y se apagan.
+  function moverChispas(dt) {
+    for (const p of particulas) {
+      p.t += dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= 1 - 2 * dt;
+      p.vy *= 1 - 2 * dt;
+    }
+    particulas = particulas.filter((p) => p.t < 0.7);
+  }
+
   // Agujeros de gusano: aparecen de a pares cada tanto, giran rápido y se apagan
   // si no entran. Al entrar en uno la nave sale por el otro y gana color.
   function actualizarCumulos(dt, circulos) {
@@ -3315,14 +3544,7 @@
         if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
       }
     }
-    for (const p of particulas) {
-      p.t += dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vx *= 1 - 2 * dt;
-      p.vy *= 1 - 2 * dt;
-    }
-    particulas = particulas.filter((p) => p.t < 0.7);
+    moverChispas(dt);
     for (const e of numeroEstrellas) actualizarNumeroEstrella(e, dt);
     numeroEstrellas = numeroEstrellas.filter(
       (e) => e.t < NUMERO_CAE_A + NUMERO_CAIDA,
@@ -3388,7 +3610,8 @@
     if (vueltas !== vueltasVistas) {
       presionJugador = Math.min(
         1,
-        presionJugador + PRESION_POR_VUELTA * Math.max(0, vueltas - vueltasVistas),
+        presionJugador +
+          PRESION_POR_VUELTA * Math.max(0, vueltas - vueltasVistas),
       );
       vueltasVistas = vueltas;
     }
@@ -3853,7 +4076,8 @@
       // Acelera con energía limitada (ver RIVAL_BOOST_*): arranca si tiene la
       // mínima y sigue mientras le quede.
       let e = rival.energia ?? 1;
-      const quiere = r.boost && (rival.boosteando ? e > 0 : e >= RIVAL_BOOST_MIN);
+      const quiere =
+        r.boost && (rival.boosteando ? e > 0 : e >= RIVAL_BOOST_MIN);
       rival.boosteando = quiere;
       e += (quiere ? -RIVAL_BOOST_GASTO : RIVAL_BOOST_RECUPERA) * dt;
       rival.energia = Math.max(0, Math.min(1, e));
@@ -3986,10 +4210,7 @@
     // Si perdiste, el fondo pasa a blanco y negro; si ganaste queda a color.
     // Con dos jugadores siempre gana alguien de los que están mirando (igual
     // que la nota de abajo), y que el rival se vaya online no es perder.
-    scene.classList.toggle(
-      "fin-perdiste",
-      ganador === "pc" && modo !== "dos",
-    );
+    scene.classList.toggle("fin-perdiste", ganador === "pc" && modo !== "dos");
     ship.classList.toggle("fin-perdiste", ganador === "pc" && modo !== "dos");
     frenarMusica();
     // Con dos jugadores siempre gana alguien de carne y hueso: suena la nota.
@@ -4818,7 +5039,9 @@
         0.3 + 0.6 * (0.5 + 0.5 * Math.sin(reloj * grupo.vel + grupo.fase));
       ctx.beginPath();
       for (const e of estrellasPorGrupo[g]) {
-        const x = e.fx * w;
+        const x = estrellasCorridas
+          ? (((e.fx * w - estrellasCorridas) % w) + w) % w
+          : e.fx * w;
         const y = e.fy * h;
         ctx.moveTo(x + e.r, y);
         ctx.arc(x, y, e.r, 0, Math.PI * 2);
@@ -4964,7 +5187,12 @@
     const b = parseInt(hasta.slice(1), 16);
     const canal = (sh) =>
       Math.round(((a >> sh) & 255) * (1 - k) + ((b >> sh) & 255) * k);
-    return "#" + ((1 << 24) | (canal(16) << 16) | (canal(8) << 8) | canal(0)).toString(16).slice(1);
+    return (
+      "#" +
+      ((1 << 24) | (canal(16) << 16) | (canal(8) << 8) | canal(0))
+        .toString(16)
+        .slice(1)
+    );
   }
 
   function mezclaAgujeros(k) {
@@ -4990,6 +5218,37 @@
     return s * s * (3 - 2 * s);
   }
 
+  // Un agujero en (x, y), girado ang, de tamaño esc (1 = el del juego) y con
+  // el color k (0 = blanco, 1 = naranja).
+  function dibujarAgujero(x, y, ang, esc, k) {
+    // El agujero: un disco negro que tapa lo que hay detrás (la luz, las
+    // estrellas del fondo) y deja bien visible el "pozo" del medio.
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(x, y, CUMULO_ANILLO * CUMULO_DISCO_RADIO * esc, 0, Math.PI * 2);
+    ctx.fill();
+    for (let v = 0; v < 2; v++) {
+      // v = 0: blanco (se apaga con k); v = 1: naranja (aparece con k).
+      const alfa = v === 0 ? 1 - k : k;
+      dibujarAnilloSprite(gusanoSprites.afuera[v], x, y, ang, esc, alfa);
+      dibujarAnilloSprite(gusanoSprites.adentro[v], x, y, -ang * 1.7, esc, alfa);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Las chispas de entrar y salir de los agujeros, del color k de los agujeros.
+  function dibujarChispas(k) {
+    if (!particulas.length) return;
+    ctx.fillStyle = mezclaAgujeros(k);
+    ctx.beginPath();
+    for (const p of particulas) {
+      const r = 2 * (1 - p.t / 0.7);
+      ctx.moveTo(p.x + r, p.y);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+
   function dibujarCumulos() {
     const k = Math.max(0, Math.min(1, colorNave));
     // Dónde va la música en su compás (todos los agujeros pulsan a la vez, al
@@ -5006,50 +5265,9 @@
         (1 +
           CUMULO_PULSO_AMPLITUD *
             pulsoCumulo(pos, compas / MUSICA_TIEMPOS_COMPAS));
-      // El agujero: un disco negro que tapa lo que hay detrás (la luz, las
-      // estrellas del fondo) y deja bien visible el "pozo" del medio.
-      ctx.fillStyle = "#000";
-      ctx.beginPath();
-      ctx.arc(
-        c.x,
-        c.y,
-        CUMULO_ANILLO * CUMULO_DISCO_RADIO * esc,
-        0,
-        Math.PI * 2,
-      );
-      ctx.fill();
-      for (let v = 0; v < 2; v++) {
-        // v = 0: blanco (se apaga con k); v = 1: naranja (aparece con k).
-        const alfa = v === 0 ? 1 - k : k;
-        dibujarAnilloSprite(
-          gusanoSprites.afuera[v],
-          c.x,
-          c.y,
-          c.ang,
-          esc,
-          alfa,
-        );
-        dibujarAnilloSprite(
-          gusanoSprites.adentro[v],
-          c.x,
-          c.y,
-          -c.ang * 1.7,
-          esc,
-          alfa,
-        );
-      }
+      dibujarAgujero(c.x, c.y, c.ang, esc, k);
     }
-    ctx.globalAlpha = 1;
-    if (particulas.length) {
-      ctx.fillStyle = mezclaAgujeros(k);
-      ctx.beginPath();
-      for (const p of particulas) {
-        const r = 2 * (1 - p.t / 0.7);
-        ctx.moveTo(p.x + r, p.y);
-        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-      }
-      ctx.fill();
-    }
+    dibujarChispas(k);
     if (numeroEstrellas.length) {
       // Titilan igual que las estrellas de fondo (ver dibujarEstrellas): por
       // eso no van todas en un solo trazo como las chispas, cada una necesita
@@ -5127,12 +5345,7 @@
           esTutorial() ? "blanco" : esAzul() ? "azul" : "rojo",
         );
       if (rival && (modo === "dos" || modo === "pc"))
-        dibujarLuz(
-          rival.x,
-          rival.y,
-          luzNivelRival,
-          esAzul() ? "rojo" : "azul",
-        );
+        dibujarLuz(rival.x, rival.y, luzNivelRival, esAzul() ? "rojo" : "azul");
     }
 
     dibujarCumulos();
@@ -5418,7 +5631,8 @@
     }
     luzNivel += ((luz ? 1 : 0) - luzNivel) * Math.min(1, dt * 6);
     luzNivelRival +=
-      (((modo === "dos" || modo === "pc") && luzRival ? 1 : 0) - luzNivelRival) *
+      (((modo === "dos" || modo === "pc") && luzRival ? 1 : 0) -
+        luzNivelRival) *
       Math.min(1, dt * 6);
     dibujar(circulos[1]); // la luz sale del cuerpo de la nave
     // Online: lo que ve el rival de esta nave, 20 veces por segundo.
@@ -5550,7 +5764,7 @@
         cancelarAyuda();
         limpiarFin();
         limpiarFinal(); // la nave vuelve a verse en el resto de los escenarios
-        ship.classList.remove("game-color");
+        ship.classList.remove("game-color", "game-sin-nave");
         ship.style.removeProperty("--luz-rgb"); // en el resto de los escenarios la luz es la de siempre
         scene.classList.remove("game-intro");
         levantarTapa(true);

@@ -676,27 +676,30 @@ html.entra-juego .game-cuadrado {
 .game-scene.fondo-instantaneo::before {
   transition: none;
 }
-/* Presentación al abrir la página (esc4-game.js, ver empezarPresentacion): el
-   planeta del escenario 2 en el medio, apagado igual que allá (.space-planet) y
-   flotando igual. Es pixel art: se agranda sin suavizar. */
-.game-presenta {
+/* Presentación al abrir la página, primera pantalla (esc4-game.js, ver
+   empezarPresentacion): el logo en el medio de la pantalla negra. Aparece y se
+   va con .visible (el fundido lo pone esc4-game.js). */
+.game-presenta-logo {
   position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: grid;
-  place-items: center;
+  top: 50%;
+  left: 50%;
+  height: min(60vh, 110vw);
+  width: auto;
+  transform: translate(-50%, -50%);
+  opacity: 0;
   pointer-events: none;
 }
-.game-presenta[hidden] {
+.game-presenta-logo.visible {
+  opacity: 1;
+}
+.game-presenta-logo[hidden] {
   display: none;
 }
-.game-presenta-planeta {
-  width: min(62vmin, 80vw);
-  height: auto;
-  image-rendering: pixelated;
-  opacity: 0.5;
-  filter: drop-shadow(0 0 8px rgba(126, 184, 201, 0.12)) brightness(0.65);
-  animation: floatPlanet 11s ease-in-out infinite;
+/* Al terminar la presentación la nave se fue por la derecha: en el menú no se
+   la ve hasta que se elige un modo. Va por visibility: la opacidad la escribe
+   script.js en cada cuadro. */
+.starry-cohete-pair.game-sin-nave {
+  visibility: hidden;
 }
 /* "presiona cualquier tecla" en la pantalla negra, mientras la presentación
    espera un toque para poder sonar. Mismas letras que el pie del menú, titilando. */
@@ -725,12 +728,6 @@ html.entra-juego .game-cuadrado {
   50% {
     opacity: 0.15;
   }
-}
-/* Se prende con la misma animación que en el escenario 2 (planetBulbBlow). */
-.game-presenta-planeta.encendido {
-  animation:
-    floatPlanet 11s ease-in-out infinite,
-    planetBulbBlow 3s ease-in-out;
 }
 .game-grid {
   display: grid;
