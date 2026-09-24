@@ -829,6 +829,12 @@
       tocarPresentacion(); // cualquier tecla
       return;
     }
+    if (esperaToque) {
+      // Ni Escape ni una tecla que se repite por tenerla apretada cuentan como
+      // toque para el navegador: no desbloquean el audio.
+      if (ev.code !== "Escape" && !ev.repeat) tocarEspera();
+      return;
+    }
     if (modo && ev.code === "Escape") {
       alternarPausa();
     } else if (pausa === "salir") {
@@ -2302,15 +2308,17 @@
   //    aparece y se va.
   // 2. Entrada: el negro se aclara (no del todo: el fondo queda como con
   //    PRESENTA_FONDO) y en el medio se abre un agujero de gusano. Llega la nave
-  //    desde la izquierda, a color, lo mira y se mete: entra en espiral
-  //    achicándose hasta desaparecer en el centro, con las chispas y el sonido
-  //    de cruzar. Se funde a negro.
+  //    desde la izquierda, a color, lo mira y se mete volando derecho: igual
+  //    que en el juego, del mismo tamaño, sin achicarse ni girar. Al llegar a la
+  //    zona de entrada (CUMULO_RADIO) desaparece de golpe por el agujero, con
+  //    las chispas y el sonido de cruzar. Se funde a negro.
   // 3. Salida: otra pantalla, ya la del menú (fondo negro con sus estrellas).
-  //    Se abre otro agujero a la izquierda, la nave sale de él y se va hacia la
-  //    derecha, y la cámara la sigue (las estrellas y el agujero se corren para
-  //    la izquierda y el menú entra desde la derecha) hasta que el menú queda
-  //    en el medio. Ahí la cámara se queda y la nave sigue de largo hasta salir
-  //    por la derecha. No vuelve a verse hasta que se elige un modo.
+  //    El menú ya está centrado, desde que se levanta la pantalla negra (no hay
+  //    cámara que se mueva). Se abre otro agujero a la izquierda y la nave
+  //    aparece en él de golpe, del mismo tamaño de siempre. Vuela hacia el menú
+  //    y frena antes de llegar, gira y lo mira un momento, y después gira otra
+  //    vez, acelera y se va por la derecha. No vuelve a verse hasta que se
+  //    elige un modo.
   // Cualquier tecla, un click o el botón A la saltean. Una sola vez por página.
   //
   // Los navegadores no dejan sonar nada hasta que la persona toca la página (una
@@ -2318,31 +2326,31 @@
   // dice "presiona cualquier tecla" y sigue recién con ese toque, así los
   // agujeros suenan. Si ya se puede sonar, sigue sola.
   //
-  // Todo lo de la presentación se dibuja en coordenadas de pantalla, corridas
-  // por la cámara (presenta.cam, px hacia la derecha): con la cámara en 0, el
-  // mundo y la pantalla coinciden.
+  // Todo lo de la presentación se dibuja en coordenadas de pantalla.
   const PRESENTA_LOGO_ENTRA = 0.8; // s que tarda en aparecer el logo
   const PRESENTA_LOGO_QUEDA = 1.8; // s que se queda a la vista
   const PRESENTA_LOGO_SALE = 0.8; // s que tarda en irse
   const PRESENTA_ACLARA = 2.4; // lo que tarda en aclarar la pantalla de entrada
   const PRESENTA_FONDO = 2 / CUMULOS_PARA_COLOR; // el fondo como con 2 agujeros
-  const PRESENTA_AGUJERO_ESC = 2.6; // tamaño de los agujeros, por el del juego
+  // (Los agujeros miden lo mismo que en el juego: 1 por el zoom de la cámara,
+  // cam.z, ver escalaAgujeroPresentacion. La nave, también: shipZoom = 1.)
   const PRESENTA_AGUJERO_COLOR = 1; // 0 = blancos, 1 = naranjas (como al final del juego)
   const PRESENTA_ABRE = 0.5; // s que tarda un agujero en abrirse (o en cerrarse)
   const PRESENTA_AGUJERO_EN = 0.9; // cuándo se abre el agujero de entrada
   const PRESENTA_LLEGA_EN = 1.8; // cuándo empieza a entrar la nave
   const PRESENTA_LLEGADA = 2.6; // lo que tarda en llegar
   const PRESENTA_ENTRA_EN = 5.4; // cuándo se mete en el agujero
-  const PRESENTA_ENTRADA = 1.1; // lo que tarda en meterse
-  const PRESENTA_ESPIRAL = 1.6; // radianes que da la vuelta mientras se mete
+  const PRESENTA_ENTRADA = 1.1; // lo que tarda en cruzar volando derecho hasta el centro del agujero (entra antes: al llegar a la zona de entrada)
   const PRESENTA_FUNDE = 0.7; // fundido a negro entre la entrada y la salida
   const PRESENTA_NEGRO_ENTRE = 0.3; // s de negro entre las dos pantallas
   const PRESENTA_LEVANTA = 0.6; // lo que tarda en verse la pantalla de salida
   const PRESENTA_SALE_EN = 0.9; // cuándo sale la nave del segundo agujero
-  const PRESENTA_SALIDA = 0.5; // lo que tarda en salir (crece de 0 a su tamaño)
-  const PRESENTA_VELOCIDAD = 0.6; // pantallas por segundo que vuela hacia la derecha
+  const PRESENTA_SALIDA = 0.5; // s desde que sale la nave hasta que el agujero empieza a cerrarse (con +0.4)
+  const PRESENTA_VE_X = 0.4; // dónde frena a mirar el menú (fracción del ancho; el menú está en 0,5)
+  const PRESENTA_VIAJE = 1.3; // s que tarda en llegar ahí desde el agujero (frena suave)
+  const PRESENTA_MIRA = 1.3; // s que se queda mirando el menú antes de irse
+  const PRESENTA_VELOCIDAD = 0.6; // pantallas por segundo que vuela hacia la derecha al irse
   const PRESENTA_ARRANQUE = 0.8; // s que tarda en llegar a esa velocidad
-  const PRESENTA_PARALAJE = 0.4; // lo que se corren las estrellas por lo que se corre la cámara
   const PRESENTA_CAIDA_SALTEO = 0.35; // fundido a negro al saltearla
   const PRESENTA_ESPERA_MAX = 3; // s de negro esperando el logo, como mucho
   const presentaLogo = document.getElementById("game-presenta-logo");
@@ -2392,7 +2400,6 @@
       listo: false,
       toque: null,
       cae: null,
-      cam: 0,
       agujeros: [],
       pos: null,
     };
@@ -2405,7 +2412,7 @@
     if (modoEl) modoEl.hidden = true;
     ship.classList.add("game-color"); // a color toda la presentación
     window.shipLibre = true; // puede estar fuera de la pantalla
-    tamanoNave(0); // todavía no se la ve
+    mostrarNave(false); // todavía no se la ve
     particulas = [];
     // Que el logo no aparezca a medio cargar: se espera a que esté listo.
     const listo = () => {
@@ -2434,10 +2441,13 @@
     if (presentaToque) presentaToque.hidden = true;
   }
 
-  // Tamaño de la nave (1 = el de siempre). Nunca 0 del todo: script.js toma
-  // un shipZoom de 0 como si no hubiera (window.shipZoom || 1).
-  function tamanoNave(z) {
-    window.shipZoom = Math.max(0.001, z);
+  // La nave se ve o no se ve, siempre del tamaño del juego (shipZoom 1): en la
+  // presentación no se achica ni se agranda, aparece y desaparece en los
+  // agujeros como en el juego. (Sin el sprite: visibility, ver game-sin-nave en
+  // styles.css.)
+  function mostrarNave(visible) {
+    window.shipZoom = 1;
+    ship.classList.toggle("game-sin-nave", !visible);
   }
 
   function pasarFase(fase) {
@@ -2524,7 +2534,7 @@
     const lejos = Math.min(260, w * 0.3);
     p.destino = { x: hueco.x - lejos, y: hueco.y + lejos * 0.35 };
     p.desde = { x: -160, y: p.destino.y + 60 };
-    window.shipZoom = 1;
+    mostrarNave(true); // arranca afuera de la pantalla, a la izquierda
     window.shipPlace(p.desde.x, p.desde.y);
   }
 
@@ -2562,33 +2572,31 @@
           : rumbo(hueco.x - pos.x, hueco.y - pos.y);
       p.pos = pos;
     } else {
-      // Se mete: en espiral hacia el centro, cada vez más rápido y más chica,
-      // hasta desaparecer justo en el medio del agujero.
+      // Se mete: derecho hacia el centro del agujero, cada vez más rápido y
+      // siempre del mismo tamaño. Al llegar a la zona de entrada (CUMULO_RADIO,
+      // por el zoom: la misma que en el juego) desaparece de golpe y el agujero
+      // se cierra con sus chispas.
       const u = Math.min(1, (f - PRESENTA_ENTRA_EN) / PRESENTA_ENTRADA);
-      const espiral = (v) => {
-        const k = 1 - v * v; // lo que le falta: acelera hacia el centro
-        const ang = v * PRESENTA_ESPIRAL;
-        const dx = p.pos.x - hueco.x;
-        const dy = p.pos.y - hueco.y;
-        return {
-          x: hueco.x + (dx * Math.cos(ang) - dy * Math.sin(ang)) * k,
-          y: hueco.y + (dx * Math.sin(ang) + dy * Math.cos(ang)) * k,
-        };
+      const k = u * u;
+      pos = {
+        x: p.pos.x + (hueco.x - p.pos.x) * k,
+        y: p.pos.y + (hueco.y - p.pos.y) * k,
       };
-      pos = espiral(u);
-      const sigue = espiral(Math.min(1, u + 0.02));
-      if (u < 1) mira = rumbo(sigue.x - pos.x, sigue.y - pos.y);
-      tamanoNave(1 - Math.pow(u, 1.5));
-      if (u >= 1 && hueco.cierra === null) {
-        // Adentro: el agujero se cierra con sus chispas, como en el juego.
+      mira = rumbo(hueco.x - p.pos.x, hueco.y - p.pos.y);
+      if (
+        hueco.cierra === null &&
+        Math.hypot(hueco.x - pos.x, hueco.y - pos.y) < CUMULO_RADIO * cam.z
+      ) {
+        p.cruzoEn = f;
         hueco.cierra = f;
+        mostrarNave(false);
         chispas(hueco.x, hueco.y);
         sonarCruce();
       }
     }
     window.shipPlace(pos.x, pos.y, true);
     if (mira !== undefined) window.shipFace(mira);
-    const negroEn = PRESENTA_ENTRA_EN + PRESENTA_ENTRADA + 0.3;
+    const negroEn = (p.cruzoEn || PRESENTA_ENTRA_EN + PRESENTA_ENTRADA) + 0.3;
     if (!p.funde && f >= negroEn) {
       p.funde = true;
       tapa.style.transition = `opacity ${PRESENTA_FUNDE}s ease`;
@@ -2597,8 +2605,8 @@
     if (f >= negroEn + PRESENTA_FUNDE + PRESENTA_NEGRO_ENTRE) empezarSalida();
   }
 
-  // Pantalla de salida: ya la del menú (fondo negro), con el menú todavía
-  // afuera, una pantalla a la derecha.
+  // Pantalla de salida: ya la del menú (fondo negro), con el menú ya en el
+  // medio.
   function empezarSalida() {
     const p = presenta;
     pasarFase("salida");
@@ -2606,8 +2614,6 @@
     particulas = [];
     const w = window.innerWidth;
     p.agujeros = [];
-    p.cam = 0;
-    p.menuEn = w; // cuánto se corre la cámara hasta que el menú queda en el medio
     const hueco = agujeroPresentacion(
       w * 0.2,
       window.innerHeight * POSICION_Y_INICIAL,
@@ -2615,9 +2621,8 @@
     );
     sonarPortal();
     p.x = hueco.x;
-    tamanoNave(0);
+    mostrarNave(false); // aparece cuando sale del agujero (actualizarSalida)
     window.shipPlace(hueco.x, hueco.y);
-    moverMenuPresentacion();
     if (modoEl) {
       modoEl.inert = true; // se ve, pero todavía no se lo puede usar
       modoEl.hidden = false;
@@ -2626,45 +2631,58 @@
     tapa.classList.remove("cae");
   }
 
+  // Rotación de la nave para mirar al centro del menú desde (x, y).
+  function rumboAlMenu(x, y) {
+    const r = modoEl && modoEl.getBoundingClientRect();
+    const cx = r && r.width ? r.left + r.width / 2 : window.innerWidth / 2;
+    const cy = r && r.height ? r.top + r.height / 2 : window.innerHeight * 0.45;
+    return rumbo(cx - x, cy - y);
+  }
+
   function actualizarSalida() {
     const p = presenta;
     const w = window.innerWidth;
     const hueco = p.agujeros[0];
-    // Sale creciendo, mirando para la derecha, y acelera hasta
-    // PRESENTA_VELOCIDAD. La cámara la sigue desde que pasa el medio de la
-    // pantalla hasta que el menú queda centrado; de ahí la nave sigue sola.
+    // Sale de golpe, mirando para la derecha, y vuela hasta un punto antes del
+    // menú (PRESENTA_VE_X) frenando suave. Ahí gira, lo mira PRESENTA_MIRA
+    // segundos, vuelve a girar para la derecha y acelera hasta
+    // PRESENTA_VELOCIDAD hasta salir de la pantalla. El menú no se mueve.
     const s = p.f - PRESENTA_SALE_EN;
     if (s >= 0 && !p.salio) {
       p.salio = true;
+      mostrarNave(true); // aparece de golpe, del tamaño de siempre
       chispas(hueco.x, hueco.y);
       sonarCruce();
     }
+    const veX = w * PRESENTA_VE_X;
+    const seVa = PRESENTA_VIAJE + PRESENTA_MIRA; // cuándo empieza a irse
+    let mira = rumbo(1, 0);
     if (s >= 0) {
-      tamanoNave(Math.min(1, s / PRESENTA_SALIDA));
-      const v = PRESENTA_VELOCIDAD * w;
-      const recorrido =
-        s < PRESENTA_ARRANQUE
-          ? (v * s * s) / (2 * PRESENTA_ARRANQUE)
-          : v * (s - PRESENTA_ARRANQUE / 2);
-      p.x = hueco.x + recorrido;
+      if (s < PRESENTA_VIAJE) {
+        const u = s / PRESENTA_VIAJE;
+        p.x = hueco.x + (veX - hueco.x) * (1 - Math.pow(1 - u, 3));
+      } else if (s < seVa) {
+        p.x = veX;
+        if (p.miraAlMenu === undefined)
+          p.miraAlMenu = rumboAlMenu(veX, hueco.y);
+        mira = p.miraAlMenu;
+      } else {
+        const t = s - seVa;
+        const v = PRESENTA_VELOCIDAD * w;
+        p.x =
+          veX +
+          (t < PRESENTA_ARRANQUE
+            ? (v * t * t) / (2 * PRESENTA_ARRANQUE)
+            : v * (t - PRESENTA_ARRANQUE / 2));
+      }
       // Ya afuera, el agujero se cierra.
       if (hueco.cierra === null && s >= PRESENTA_SALIDA + 0.4)
         hueco.cierra = p.f;
     }
-    p.cam = Math.max(0, Math.min(p.menuEn, p.x - w / 2));
     const y = hueco.y + Math.sin(p.f * 2.3) * NAVE_FLOTA.y;
-    window.shipPlace(p.x - p.cam, y, true);
-    window.shipFace(rumbo(1, 0));
-    moverMenuPresentacion();
-    if (p.x - p.cam > w + 160) terminarPresentacion(); // ya se fue
-  }
-
-  // El menú está una pantalla a la derecha del agujero de salida: se lo corre
-  // con la cámara.
-  function moverMenuPresentacion() {
-    if (!modoEl) return;
-    const x = presenta.menuEn - presenta.cam;
-    modoEl.style.transform = `translate(calc(-50% + ${x.toFixed(1)}px), -50%)`;
+    window.shipPlace(p.x, y, true);
+    window.shipFace(mira);
+    if (p.x > w + 160) terminarPresentacion(); // ya se fue
   }
 
   // Tamaño de un agujero de la presentación ahora: se abre y se cierra
@@ -2676,7 +2694,7 @@
     );
     const compas = MUSICA_COMPAS_RESPALDO;
     return (
-      PRESENTA_AGUJERO_ESC *
+      cam.z * // el tamaño del juego: 1 por el zoom de su cámara
       abierto *
       (1 +
         CUMULO_PULSO_AMPLITUD *
@@ -2701,10 +2719,8 @@
       dpr * ox * (1 - cam.z),
       dpr * oy * (1 - cam.z),
     );
-    estrellasCorridas = (p.cam * PRESENTA_PARALAJE) / cam.z;
     dibujarEstrellas();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.translate(-p.cam, 0);
     for (const h of p.agujeros) {
       const esc = escalaAgujeroPresentacion(h, p.f);
       if (esc > 0.01)
@@ -2730,6 +2746,69 @@
       caerPresentacion(PRESENTA_CAIDA_SALTEO);
   }
   document.addEventListener("pointerdown", tocarPresentacion);
+
+  // --- Entrar a un modo elegido desde la pausa, con sonido ----------------------
+  // Elegir un modo desde la pausa recarga la página (ver reiniciarEnModo) y al
+  // volver se entra directo a ese modo. Pero el toque que lo eligió quedó en la
+  // página de antes: la nueva no tiene ninguno y el navegador no deja sonar
+  // nada hasta que lo haya, así que la música, las voces y los agujeros
+  // quedaban mudos toda la partida (con una recarga común no pasaba: ahí la
+  // presentación espera un toque). Igual que ella, si no se puede sonar se
+  // espera en la pantalla negra un toque -una tecla, un click o el botón A- y
+  // recién ahí arranca el modo. Si ya se puede sonar, entra sin más.
+  let esperaToque = null; // mientras espera: { entrar, padA }; si no, null
+
+  // ¿Puede sonar el audio del juego (Web Audio) sin que se toque nada? Se lo
+  // prueba reanudándolo: el navegador que no deja deja la promesa colgada
+  // (Chrome) o la rechaza (Safari), así que se mira el estado a los 300 ms.
+  function audioPuedeSonar() {
+    if (!audioCtx) return puedeSonar();
+    if (audioCtx.state === "running") return Promise.resolve(true);
+    return new Promise((listo) => {
+      const ver = () => listo(audioCtx.state === "running");
+      audioCtx.resume().then(ver, ver);
+      setTimeout(ver, 300);
+    });
+  }
+
+  function entrarConSonido(entrar) {
+    // Pantalla negra, sin menú ni nave, mientras se averigua (si ya se puede
+    // sonar, ni se nota: la escena ya es negra).
+    if (modoEl) modoEl.hidden = true;
+    ship.classList.add("game-sin-nave");
+    if (tapa) {
+      tapa.style.transition = "none";
+      tapa.classList.add("cae");
+      void tapa.offsetWidth;
+    }
+    const gp = primerJoystick();
+    esperaToque = { entrar, padA: !!gp && botonPad(gp, PAD_A) };
+    audioPuedeSonar().then((puede) => {
+      if (!esperaToque || esperaToque.entrar !== entrar) return; // ya tocaron
+      if (puede) seguirConSonido(true);
+      else if (presentaToque) presentaToque.hidden = false; // "presiona cualquier tecla"
+    });
+  }
+
+  function tocarEspera() {
+    if (esperaToque) seguirConSonido(false);
+  }
+
+  function seguirConSonido(instantaneo) {
+    const { entrar } = esperaToque;
+    esperaToque = null;
+    if (presentaToque) presentaToque.hidden = true;
+    if (audioCtx) audioCtx.resume().catch(() => {});
+    if (tapa) {
+      tapa.style.transition = "";
+      levantarTapa(instantaneo); // con el toque, la pantalla se aclara de a poco
+    }
+    // Vuelve el menú como estaba: elegirModo lo esconde (salvo online, que lo
+    // deja con el estado de la búsqueda).
+    if (modoEl) modoEl.hidden = false;
+    entrar();
+  }
+  document.addEventListener("pointerup", tocarEspera);
 
   // Termina (se fue la nave, o ya en negro al saltearla): todo vuelve a como
   // estaba (fondo negro, nave en blanco y negro en el medio abajo, pero sin
@@ -5471,6 +5550,15 @@
       actualizarPresentacion(dt);
       return;
     }
+    if (esperaToque) {
+      // Esperando el toque para poder sonar (ver entrarConSonido): el botón A
+      // del joystick también vale; el teclado y el mouse tienen sus eventos.
+      const gp = primerJoystick();
+      const a = !!gp && botonPad(gp, PAD_A);
+      if (a && !esperaToque.padA) seguirConSonido(false);
+      else esperaToque.padA = a;
+      return;
+    }
     const circulos = circulosNave();
     reloj += dt;
     if (!modo) {
@@ -5748,7 +5836,7 @@
         if (i >= 0) {
           controlesCambiados = !!dePausa.cambiados;
           apuntarOpcion(i);
-          elegirApuntada();
+          entrarConSonido(elegirApuntada);
         } else if (!presentada) {
           empezarPresentacion();
         }
@@ -5757,6 +5845,10 @@
       } else {
         cancelAnimationFrame(raf);
         if (presenta) terminarPresentacion();
+        if (esperaToque) {
+          esperaToque = null;
+          if (presentaToque) presentaToque.hidden = true;
+        }
         if (pausa) cerrarPausa();
         if (modoEl) modoEl.hidden = true;
         if (menuEl) menuEl.hidden = true;
