@@ -1,5 +1,5 @@
 // Medidor de rendimiento: solo se carga si la URL trae ?perf=1 (ver el script del
-// final de index.html). Arriba a la izquierda muestra, cada medio segundo:
+// final de juego.html). Arriba a la izquierda muestra, cada medio segundo:
 //   fps        cuadros por segundo (promedio)
 //   peor       el cuadro más lento de ese medio segundo (ms): lo que se siente como tirón
 //   tareas     tareas largas (>50 ms) acumuladas: cantidad y ms totales

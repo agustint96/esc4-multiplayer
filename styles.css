@@ -148,7 +148,7 @@ body {
   pointer-events: none !important;
 }
 /* El <main> es sólo un landmark de accesibilidad (nav queda afuera, ver
-   index.html): no debe alterar el flex column de .site-content, así que
+   juego.html): no debe alterar el flex column de .site-content, así que
    sus hijos (.starry-bg, .parallax-footer) siguen siendo los flex items
    directos como si el wrapper no existiera. */
 #main-content {
@@ -573,7 +573,7 @@ nav.nav-compact {
   overflow: hidden;
   background-color: var(--accent);
   /* La imagen (95 KB) no se baja en la carga: el escenario está oculto. La pide
-     el script del final de index.html (html.escenas-listas) cuando el navegador
+     el script del final de juego.html (html.escenas-listas) cuando el navegador
      ya está desocupado; hasta entonces se ve el salmón liso de arriba. */
   background-size: cover;
   background-position: center;
@@ -633,7 +633,7 @@ html.escenas-listas .salmon-scene {
   opacity: 1;
 }
 /* Al cargar la página: el juego ya tapa todo desde el primer render, sin
-   fundido (ver html.entra-juego en index.html). */
+   fundido (ver html.entra-juego en juego.html). */
 html.entra-juego .game-scene {
   opacity: 1;
   transition: none;
@@ -1873,7 +1873,7 @@ html[data-calidad="baja"] .starry-cohete-pair {
   margin-top: auto;
 }
 /* Carga: en una recarga sin caché (Ctrl+Shift+R) las capas del parallax llegan
-   una por una y se veían aparecer de a pedazos. Mientras index.html no termine
+   una por una y se veían aparecer de a pedazos. Mientras juego.html no termine
    de bajarlas y decodificarlas (html.cargando, ver el script del final del
    body) quedan transparentes y después se funden todas juntas. El texto y el
    fondo no esperan. Va sobre las capas y no sobre .parallax-footer para no

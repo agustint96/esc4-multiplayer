@@ -49,6 +49,19 @@ también en la pausa y en el cartel de salir del online. Durante el juego, el bo
   MENU o Escape cancelan la búsqueda o te sacan de la partida; salir cuenta
   como irse: al rival le aparece EL RIVAL SE FUE y vuelve a su elección.
 
+## El mapa, igual en cualquier pantalla
+
+El juego está en `juego.html` y corre siempre en un mapa de **1920 × 1080**,
+el mismo en cualquier pantalla. `index.html` es solo el marco: lo agranda o
+lo achica para que entre entero en la ventana, y si la pantalla tiene otra
+forma (16:10, ultra ancha) lo que sobra son franjas de estrellas, sin juego.
+Así nadie ve más mapa ni lo cruza más rápido por tener otra pantalla: online
+los dos juegan exactamente en el mismo mapa. En pantallas de más de 1920 de
+ancho se ve apenas menos nítido (el juego se agranda).
+
+Lo que venga en la dirección (`?servidor=`, `?calidad=`, `?perf=1`) el marco
+se lo pasa al juego.
+
 ## Adentro del portfolio
 
 El escenario 4 de [agustint96.github.io](https://agustint96.github.io) ya no
@@ -56,8 +69,10 @@ tiene su propio juego: muestra este (`/esc4-multiplayer/`) en un iframe que
 tapa todo, así lo que se cambia acá aparece allá sin copiar nada. Adentro del
 iframe no está el logo de la presentación (se arranca en el menú) y el menú
 suma **5 · volver al sitio**; con eso, o con Escape en el menú, el juego le
-avisa al sitio (`esc4-volver`) y la nave vuelve al escenario principal por el
-borde derecho. Suelto, en su propia página, todo sigue como siempre.
+avisa al marco y el marco al sitio (`esc4-volver`), y la nave vuelve al
+escenario principal por el borde derecho. El marco le avisa al juego que está
+en el portfolio con `?embebido=1`. Suelto, en su propia página, todo sigue
+como siempre.
 
 Como el sitio carga lo que esté publicado acá, hay que subir este repo antes
 que un cambio del sitio que dependa de algo nuevo de acá.
@@ -72,9 +87,9 @@ Cada PC maneja su nave y su lluvia y le manda al otro 20 veces por segundo
 dónde está, sus piedras y si está golpeada; cada una detecta sola los golpes
 a su nave. La forma de cada piedra (sus puntas) no cambia nunca, así que viaja
 una sola vez apenas nace, por el camino que no pierde nada, y en el estado va
-solo dónde está; si a alguno igual le falta una, la pide. Las posiciones
-viajan como fracción de la pantalla, así juegan bien aunque los monitores sean
-de distinto tamaño.
+solo dónde está; si a alguno igual le falta una, la pide. Como el mapa mide
+lo mismo en las dos PCs (ver "El mapa, igual en cualquier pantalla"), los dos
+juegan en el mismo mapa aunque los monitores sean de distinto tamaño.
 
 Los agujeros y los goles los decide el anfitrión (el que estaba esperando),
 pero el invitado no espera la ida y vuelta para salir por el otro agujero: lo
@@ -121,10 +136,16 @@ probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
 - Cuando las naves se acercan se repelen un poco, sin llegar a chocarse
   (nadie se lastima ni pierde el control).
 - Si las dos dan la vuelta por el mismo costado casi a la vez (menos de
-  1,2 s entre una y otra), el fondo se corre un tramo para ese lado: las
-  estrellas viejas se van y entran nuevas. Es solo el fondo (las piedras y
-  los agujeros no se mueven). Online lo decide el anfitrión y se lo avisa al
-  invitado. En el tutorial no pasa (ahí no se da la vuelta).
+  1,2 s entre una y otra), el cielo gira una pantalla entera para ese lado.
+  El cielo es un tubo de 3 pantallas: al tercer giro se vuelve a ver el
+  mismo. Está pintado sobre un cilindro (las estrellas se juntan hacia los
+  costados y al girar aceleran en el medio) y tiene una capa de estrellas
+  lejanas, más tenue, que gira la mitad. Es solo el fondo (las piedras y los
+  agujeros no se mueven). Online lo decide el anfitrión y se lo avisa al
+  invitado, y los dos ven el mismo cielo: el anfitrión le pasa su semilla
+  (el número con el que se arman las estrellas). En el tutorial no pasa
+  (ahí no se da la vuelta). Los valores están en `CIELO`, en
+  `js/esc4-game.js`.
 - Al terminar aparece un cartel (GANASTE / GANO LA PC, o GANO J1 / GANO J2)
   y arranca otra partida en el mismo modo.
 
@@ -136,8 +157,10 @@ probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
   las flechas y el Shift derecho no mueven la nave del jugador 1 y la cámara
   va sin zoom. El stick del joystick (`stickShip`) a fondo empuja igual que
   las flechas en cualquier dirección, también en diagonal (antes iba bastante
-  más lento que el teclado); `stickNave` en `js/esc4-game.js` hace lo mismo
-  para el jugador 2.
+  más lento que el teclado). La física de la nave en el escenario 4 (empuje,
+  boost, freno, el stick y cuánto se puede salir de la pantalla) está en un
+  solo lugar, `window.naveFisica`, y `js/esc4-game.js` mueve con esa misma
+  ficha la nave del jugador 2 y la de la PC: ninguna tiene números propios.
 - `js/esc4-game.js`: la PC (bloque "Modo contra la PC"), las dos lluvias, el
   golpe con 3 s fuera de juego en vez de reiniciar la partida, el marcador, la
   voz contando para arriba, y sin la intro ni el final de las navecitas (se
@@ -145,7 +168,7 @@ probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
 - `styles.css`: colores del marcador, halo azul de tu nave, la nave oculta
   mientras está fuera de juego y el parpadeo al volver.
 - `js/calidad.js` (nuevo): la calidad automática (ver abajo). El filtro gris
-  de la nave pasó de SVG (`#nave-gris` en `index.html`) a CSS (`--nave-sat`).
+  de la nave pasó de SVG (`#nave-gris` en `juego.html`) a CSS (`--nave-sat`).
 
 El resto es el sitio original sin tocar. Si cambiás el juego en el portfolio
 y querés traer esos cambios acá, hay que volver a aplicar esas cosas.
@@ -168,7 +191,9 @@ Para probar un nivel a mano: `?calidad=baja`, `?calidad=media` o
 
 ## Cómo correrlo
 
-Necesita servirse por http (no abriendo el `index.html` directo):
+Necesita servirse por http (no abriendo el `index.html` directo). Se abre
+`index.html` (el marco); `juego.html` solo también anda, pero con el mapa del
+tamaño de la ventana:
 
 ```
 npx http-server .

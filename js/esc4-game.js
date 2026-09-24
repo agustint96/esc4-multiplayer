@@ -28,7 +28,7 @@
 // de decirlo, arranca la del juego y empieza el segundero (y, tras la gracia,
 // las piedras). Si hay un joystick conectado los pasos son los del joystick
 // (stick izquierdo o cruceta, RB, LT; ver el bloque data-modo="joystick" de
-// index.html) y con sus propias voces (1- Analogico, 2- RB, 3- L2, ver
+// juego.html) y con sus propias voces (1- Analogico, 2- RB, 3- L2, ver
 // AYUDA_VOCES_JOYSTICK); lo que se use, teclado o joystick, completa
 // los pasos de las dos versiones. Solo pasa la primera vez: después de un
 // choque no.
@@ -134,7 +134,7 @@
   const AYUDA_FUNDIDO = 0.6; // segundos que tarda en desvanecerse un paso (igual que la transición de .game-ayuda-paso en styles.css)
   const AYUDA_VOZ_MAX = 6; // segundos: si una voz no termina (ej. el audio está bloqueado) no se la espera más
   const LISTO_CARGA_MAX = 8; // segundos: lo más que se espera a que carguen las voces para decir "listo" (ver empezarArranque)
-  // Qué teclas hay que apretar en cada paso (ver #game-ayuda en index.html: cada
+  // Qué teclas hay que apretar en cada paso (ver #game-ayuda en juego.html: cada
   // tecla dibujada tiene su data-tecla). Las flechas y WASD valen lo mismo, como
   // en script.js.
   const AYUDA_PASOS = [["up", "left", "down", "right"], ["shift"], ["space"]];
@@ -374,7 +374,20 @@
   const LUZ_INTENSIDAD = 0.12; // opacidad del salmón en el centro de la luz (la misma que el ::before de la nave en styles.css)
 
   // --- Estrellas y cúmulos ---------------------------------------------------
-  const ESTRELLAS_FONDO = 90; // estrellas blancas del fondo (decoración)
+  // El cielo del nivel: un tubo de "pantallas" de ancho que gira una pantalla
+  // entera cada vez que las dos naves dan la vuelta juntas (ver "El fondo se
+  // corre"); al dar la vuelta completa se vuelve a ver el mismo cielo. Dos
+  // capas: la cercana y una lejana, más tenue, que gira menos (profundidad).
+  // Los valores salieron de la página de prueba "Tubo de estrellas"; cada
+  // nivel nuevo podría traer los suyos.
+  const CIELO = {
+    pantallas: 3,
+    giroDura: 2.1, // s que tarda en girar una pantalla
+    curvatura: 0.8, // 0 = plano; más alto: juntas y lentas en los costados, rápidas en el medio
+    estrellas: 110, // por pantalla, en la capa cercana
+    lejana: { gira: 0.5, brillo: 0.4, estrellas: 140 }, // gira: fracción del giro de la cercana
+  };
+  const CIELO_MARGEN = 0.12; // fracción del ancho que se dibuja de más a cada lado (la cámara con zoom ve un poco más allá)
   const ESTRELLA_SALMON = "#f19280"; // salmón del sitio (--accent en styles.css)
   const GRUPOS_SALMON = [1, 3]; // qué grupos de estrellas (ver GRUPOS_ESTRELLAS) son salmón en la intro y en el final
   // Los agujeros de gusano (cúmulos) arrancan blancos y terminan naranja (el
@@ -432,7 +445,7 @@
   // una grilla de puntos ni como una masa.
   const NUMERO_ALTO = 52; // px del mundo: alto de los dígitos
   const NUMERO_ESPACIO = 5.6; // px del mundo: distancia mínima entre estrellas (más chico = más estrellas)
-  // Mismo radio que ESTRELLAS_FONDO (0,6 a 1,1 + hasta 1,1 más): así el número
+  // Mismo radio que las estrellas cercanas del fondo (ver armarCielo): así el número
   // se ve hecho de las mismas estrellas que decoran el fondo, no de puntos más
   // grandes y aparte.
   const NUMERO_RADIO = [0.6, 1.7];
@@ -500,12 +513,10 @@
   const STUN = 3;
   const BORDE_JUGADOR = "#5aa9ff"; // piedras que persiguen al jugador
   const BORDE_RIVAL = "#ff5a5a"; // piedras que persiguen a la PC
-  // Física de la PC: la misma que la nave con flechas en script.js
-  // (GAMEPAD_THRUST_BASE 0.3 × GAME_SHIP_SPEED 1.2, GAMEPAD_DAMPING 0.9, todo
-  // por cuadro de 60 Hz), así las dos naves corren igual.
-  const RIVAL_EMPUJE = 0.36;
-  const RIVAL_EMPUJE_BOOST = 0.72; // GAMEPAD_THRUST_BOOST 0.6 × 1.2: el jugador 2 con Shift derecho
-  const RIVAL_FRENO = 0.9;
+  // La física de la nave del rival (jugador 2 o PC) no tiene números propios:
+  // es window.naveFisica, la misma ficha con la que script.js mueve la del
+  // jugador 1 (empuje, boost, freno, stick y cuánto se puede salir de la
+  // pantalla). Ver moverRival.
   // La PC acelera (como el jugador con Shift) cuando el agujero está a más de
   // RIVAL_BOOST_DIST px y no hay piedras encima, pero con una energía que se
   // gasta a RIVAL_BOOST_GASTO por segundo y vuelve a RIVAL_BOOST_RECUPERA; para
@@ -536,7 +547,7 @@
   // que es bastante más chica): empiezan a empujarse con los centros a
   // REPELER_ALCANCE largos, y nunca quedan a menos de REPELER_MINIMO. El empujón
   // crece al acercarse hasta REPELER_FUERZA px por cuadro² (más que el motor,
-  // RIVAL_EMPUJE, así que no se pueden encimar a propósito).
+  // naveFisica.empuje, así que no se pueden encimar a propósito).
   const REPELER_ALCANCE = 2.2;
   const REPELER_MINIMO = 0.9;
   const REPELER_FUERZA = 1.5;
@@ -579,13 +590,15 @@
   // Adentro del portfolio (agustint96.github.io lo muestra en un iframe en su
   // escenario 4): sin el logo de la presentación, que ya se está en el sitio, y
   // con "volver al sitio" en el menú (ver volverAlSitio). Suelto, esa opción no
-  // va.
-  const embebido = window.parent !== window;
+  // va. El juego siempre corre adentro del marco (index.html), así que no
+  // alcanza con mirar si hay una página de afuera: el marco avisa con
+  // ?embebido=1 cuando a él lo tiene el portfolio.
+  const embebido = new URLSearchParams(location.search).has("embebido");
   if (!embebido && modoEl) {
     const volver = modoEl.querySelector('[data-elegir="volver"]');
     if (volver) volver.remove();
   }
-  // Las dos versiones de las instrucciones (ver #game-ayuda en index.html), cada
+  // Las dos versiones de las instrucciones (ver #game-ayuda en juego.html), cada
   // una con sus pasos y con el dibujo de cada tecla o botón ("up", "shift"...).
   const modosAyuda = {};
   ayudaEl.querySelectorAll("[data-modo]").forEach((el) => {
@@ -715,30 +728,57 @@
   let negro = false; // la pantalla ya está toda negra (fondo y nave ya cambiaron a blanco y negro)
   let miradaGrados = 0; // hacia dónde mira la nave en la intro (queda fija cuando se van las navecitas)
   let reloj = 0; // segundos corridos (para el titilar de las estrellas)
-  const estrellas = Array.from({ length: ESTRELLAS_FONDO }, (_, i) => ({
-    // Posición como fracción de la pantalla (con margen: la cámara con zoom y
-    // el mapa completo ven distinto), así se acomodan al cambiar el tamaño.
-    fx: -0.12 + Math.random() * 1.24,
-    fy: -0.15 + Math.random() * 1.3,
-    r: 0.6 + Math.random() * 1.1,
-    grupo: i % 4,
-  }));
   // Titilan de a grupos (uno por grupo, un solo fill cada uno) en vez de una por
-  // una: se ve igual y cuesta 4 fills en lugar de 90.
+  // una: se ve igual y cuesta 4 fills por capa en lugar de uno por estrella.
   const GRUPOS_ESTRELLAS = [
     { vel: 0.7, fase: 0 },
     { vel: 1.1, fase: 1.7 },
     { vel: 1.6, fase: 3.1 },
     { vel: 2.1, fase: 4.6 },
   ];
-  const estrellasPorGrupo = GRUPOS_ESTRELLAS.map((_, g) =>
-    estrellas.filter((e) => e.grupo === g),
-  );
-  // px que quedaron corridas las estrellas para la izquierda (ver correrFondo).
-  // Dan la vuelta dentro del mismo ancho en el que nacen (el de la pantalla
-  // más ESTRELLAS_MARGEN de cada lado), así sin correr quedan donde nacieron.
-  let estrellasCorridas = 0;
-  const ESTRELLAS_MARGEN = 0.12; // fracción del ancho, de cada lado
+  // Dados con semilla (mulberry32): la misma semilla tira siempre los mismos
+  // números, así la misma semilla arma siempre el mismo cielo. Online el
+  // anfitrión le manda la suya al invitado (ver "cielo" en recibirOnline) y
+  // los dos ven el mismo.
+  function dados(semilla) {
+    let a = semilla >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // Cada capa es una tira fija con sus estrellas: p es el lugar en la tira, en
+  // pantallas; fy, la altura como fracción de la pantalla (con margen, como
+  // las x). La lejana gira "gira" de lo que gira la cercana, y su tira mide
+  // eso mismo por el largo del tubo: así las dos vuelven juntas al principio.
+  let semillaCielo = Math.floor(Math.random() * 1e9);
+  let capasCielo = []; // [lejana, cercana]: { largo, gira, brillo, porGrupo }
+  let cieloCorrido = 0; // pantallas que giró el cielo (+ hacia la derecha)
+  function armarCielo(semilla) {
+    semillaCielo = semilla;
+    const azar = dados(semilla);
+    const capa = (porPantalla, gira, brillo, rMin, rMax) => {
+      const largo = CIELO.pantallas * gira;
+      const porGrupo = GRUPOS_ESTRELLAS.map(() => []);
+      const total = Math.round(porPantalla * largo);
+      for (let i = 0; i < total; i++)
+        porGrupo[i % porGrupo.length].push({
+          p: azar() * largo,
+          fy: -0.15 + azar() * 1.3,
+          r: rMin + azar() * (rMax - rMin),
+        });
+      return { largo, gira, brillo, porGrupo };
+    };
+    const lejana = CIELO.lejana;
+    capasCielo = [
+      capa(lejana.estrellas, lejana.gira, lejana.brillo, 0.35, 0.8),
+      capa(CIELO.estrellas, 1, 1, 0.6, 1.7),
+    ];
+  }
+  armarCielo(semillaCielo);
   let gusanoSprites = null; // anillos de los agujeros ya dibujados con brillo (ver armarSprites)
   let luzSprites = null; // la luz de la nave ya dibujada (degradado), en blanco y en salmón
   let cumulos = []; // cúmulos de estrellas azules en el mapa
@@ -950,6 +990,9 @@
 
   function abrirPausa() {
     pausa = "menu";
+    // Sin el botón de menú de arriba: así la pausa se ve igual que el menú del
+    // principio, que no lo tiene. Se sigue con Escape o con el joystick.
+    if (menuEl) menuEl.hidden = true;
     window.juegoEnPausa = true; // script.js: sin luz ni zoom mientras tanto
     pausarSonidos(true);
     scene.classList.add("en-pausa");
@@ -972,6 +1015,7 @@
 
   function abrirSalir() {
     pausa = "salir";
+    if (menuEl) menuEl.hidden = true; // como en la pausa
     apuntarSalir(0, true); // arranca en continuar
     const gp = primerJoystick();
     padSalirLR = !!gp && (botonPad(gp, PAD_LB) || botonPad(gp, PAD_RB));
@@ -999,6 +1043,7 @@
     }
     if (salirEl) salirEl.hidden = true;
     if (modoEl) modoEl.style.removeProperty("visibility");
+    if (menuEl && modo) menuEl.hidden = false;
     pausa = null;
     window.juegoEnPausa = false;
   }
@@ -1458,7 +1503,8 @@
   }
 
   // Adentro del portfolio: le pide al sitio que cierre el juego y devuelva la
-  // nave al escenario principal (ver abrirEsc4 en el script.js del sitio).
+  // nave al escenario principal (ver abrirEsc4 en el script.js del sitio). Se
+  // lo pide al marco (index.html), que se lo pasa al sitio.
   // Online es como irse: al cerrarse el iframe se cae la conexión y al rival
   // le aparece EL RIVAL SE FUE.
   function volverAlSitio() {
@@ -1496,7 +1542,8 @@
     // para la nave propia, moverRival para la del rival); online y en el
     // tutorial frenan como siempre.
     window.vueltaCostados = m === "dos" || m === "pc" || m === "online";
-    window.vueltaAlBorde = m === "pc" || m === "online"; // ver margenVuelta
+    window.vueltaMargen = margenVuelta(); // script.js da la vuelta con el mismo
+    window.naveMargenY = margenVertical(); // y frena arriba y abajo en el mismo lugar
     actualizarControles();
     if (menuEl) menuEl.hidden = false;
     if (m === "online") {
@@ -1596,16 +1643,7 @@
   // el del 1: a fondo empuja igual que las flechas en cualquier dirección (en
   // diagonal también), con la zona muerta sobre la inclinación total. Devuelve
   // [x, y].
-  function stickNave(x, y) {
-    const ZONA = 0.2;
-    const A_FONDO = 0.95;
-    const m = Math.hypot(x, y);
-    if (m < ZONA) return [0, 0];
-    const fuerza = Math.min(1, (m - ZONA) / (A_FONDO - ZONA));
-    const k = fuerza / Math.max(Math.abs(x), Math.abs(y));
-    return [x * k, y * k];
-  }
-  // La nave de la PC se arma igual que la del jugador en index.html: el sprite
+  // La nave de la PC se arma igual que la del jugador en juego.html: el sprite
   // de atrás, el fuego y el de adelante (cohete_on: en el juego la luz va
   // prendida), los tres en el mismo lienzo de 203x300.
   const cargarImagen = (src) => {
@@ -1878,7 +1916,7 @@
 
   // Polígono irregular "estrellado": los vértices van ordenados por ángulo
   // alrededor del centro, así nunca se cruza consigo mismo.
-  function crearPoligono(objetivo, paraRival, rapida = false) {
+  function crearPoligono(objetivo, rapida = false) {
     const d = (50 + Math.random() * 70) * ESCALA_MUNDO;
     const n = 4 + Math.floor(Math.random() * 3);
     const paso = (Math.PI * 2) / n;
@@ -1897,12 +1935,15 @@
     // Casi todos nacen apuntados a la nave (con algo de dispersión).
     if (objetivo && Math.random() < PUNTERIA)
       x = objetivo.x + (Math.random() - 0.5) * PUNTERIA_ANCHO;
-    else if (paraRival && objetivo)
+    else if (objetivo && !esTutorial())
       x = objetivo.x + (Math.random() - 0.5) * v.w;
-    // Las de la PC nacen arriba de ella, aunque esté fuera de lo que se ve
-    // (nunca más abajo del borde de arriba de la vista: no aparecen de la nada).
+    // Con dos naves, las de cada una nacen arriba de ella, a la misma
+    // distancia para las dos (al menos 0,6 del alto de la vista, y nunca más
+    // abajo del borde de arriba de la vista: no aparecen de la nada). Así
+    // estar más arriba o más abajo en el mapa no le da ventaja a ninguna. En
+    // el tutorial, como en el sitio: justo arriba de lo que se ve.
     const y =
-      paraRival && objetivo ? Math.min(v.y, objetivo.y - v.h * 0.6) : v.y;
+      objetivo && !esTutorial() ? Math.min(v.y, objetivo.y - v.h * 0.6) : v.y;
     return {
       id: ++idPoligono,
       x,
@@ -4094,12 +4135,23 @@
       entrado = null;
     }
     // Online los goles del rival los avisa él (ver golInvitado).
-    if (!entrado && !enLinea() && rival && rival.stun <= 0) {
+    if (!enLinea() && rival && rival.stun <= 0) {
       const circ = circulosRival();
       const deRival = cumulos.find((c) =>
         circ.some((n) => Math.hypot(n.x - c.x, n.y - c.y) < n.r + CUMULO_RADIO),
       );
-      if (deRival) golRival(deRival);
+      // Si las dos llegan en el mismo cuadro al mismo par (al mismo agujero o
+      // cada una a uno de los dos), se sortea: si no, ganaría siempre la del
+      // jugador, que se revisa primero. A pares distintos, la del rival entra
+      // en el cuadro siguiente.
+      const empate =
+        entrado &&
+        deRival &&
+        (deRival === entrado || deRival === entrado.par);
+      if (deRival && (!entrado || (empate && Math.random() < 0.5))) {
+        entrado = null;
+        golRival(deRival);
+      }
     }
     if (entrado) {
       // La nave desaparece por este agujero y aparece por el otro (ambos se
@@ -4150,6 +4202,21 @@
     );
   }
 
+  // Fuerza con la que una lluvia busca a su nave, la misma cuenta para las dos:
+  // siempre BUSQUEDA_BASE, y sube hasta 1 a partir de los QUIETA_SEG segundos
+  // sin moverse o mientras haya presión por dar vueltas al mapa; con presión,
+  // además, corrigen más rápido de costado (BUSQUEDA_VUELTA_EXTRA).
+  function fuerzaBusqueda(segQuieta, presion) {
+    const quieta = Math.max(
+      0,
+      Math.min(1, (segQuieta - QUIETA_SEG) / BUSQUEDA_RAMPA),
+    );
+    return (
+      (BUSQUEDA_BASE + (1 - BUSQUEDA_BASE) * Math.max(quieta, presion)) *
+      (1 + BUSQUEDA_VUELTA_EXTRA * presion)
+    );
+  }
+
   function actualizar(dt, circulos) {
     if (!ganado) tiempo += dt; // al ganar el segundero queda parado
     if (!ganado) actualizarVoces();
@@ -4175,7 +4242,7 @@
         acumSpawnRival += dt;
         if (acumSpawnRival >= intervalo) {
           acumSpawnRival = 0;
-          poligonosRival.push(crearPoligono(rival, true));
+          poligonosRival.push(crearPoligono(rival));
         }
       }
     }
@@ -4184,12 +4251,6 @@
 
     const v = vista();
     const abajo = v.y + v.h;
-    // Fuerza con la que buscan a la nave: siempre BUSQUEDA_BASE, y sube hasta 1
-    // a partir de los QUIETA_SEG segundos sin movimiento.
-    const quieta = Math.max(
-      0,
-      Math.min(1, (tQuieta - QUIETA_SEG) / BUSQUEDA_RAMPA),
-    );
     // Dar la vuelta al mapa una y otra vez no es una forma de esconderse: cada
     // vuelta suma presión (baja sola con el tiempo) y, mientras la haya, la
     // lluvia de esa nave busca como si estuviera quieta y además corrige más
@@ -4202,10 +4263,10 @@
     vueltasRivalVistas = vueltasRival;
     if (circulos[1] && stunJugador <= 0)
       for (let i = 0; i < nuevasJugador * VUELTA_PIEDRAS; i++)
-        poligonos.push(crearPoligono(circulos[1], false, true));
+        poligonos.push(crearPoligono(circulos[1], true));
     if (rival && rival.stun <= 0)
       for (let i = 0; i < nuevasRival * VUELTA_PIEDRAS; i++)
-        poligonosRival.push(crearPoligono(rival, true, true));
+        poligonosRival.push(crearPoligono(rival, true));
     if (vueltas !== vueltasVistas) {
       anotarVuelta("jugador", window.shipVueltaLado);
       presionJugador = Math.min(
@@ -4217,12 +4278,8 @@
     }
     presionJugador = Math.max(0, presionJugador - PRESION_BAJA * dt);
     presionRival = Math.max(0, presionRival - PRESION_BAJA * dt);
-    const busqueda =
-      (BUSQUEDA_BASE + (1 - BUSQUEDA_BASE) * Math.max(quieta, presionJugador)) *
-      (1 + BUSQUEDA_VUELTA_EXTRA * presionJugador);
-    const busquedaRival =
-      (BUSQUEDA_BASE + (1 - BUSQUEDA_BASE) * presionRival) *
-      (1 + BUSQUEDA_VUELTA_EXTRA * presionRival);
+    const busqueda = fuerzaBusqueda(tQuieta, presionJugador);
+    const busquedaRival = fuerzaBusqueda(rival ? rival.quieta : 0, presionRival);
     // Fuera de juego o parpadeando, la nave no es el foco de su lluvia: las
     // que ya venían dejan de corregir y siguen derecho.
     const focoJugador =
@@ -4287,6 +4344,16 @@
   // (ventaja para ella), así que ahí dan la vuelta justo en el borde.
   function margenVuelta() {
     return modo === "pc" || modo === "online" ? 0 : MUNDO_VUELTA_MARGEN;
+  }
+
+  // Arriba y abajo, por lo mismo: contra la PC ninguna de las dos se sale de la
+  // pantalla (el centro de la nave frena a PC_MARGEN_Y px adentro del borde;
+  // la PC sabría dónde está la otra, pero el jugador no la vería a ella). Da
+  // cuánto se puede salir el centro (negativo: se queda adentro), o null si
+  // rigen los límites de siempre (naveFisica.fueraArriba y fueraAbajo).
+  const PC_MARGEN_Y = 40;
+  function margenVertical() {
+    return modo === "pc" ? -PC_MARGEN_Y : null;
   }
 
   // La diferencia horizontal dx llevada al camino más corto de los dos (entre
@@ -4453,6 +4520,7 @@
       hy: 0,
       energia: 1, // para acelerar, solo la PC (ver RIVAL_BOOST_*)
       boosteando: false,
+      quieta: 0, // segundos seguidos sin moverse (como tQuieta del jugador)
     };
   }
 
@@ -4628,6 +4696,7 @@
 
   function moverRival(dt, circulos) {
     if (rival.stun > 0) {
+      rival.quieta = 0; // como la del jugador: golpeada no cuenta como quieta
       rival.stun -= dt;
       rival.t += dt;
       if (rival.cae && rival.t < DURACION_CHOQUE) {
@@ -4651,23 +4720,26 @@
     }
     if (rival.invul > 0) rival.invul = Math.max(0, rival.invul - dt);
 
-    // Misma física que la nave con flechas (script.js): empuje constante en la
-    // dirección elegida y freno exponencial, en subpasos de ~1 cuadro de 60 Hz.
+    // Misma física que la nave del jugador 1 (window.naveFisica, de script.js):
+    // empuje constante en la dirección elegida y freno exponencial, en
+    // subpasos de ~1 cuadro de 60 Hz.
+    const fisica = window.naveFisica;
+    if (!fisica) return;
     let gx = 0;
     let gy = 0;
-    let empuje = RIVAL_EMPUJE;
+    let empuje = fisica.empuje;
     const pad = window.j2Joystick ? primerJoystick() : null;
     if (modo === "dos" && pad) {
       // La maneja el jugador 2 con el joystick, igual que el joystick a la nave
       // del jugador 1 en script.js: stick con zona muerta, la cruceta lo pisa y
       // RB acelera.
-      [gx, gy] = stickNave(pad.axes[0] || 0, pad.axes[1] || 0);
+      [gx, gy] = fisica.stick(pad.axes[0] || 0, pad.axes[1] || 0);
       const apretado = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed);
       if (apretado(PAD_CRUCETA.left)) gx = -1;
       else if (apretado(PAD_CRUCETA.right)) gx = 1;
       if (apretado(PAD_CRUCETA.up)) gy = -1;
       else if (apretado(PAD_CRUCETA.down)) gy = 1;
-      if (apretado(PAD_RB)) empuje = RIVAL_EMPUJE_BOOST;
+      if (apretado(PAD_RB)) empuje = fisica.empujeBoost;
     } else if (modo === "dos") {
       // La maneja el jugador 2 con las flechas (o WASD, con los lados dados
       // vuelta), igual que las flechas a la nave del jugador 1 en script.js
@@ -4675,10 +4747,13 @@
       const t = window.tecladoAlReves ? teclasJ2Wasd : teclasJ2;
       gx = (t.right ? 1 : 0) - (t.left ? 1 : 0);
       gy = (t.down ? 1 : 0) - (t.up ? 1 : 0);
-      if (t.boost) empuje = RIVAL_EMPUJE_BOOST;
+      if (t.boost) empuje = fisica.empujeBoost;
     } else {
+      // A fondo hacia donde quiere ir, como un stick a fondo o las flechas:
+      // del círculo al cuadrado (en diagonal, (1, 1) y no (0,7, 0,7)), así en
+      // diagonal va tan rápido como el jugador con dos flechas apretadas.
       const r = rumboRival(circulos);
-      const m = Math.hypot(r.x, r.y);
+      const m = Math.max(Math.abs(r.x), Math.abs(r.y));
       gx = m > 1e-3 ? r.x / m : 0;
       gy = m > 1e-3 ? r.y / m : 0;
       // Acelera con energía limitada (ver RIVAL_BOOST_*): arranca si tiene la
@@ -4689,7 +4764,7 @@
       rival.boosteando = quiere;
       e += (quiere ? -RIVAL_BOOST_GASTO : RIVAL_BOOST_RECUPERA) * dt;
       rival.energia = Math.max(0, Math.min(1, e));
-      if (quiere) empuje = RIVAL_EMPUJE_BOOST;
+      if (quiere) empuje = fisica.empujeBoost;
     }
     if (fin) {
       // Terminó la partida: nadie la maneja, sigue con lo que traía.
@@ -4699,7 +4774,7 @@
     const cuadros = dt * 60;
     const subpasos = Math.max(1, Math.round(cuadros));
     const paso = cuadros / subpasos;
-    const freno = Math.pow(RIVAL_FRENO, paso);
+    const freno = Math.pow(fisica.freno, paso);
     for (let i = 0; i < subpasos; i++) {
       rival.vx += gx * empuje * paso;
       rival.vy += gy * empuje * paso;
@@ -4708,6 +4783,11 @@
       rival.x += rival.vx * paso;
       rival.y += rival.vy * paso;
     }
+    // Quieta, con la misma vara que la del jugador (QUIETA_MOV px/s; durante la
+    // gracia no cuenta): sus piedras la buscan con más fuerza (fuerzaBusqueda).
+    const vel = Math.hypot(rival.vx, rival.vy) * 60; // px por cuadro -> px/s
+    rival.quieta =
+      tiempo >= gracia && vel < QUIETA_MOV ? rival.quieta + dt : 0;
     const margen = 40;
     if (modo === "dos" || modo === "pc") {
       // Los costados no frenan, dan la vuelta (igual que la nave del
@@ -4729,7 +4809,23 @@
     } else {
       rival.x = Math.max(margen, Math.min(window.innerWidth - margen, rival.x));
     }
-    rival.y = Math.max(margen, Math.min(window.innerHeight - margen, rival.y));
+    const margenY = margenVertical();
+    if (margenY !== null) {
+      // Contra la PC ninguna se sale por arriba ni por abajo (ver
+      // margenVertical); la del jugador frena en el mismo lugar (script.js).
+      rival.y = Math.max(
+        -margenY,
+        Math.min(window.innerHeight + margenY, rival.y),
+      );
+    } else {
+      // Con dos jugadores llega tan lejos como la del jugador 1: puede
+      // salirse un poco de la pantalla, y la flecha de su color muestra
+      // dónde quedó (ver dibujarPunteros).
+      rival.y = Math.max(
+        -fisica.fueraArriba,
+        Math.min(window.innerHeight + fisica.fueraAbajo, rival.y),
+      );
+    }
 
     // Gira igual que la nave del jugador con las flechas en script.js: hacia
     // donde se la empuja (0° = nariz arriba), un 25 % de lo que falta por
@@ -5168,6 +5264,10 @@
       ship.classList.toggle("color-rival", !soyAnfitrion());
       centrarNave();
       conectarDirecto();
+      // El mismo cielo en las dos pantallas: la semilla del anfitrión.
+      if (soyAnfitrion()) enviarOnline({ tipo: "cielo", semilla: semillaCielo });
+    } else if (m.tipo === "cielo") {
+      if (!soyAnfitrion() && Number.isFinite(m.semilla)) armarCielo(m.semilla);
     } else if (m.tipo === "rtc") {
       recibirRtc(m);
     } else if (m.tipo === "latido") {
@@ -5656,21 +5756,15 @@
     }
   }
 
-  function renovarEstrella(e) {
-    e.fy = -0.15 + Math.random() * 1.3;
-    e.r = 0.6 + Math.random() * 1.1;
-  }
-
   // --- El fondo se corre ------------------------------------------------------
   // Si las dos naves dan la vuelta por el mismo costado casi a la vez (las dos
-  // yendo para el mismo lado), el cielo se corre un tramo para ese lado: las
-  // estrellas viejas se van para el otro y entran nuevas (ver dibujarEstrellas),
-  // como si juntas hubieran avanzado. Es solo el fondo: las piedras y los
-  // agujeros siguen donde están. Online lo decide el anfitrión y le avisa al
-  // invitado ("fondo"), así las dos pantallas se corren juntas.
+  // yendo para el mismo lado), el cielo gira una pantalla entera sobre su tubo
+  // para ese lado (ver CIELO y dibujarEstrellas), como si juntas hubieran
+  // avanzado; al dar la vuelta al tubo reaparece el mismo cielo. Es solo el
+  // fondo: las piedras y los agujeros siguen donde están. Online lo decide el
+  // anfitrión y le avisa al invitado ("fondo"), así las dos pantallas giran
+  // juntas.
   const FONDO_JUNTAS = 1.2; // s que puede haber entre las dos vueltas
-  const FONDO_TRAMO = 0.2; // cuánto se corre, en fracción del ancho
-  const FONDO_DURA = 1.4; // s que tarda en correrse
   const vueltaDe = { jugador: null, rival: null }; // la última de cada nave: { lado, t }
   let fondoCorre = null; // { desde, hasta, t (0 a 1) } mientras se corre
 
@@ -5687,56 +5781,70 @@
     }
   }
 
-  // Si ya se estaba corriendo, el tramo nuevo se suma al que faltaba.
+  // Si ya se estaba girando, la pantalla nueva se suma a la que faltaba.
   function correrFondo(lado) {
-    const meta = fondoCorre ? fondoCorre.hasta : estrellasCorridas;
-    fondoCorre = {
-      desde: estrellasCorridas,
-      hasta: meta + lado * window.innerWidth * FONDO_TRAMO,
-      t: 0,
-    };
+    const meta = fondoCorre ? fondoCorre.hasta : cieloCorrido;
+    fondoCorre = { desde: cieloCorrido, hasta: meta + lado, t: 0 };
   }
 
-  // Arranca y frena suave (smoothstep): no pega un tirón al empezar.
+  // Arranca y frena suave (smoothstep): no pega un tirón al empezar. Al
+  // terminar se lo lleva adentro del tubo (es lo mismo girar 4 que 1).
   function moverFondo(dt) {
     if (!fondoCorre) return;
     const f = fondoCorre;
-    f.t = Math.min(1, f.t + dt / FONDO_DURA);
+    f.t = Math.min(1, f.t + dt / CIELO.giroDura);
     const k = f.t * f.t * (3 - 2 * f.t);
-    estrellasCorridas = f.desde + (f.hasta - f.desde) * k;
-    if (f.t >= 1) fondoCorre = null;
+    cieloCorrido = f.desde + (f.hasta - f.desde) * k;
+    if (f.t < 1) return;
+    const n = CIELO.pantallas;
+    cieloCorrido = ((f.hasta % n) + n) % n;
+    fondoCorre = null;
   }
 
   // Estrellas del fondo (decoración, no se chocan). Se ven siempre: en el juego,
   // en la intro y en el final, sobre el fondo negro o el starry. Son blancas, y
-  // en la intro y en el final algunas (ciertos grupos) son salmón. 4 fills en
-  // total (uno por grupo, cada grupo con su titilar).
+  // en la intro y en el final algunas (ciertos grupos) son salmón. 4 fills por
+  // capa (uno por grupo, cada grupo con su titilar).
+  //
+  // Cada capa es un tubo (ver armarCielo) y la pantalla muestra una pantalla
+  // de él, pintada sobre un cilindro: con CIELO.curvatura el borde de la
+  // pantalla queda a curvatura * 90° del centro, así las estrellas se juntan
+  // hacia los costados y, al girar, entran lentas, aceleran en el medio y
+  // frenan al irse. Con 0 queda plano.
   function dibujarEstrellas() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const margen = w * ESTRELLAS_MARGEN;
-    const largo = w + margen * 2;
     const conSalmon = !negro || ganado; // intro y final
-    for (let g = 0; g < GRUPOS_ESTRELLAS.length; g++) {
-      const grupo = GRUPOS_ESTRELLAS[g];
-      ctx.fillStyle =
-        conSalmon && GRUPOS_SALMON.includes(g) ? ESTRELLA_SALMON : "#fff";
-      ctx.globalAlpha =
-        0.3 + 0.6 * (0.5 + 0.5 * Math.sin(reloj * grupo.vel + grupo.fase));
-      ctx.beginPath();
-      for (const e of estrellasPorGrupo[g]) {
-        const crudo = e.fx * w - estrellasCorridas + margen;
-        // La que da la vuelta entra por el otro lado como una estrella nueva
-        // (otra altura y otro tamaño): el fondo corrido muestra cielo nuevo.
-        const vuelta = Math.floor(crudo / largo);
-        if (e.vuelta !== undefined && e.vuelta !== vuelta) renovarEstrella(e);
-        e.vuelta = vuelta;
-        const x = crudo - vuelta * largo - margen;
-        const y = e.fy * h;
-        ctx.moveTo(x + e.r, y);
-        ctx.arc(x, y, e.r, 0, Math.PI * 2);
+    const tope = CIELO.curvatura * (Math.PI / 2);
+    const curva = tope > 0.001 ? Math.sin(tope) : 0;
+    for (const capa of capasCielo) {
+      const corrida = cieloCorrido * capa.gira;
+      for (let g = 0; g < GRUPOS_ESTRELLAS.length; g++) {
+        const grupo = GRUPOS_ESTRELLAS[g];
+        ctx.fillStyle =
+          conSalmon && GRUPOS_SALMON.includes(g) ? ESTRELLA_SALMON : "#fff";
+        ctx.globalAlpha =
+          capa.brillo *
+          (0.3 + 0.6 * (0.5 + 0.5 * Math.sin(reloj * grupo.vel + grupo.fase)));
+        ctx.beginPath();
+        for (const e of capa.porGrupo[g]) {
+          // d: dónde cae en la pantalla (0 el borde izquierdo, 1 el derecho).
+          let d = (((e.p - corrida) % capa.largo) + capa.largo) % capa.largo;
+          if (d > capa.largo - CIELO_MARGEN) d -= capa.largo; // asoma por la izquierda
+          if (d > 1 + CIELO_MARGEN) continue; // está en otra parte del tubo
+          let u = d * 2 - 1; // -1 a 1 del borde izquierdo al derecho
+          if (curva) {
+            const ang = u * tope;
+            if (Math.abs(ang) >= Math.PI / 2) continue; // del otro lado del cilindro
+            u = Math.sin(ang) / curva;
+          }
+          const x = (u + 1) * 0.5 * w;
+          const y = e.fy * h;
+          ctx.moveTo(x + e.r, y);
+          ctx.arc(x, y, e.r, 0, Math.PI * 2);
+        }
+        ctx.fill();
       }
-      ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
@@ -6083,9 +6191,9 @@
   // a la altura que tiene; si se fue por arriba o por abajo, a lo ancho donde
   // está. Si se fue en diagonal queda en la esquina, apuntando a ella.
   //
-  // (Con dos jugadores esto no llega a pasar: ahí la cámara se abre al mapa
-  // completo justo para que las dos entren, ver camera.zoom en script.js. La
-  // flecha azul igual está hecha, por si la cámara alguna vez cambia.)
+  // Con dos jugadores la cámara muestra el mapa completo (ver camera.zoom en
+  // script.js), pero las naves igual pueden salirse un poco por arriba y por
+  // abajo: ahí también va la flecha de cada una.
   const PUNTERO_BORDE = 24; // px del borde de la pantalla a la punta del triángulo
   const PUNTERO_LADO = 22; // px: lado del triángulo equilátero
 
@@ -6454,7 +6562,8 @@
         modo = null; // se elige de nuevo cada vez que se entra
         window.dosJugadores = false;
         window.vueltaCostados = false;
-        window.vueltaAlBorde = false;
+        window.vueltaMargen = 0;
+        window.naveMargenY = null;
         window.j2Joystick = false;
         window.j2Teclado = false;
         window.tecladoAlReves = false;

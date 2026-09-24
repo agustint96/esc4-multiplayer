@@ -1001,7 +1001,7 @@ function drawStars() {
         }),
       );
     }
-    // Texto BIOS (ver .space-bios en index.html/styles.css): cada letra
+    // Texto BIOS (ver .space-bios en juego.html/styles.css): cada letra
     // tiene un mini resorte propio (posición x/y + velocidad, igual
     // espíritu que makeSpaceDrifter) que la empuja lejos de la nave cuando
     // está cerca -"campo de repulsión"- y, a diferencia de las piedras, una
@@ -1345,7 +1345,7 @@ function drawStars() {
     // scenes.main ya existe (registrado al inicio del archivo, arranca
     // visible) y sólo necesita declarar a dónde lleva su borde de arriba.
     // Para sumar un escenario nuevo más adelante: armar sus capas en
-    // index.html/styles.css (mismo patrón que space-scene/space-scene-front,
+    // juego.html/styles.css (mismo patrón que space-scene/space-scene-front,
     // toggleadas por una clase tipo "visible"), llamar acá a
     // registerScene("id", {...}) con sólo la config que necesite -todo lo
     // demás tiene default razonable, ver el registro global al inicio del
@@ -1430,7 +1430,7 @@ function drawStars() {
       setVisible: (visible) => {
         if (gameScene) gameScene.classList.toggle("game-visible", visible);
         // Ya visible de verdad: de acá en más entra y sale con su fundido (ver
-        // html.entra-juego en index.html).
+        // html.entra-juego en juego.html).
         document.documentElement.classList.remove("entra-juego");
         if (window.esc4Game) window.esc4Game.setActive(visible);
         // La nave entra con la luz apagada (la intro es a color; la prende
@@ -1973,7 +1973,7 @@ function drawStars() {
     // se comía el 20 % dos veces en la diagonal), y desde GAMEPAD_FULL ya es a
     // fondo. Después, del círculo al cuadrado: se estira hasta que el eje más
     // inclinado valga lo que la inclinación. A medio camino sigue yendo más
-    // despacio. Lo mismo hace stickNave en esc4-game.js (jugador 2).
+    // despacio. La nave del jugador 2 usa esta misma función (ver naveFisica).
     function stickShip(x, y) {
       const m = Math.hypot(x, y);
       if (m < GAMEPAD_DEADZONE) return [0, 0];
@@ -1984,6 +1984,20 @@ function drawStars() {
       const k = fuerza / Math.max(Math.abs(x), Math.abs(y));
       return [x * k, y * k];
     }
+
+    // La física de la nave en el escenario 4, en un solo lugar: esc4-game.js
+    // mueve la del jugador 2 y la de la PC con estos mismos números (ver
+    // moverRival), así ninguna tiene ventaja por ser una u otra. Todo por
+    // cuadro de 60 Hz. Los "fuera" son cuánto se puede salir de la pantalla el
+    // centro de la nave (FLIGHT_MARGIN* miden la esquina de su caja de 130 px).
+    window.naveFisica = {
+      empuje: GAMEPAD_THRUST_BASE * GAME_SHIP_SPEED,
+      empujeBoost: GAMEPAD_THRUST_BOOST * GAME_SHIP_SPEED,
+      freno: GAMEPAD_DAMPING,
+      stick: stickShip,
+      fueraArriba: FLIGHT_MARGIN_TOP - 65,
+      fueraAbajo: FLIGHT_MARGIN + 65,
+    };
 
     (document.addEventListener("mousemove", (t) => {
       ((i = t.clientX), (o = t.clientY), (l = !0));
@@ -2132,6 +2146,17 @@ function drawStars() {
           (boosting ? GAMEPAD_THRUST_BOOST : GAMEPAD_THRUST_BASE) * speedMult;
         const p = gamepadActive ? GAMEPAD_DAMPING : l ? 0.15 : 0.995;
         const frenoPaso = Math.pow(p, paso);
+        // En el escenario 4 el mouse no va más rápido que el teclado o el stick
+        // a fondo en esa dirección (con click, que el Shift): ahí se juega
+        // contra otra nave, que no puede usar el mouse. El tope es la velocidad
+        // a la que se estabiliza el empuje con el freno del teclado, y va por
+        // eje, como las flechas (en diagonal, las dos a la vez).
+        const empujeTope =
+          (mouseBoost ? GAMEPAD_THRUST_BOOST : GAMEPAD_THRUST_BASE) * speedMult;
+        const topeMouse =
+          !gamepadActive && l && currentSceneId === "game"
+            ? (empujeTope * GAMEPAD_DAMPING) / (1 - GAMEPAD_DAMPING)
+            : Infinity;
         const sostenida = ahoraNave < shipCarriedUntil;
         for (let sub = 0; sub < subpasos; sub++) {
           if (gamepadActive) {
@@ -2151,6 +2176,11 @@ function drawStars() {
           }
           n *= frenoPaso;
           r *= frenoPaso;
+          const eje = Math.max(Math.abs(n), Math.abs(r));
+          if (eje > topeMouse) {
+            n *= topeMouse / eje;
+            r *= topeMouse / eje;
+          }
           if (sostenida) {
             n = 0;
             r = 0;
@@ -2203,14 +2233,25 @@ function drawStars() {
         // velocidad, así ninguno queda arrinconado contra el borde. Arriba y
         // abajo siguen frenando como siempre.
         const daVuelta = window.vueltaCostados && currentSceneId === "game";
-        // Límites de la vuelta: con dos jugadores los mismos de siempre (más
-        // allá del viewport); contra la PC (window.vueltaAlBorde) justo en el
-        // borde, cuando el centro de la nave lo cruza (e es la esquina de su
-        // caja de 130 px, el centro está 65 px más allá): si no, la nave
-        // queda afuera de la vista mientras la IA sí sabe dónde está.
-        const alBorde = daVuelta && window.vueltaAlBorde;
-        const vMin = alBorde ? -65 : minX;
-        const vMax = alBorde ? window.innerWidth - 65 : maxX;
+        // Arriba y abajo, en el escenario 4 esc4-game.js puede pedir otro
+        // límite (window.naveMargenY: cuánto se puede salir de la pantalla el
+        // centro de la nave, negativo si se queda adentro), el mismo con el
+        // que frena la otra nave: contra la PC ninguna se sale.
+        const margenY =
+          currentSceneId === "game" && typeof window.naveMargenY === "number"
+            ? window.naveMargenY
+            : null;
+        const yMin = margenY === null ? minY : -margenY - 65;
+        const yMax =
+          margenY === null ? maxY : window.innerHeight + margenY - 65;
+        // Límites de la vuelta: cuando el centro de la nave pasa
+        // window.vueltaMargen más allá del borde (e es la esquina de su caja
+        // de 130 px, el centro está 65 px más allá). Es el mismo margen con el
+        // que da la vuelta la otra nave (ver margenVuelta en esc4-game.js),
+        // así las dos cruzan en el mismo punto.
+        const margenVuelta = window.vueltaMargen || 0;
+        const vMin = -margenVuelta - 65;
+        const vMax = window.innerWidth + margenVuelta - 65;
         let touchedEdge = null;
         // La presentación del escenario 4 (window.shipLibre, lo pone
         // esc4-game.js) hace entrar y salir a la nave desde bien afuera de la
@@ -2241,12 +2282,12 @@ function drawStars() {
         }
         if (libre) {
           // sin bordes
-        } else if (a < minY) {
-          a = minY;
+        } else if (a < yMin) {
+          a = yMin;
           r = 0;
           touchedEdge = "top";
-        } else if (a > maxY) {
-          a = maxY;
+        } else if (a > yMax) {
+          a = yMax;
           r = 0;
           touchedEdge = "bottom";
         }

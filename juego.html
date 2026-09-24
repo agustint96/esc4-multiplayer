@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Carátula - Agustin Tardella</title>
+    <meta
+      name="description"
+      content="Portfolio de Agustín Tardella, Analista de Sistemas Informáticos y Desarrollador Full Stack de Córdoba, Argentina. Fondo parallax animado y acceso a la consola SQL interactiva."
+    />
+
+    <!-- Carga (sobre todo en una recarga sin caché, Ctrl+Shift+R): mientras las
+    capas del parallax no estén todas bajadas y decodificadas, html.cargando las
+    deja transparentes para que se funden juntas y no de a pedazos (ver el
+    script del final del body y "Carga" en styles.css). Va acá, antes del CSS,
+    para que la clase esté puesta desde el primer render. -->
+    <script>
+      document.documentElement.classList.add("cargando");
+      // La página arranca directo en el juego (escenario 4): html.entra-juego
+      // lo muestra tapando todo desde el primer render, sin el fundido de
+      // entrada, así no se llega a ver el index de atrás mientras carga. Lo
+      // saca script.js apenas el escenario queda visible (ver registerScene
+      // "game").
+      document.documentElement.classList.add("entra-juego");
+    </script>
+
+    <!-- Lo que se ve primero, pedido ya mismo: el fondo estrellado (lo pide el
+    CSS, o sea que sin esto se descubre tarde y la página aparece un rato sobre
+    azul liso) y la tipografía del nombre (si no, el nombre se ve un instante en
+    otra fuente y después salta). DM Mono y JetBrains Mono ya no vienen de
+    Google Fonts: están en fonts/ y las declara styles.css. -->
+    <link
+      rel="preload"
+      as="image"
+      href="parallax/fondo-estrellado.webp"
+      type="image/webp"
+      fetchpriority="high"
+    />
+    <link
+      rel="preload"
+      as="font"
+      href="fonts/dm-mono-400-latin.woff2"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      href="fonts/Spaceport_2006.otf"
+      type="font/otf"
+      crosNsorigin
+    />
+
+    <link rel="icon" type="image/png" href="parallax/parallax 9.webp" />
+
+    <link rel="stylesheet" href="styles.css" />
+    <meta
+      name="google-site-verification"
+      content="dLNxJtTeOr2m5lAeooB5U52gBYTG3taGUBANK4NMc-I"
+    />
+  </head>
+
+  <body>
+    <svg style="position: absolute; width: 0; height: 0; overflow: hidden">
+      <filter id="cv-menu-glass">
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.012 0.02"
+          numOctaves="2"
+          seed="7"
+          result="noise"
+        />
+        <feDisplacementMap
+          in="SourceGraphic"
+          in2="noise"
+          scale="40"
+          xChannelSelector="R"
+          yChannelSelector="G"
+        />
+      </filter>
+    </svg>
+    <div class="site-content" id="site-content">
+      <nav id="main-nav">
+        <a
+          class="power-btn"
+          href="sisop.html"
+          aria-label="Encender la PC — Consola SQL"
+          title="Encender SISOP"
+        >
+          <svg viewBox="0 3.6 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M12 3.4v8.2"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              d="M6.7 7.3a8 8 0 1 0 10.6 0"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </a>
+
+        <ul class="nav-links">
+          <li>
+            <a
+              href="https://github.com/agustint96"
+              aria-label="Github"
+              title="Github"
+            >
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path
+                  fill-rule="evenodd"
+                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+                />
+              </svg>
+            </a>
+          </li>
+
+          <li class="cv-picker" id="cvPicker">
+            <button
+              type="button"
+              class="cv-btn"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-label="CV"
+              title="CV"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M6 2.75h8l4 4v13.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.75a1 1 0 0 1 1-1z"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M14 2.75v4h4"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M8.5 12.5h7M8.5 15.5h7M8.5 18.5h4"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+            <ul class="cv-menu" hidden>
+              <li>
+                <a href="CV_Agustin_Tardella.pdf" download>
+                  <span class="cv-menu-label">
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path
+                        d="M8 1.5v8.5m0 0L4.75 6.75M8 10l3.25-3.25"
+                        stroke="currentColor"
+                        stroke-width="1.4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M2.5 12v1.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V12"
+                        stroke="currentColor"
+                        stroke-width="1.4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    Español
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a href="CV_Agustin_Tardella_EN.pdf" download>
+                  <span class="cv-menu-label">
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path
+                        d="M8 1.5v8.5m0 0L4.75 6.75M8 10l3.25-3.25"
+                        stroke="currentColor"
+                        stroke-width="1.4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M2.5 12v1.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V12"
+                        stroke="currentColor"
+                        stroke-width="1.4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    English
+                  </span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            <a
+              href="https://mail.google.com/mail/?view=cm&fs=1&to=agustintardella7@gmail.com"
+              aria-label="Contacto"
+              title="Contacto"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect
+                  x="2.5"
+                  y="5"
+                  width="19"
+                  height="14"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+                <path
+                  d="M3.5 6.5l8.5 7 8.5-7"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <main id="main-content">
+        <div class="starry-bg">
+          <canvas id="star-canvas"></canvas>
+
+          <div class="starry-p9-wrap">
+            <img src="parallax/parallax 9.webp" class="starry-p9" alt="" />
+          </div>
+
+          <div class="footer-col-left">
+            <span class="name">AGUSTIN TARDELLA</span>
+
+            <span class="role"> Analista de Sistemas Informáticos </span>
+
+            <span class="role"> Desarrollador Full Stack </span>
+
+            <span class="year"> © <span id="typed-year"></span> </span>
+          </div>
+        </div>
+
+        <div class="parallax-footer">
+          <div id="p1"></div>
+
+          <div class="layer" id="p8">
+            <img src="parallax/parallax 8.webp" alt="" />
+          </div>
+
+          <div class="layer" id="p3">
+            <img src="parallax/parallax 3.webp" alt="" />
+          </div>
+
+          <div class="layer" id="p4">
+            <img src="parallax/parallax 4.webp" alt="" />
+            <img
+              src="parallax/parallax 4 luz sola.webp"
+              class="p4-luz"
+              alt=""
+            />
+            <div class="p4-glow" aria-hidden="true"></div>
+          </div>
+
+          <div class="layer" id="group-256">
+            <div class="gl">
+              <img src="parallax/parallax 2.webp" alt="" />
+            </div>
+
+            <div class="gl">
+              <img src="parallax/parallax 5.webp" alt="" />
+            </div>
+
+            <div class="gl">
+              <img src="parallax/parallax 6.webp" alt="" />
+            </div>
+          </div>
+
+          <div class="layer" id="p7">
+            <img src="parallax/parallax 7.webp" alt="" />
+          </div>
+
+          <div class="footer-text">
+            <div class="footer-col-right">
+              <p>
+                «Animula, vagula, blandula<br />
+                Hospes comesque corporis<br />
+                Quae nunc abibis in loca<br />
+                Pallidula, rigida, nudula,<br />
+                Nec, ut soles, dabis iocos…»
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div class="space-scene" id="space-scene" aria-hidden="true">
+      <canvas id="space-scene-canvas"></canvas>
+      <img
+        src="parallax/nave bora het.webp"
+        fetchpriority="low"
+        decoding="async"
+        class="space-bora-nave"
+        id="space-bora-nave"
+        alt=""
+        aria-hidden="true"
+      />
+      <img
+        src="parallax/piedra.webp"
+        fetchpriority="low"
+        decoding="async"
+        class="space-rock"
+        id="space-rock"
+        alt=""
+        aria-hidden="true"
+      />
+      <!-- Piedra naranja: mismo comportamiento que .space-rock (física de
+      choque en makeSpaceDrifter, ver script.js), pero con tres sprites -uno
+      quieta (piedra_naranja_1) y dos "en movimiento" (piedra_naranja_2/3)
+      que se alternan cada 2 segundos mientras está a la deriva. -->
+      <div class="space-rock-orange" id="space-rock-orange">
+        <img
+          src="parallax/piedra_naranja_1.webp"
+          fetchpriority="low"
+          decoding="async"
+          class="space-rock-orange-sprite space-rock-orange-rest"
+          alt=""
+          aria-hidden="true"
+        />
+        <img
+          src="parallax/piedra_naranja_2.webp"
+          fetchpriority="low"
+          decoding="async"
+          class="space-rock-orange-sprite space-rock-orange-move"
+          alt=""
+          aria-hidden="true"
+        />
+        <img
+          src="parallax/piedra_naranja_3.webp"
+          fetchpriority="low"
+          decoding="async"
+          class="space-rock-orange-sprite space-rock-orange-move-alt"
+          alt=""
+          aria-hidden="true"
+        />
+      </div>
+      <!-- Planeta violeta: sólo flota en el lugar (floatPlanet, igual que
+      .space-planet), 100px arriba de la piedra naranja -no es un drifter
+      en script.js: no choca con la nave ni se mueve de su lugar-. La nave
+      pasa por delante sola, sin código extra: #space-scene tiene z-index
+      250 y la nave (.in-space) 253, ver styles.css. -->
+      <img
+        src="parallax/planetavioleta.webp"
+        fetchpriority="low"
+        decoding="async"
+        class="space-planet-violeta"
+        id="space-planet-violeta"
+        alt=""
+        aria-hidden="true"
+      />
+      <img
+        src="parallax/piedra_2.webp"
+        fetchpriority="low"
+        decoding="async"
+        class="space-rock-2"
+        id="space-rock-2"
+        alt=""
+        aria-hidden="true"
+      />
+      <!-- Texto tipo BIOS de PC vieja: sólo el texto, sobre el fondo
+      estrellado que ya tiene la escena (nada de pantalla negra propia).
+      Cada <p> es un bloque separado para que el flex de .space-bios
+      (justify-content: space-between) los reparta a lo largo de casi
+      toda la altura, como si fueran las distintas líneas que va tirando
+      el POST al arrancar. -->
+      <div class="space-bios" id="space-bios" aria-hidden="true">
+        <p>
+          Award Modular Bios v4.51, An Energy Star Ally,<br />
+          Copyright (C) 1984-1994, Award Software, Inc.
+        </p>
+        <p>i486-DX2 CPU at 50 mhz</p>
+        <p>Memory Test: 3277 OK</p>
+        <p>
+          Award Plug and Play BIOS Extension v1.0<br />
+          Copyright (C) 1994, Award Software, Inc.<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;Detecting IDE Primary Master ... WDC-20<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;Detecting IDE Primary Slave ... None<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;Detecting IDE Secondary Master ... Generic
+          CD-ROM
+        </p>
+      </div>
+      <p class="space-empty-notice">БОТА НЕТ!</p>
+    </div>
+
+    <!-- Capa "delante de la nave": mismo mapa que #space-scene (recibe el
+    mismo transform de cámara cuadro a cuadro, ver script.js), pero con
+    z-index por encima de la nave principal -así astronauta y planeta
+    quedan siempre delante suyo, a diferencia del fondo/nave-bora que
+    quedan detrás. Ver comentario largo en .space-scene-front (styles.css)
+    para el porqué de este split. -->
+    <div class="space-scene-front" id="space-scene-front" aria-hidden="true">
+      <img
+        src="parallax/everyone planeta.webp"
+        fetchpriority="low"
+        decoding="async"
+        class="space-planet"
+        id="space-planet"
+        alt=""
+        aria-hidden="true"
+      />
+      <img
+        src="parallax/Astronauta.webp"
+        fetchpriority="low"
+        decoding="async"
+        class="space-astronaut"
+        id="space-astronaut"
+        alt=""
+        aria-hidden="true"
+      />
+    </div>
+
+    <!-- Escenario 3: se entra volando hacia abajo desde el borde inferior
+    del escenario principal (ver edges.bottom en scenes.main, script.js), lo
+    opuesto al escenario 2 (espacio profundo) que se entra por arriba.
+    "Fondo" (FONDO.webp, paisaje salmón con dos soles): detrás de la nave,
+    mismo z-index que #space-scene (250). -->
+    <div class="salmon-scene" id="salmon-scene" aria-hidden="true"></div>
+
+    <!-- "Fondo 2": delante de la nave, mismo patrón que #space-scene-front
+    (z-index 260, ver comentario largo ahí). FONDO2.webp es la silueta de
+    cerro en primer plano, transparente arriba del cerro -la nave se ve por
+    ahí y desaparece detrás de la parte opaca-. -->
+    <div class="salmon-scene-front" id="salmon-scene-front" aria-hidden="true">
+      <img
+        src="parallax/esc3/FONDO2.webp"
+        fetchpriority="low"
+        decoding="async"
+        class="salmon-fondo2"
+        alt=""
+        aria-hidden="true"
+      />
+    </div>
+
+    <!-- Escenario 4 (juego): se entra volando hacia la izquierda desde el
+    escenario principal (ver edges.left en scenes.main, script.js). Fondo
+    negro dividido en 4 cuadrantes vacíos, con un cuadrado negro en el medio
+    que aloja el segundero. Los polígonos que caen se dibujan en
+    #game-canvas (js/esc4-game.js), por encima del cuadrado y por detrás de
+    la nave. -->
+    <div class="game-scene" id="game-scene" aria-hidden="true">
+      <main class="game-grid">
+        <section class="game-cuadrante game-cuadrante--sup-izq"></section>
+        <section class="game-cuadrante game-cuadrante--sup-der"></section>
+        <section class="game-cuadrante game-cuadrante--inf-izq"></section>
+        <section class="game-cuadrante game-cuadrante--inf-der"></section>
+      </main>
+      <div class="game-cuadrado">
+        <span class="game-timer" id="game-timer">0.0</span>
+      </div>
+      <!-- Elección del modo al arrancar (esc4-game.js): tutorial, contra la PC,
+           dos jugadores en el mismo teclado u online. Se recorre con las
+           flechas, con el stick o la cruceta del joystick y con el mouse, y se
+           elige con enter, con E, con el boton A, con click o con su numero.
+           Cada opcion es un boton pero sin foco de teclado (tabindex -1): si no,
+           Espacio -alejar la camara- lo apretaria. Spaceport no tiene tildes ni
+           puntuacion. -->
+      <!-- Pausa (también con Escape y el botón de menú del joystick). Sin foco de
+           teclado: si no, Espacio (alejar la cámara) lo apretaría. -->
+      <button
+        class="game-menu"
+        id="game-menu"
+        type="button"
+        tabindex="-1"
+        hidden
+      >
+        menu
+      </button>
+      <div class="game-modo" id="game-modo" hidden>
+        <!-- Las cuatro en su propia columna: así todas miden lo mismo (la más
+             ancha) y arrancan a la misma altura, sin que el ancho dependa del
+             texto de controles de abajo, que cambia si hay un joystick. -->
+        <div class="game-modo-opciones">
+          <button
+            class="game-ayuda-paso game-modo-opcion visible"
+            type="button"
+            tabindex="-1"
+            data-elegir="tutorial"
+          >
+            <kbd class="game-tecla">1</kbd><span>tutorial</span>
+          </button>
+          <button
+            class="game-ayuda-paso game-modo-opcion visible"
+            type="button"
+            tabindex="-1"
+            data-elegir="pc"
+          >
+            <kbd class="game-tecla">2</kbd><span>contra la PC</span>
+          </button>
+          <button
+            class="game-ayuda-paso game-modo-opcion visible"
+            type="button"
+            tabindex="-1"
+            data-elegir="dos"
+          >
+            <kbd class="game-tecla">3</kbd><span>dos jugadores</span>
+          </button>
+          <button
+            class="game-ayuda-paso game-modo-opcion visible"
+            type="button"
+            tabindex="-1"
+            data-elegir="online"
+          >
+            <kbd class="game-tecla">4</kbd><span>online</span>
+          </button>
+          <!-- Solo con el juego adentro del portfolio (en un iframe): vuelve
+               al escenario principal. Si no, esc4-game.js la saca. -->
+          <button
+            class="game-ayuda-paso game-modo-opcion visible"
+            type="button"
+            tabindex="-1"
+            data-elegir="volver"
+          >
+            <kbd class="game-tecla">5</kbd><span>volver al sitio</span>
+          </button>
+        </div>
+        <!-- Online, antes de buscar: la clave (ver abrirClave en esc4-game.js).
+             Solo se juntan los que ponen la misma; vacia, con cualquiera. -->
+        <div class="game-modo-clave" id="game-modo-clave" hidden>
+          <p class="game-modo-estado">
+            clave<br /><small>la misma que tu rival<br />vacia para jugar con cualquiera</small>
+          </p>
+          <input
+            class="game-clave-campo"
+            id="game-clave"
+            type="text"
+            maxlength="16"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            aria-label="clave"
+          />
+          <p class="game-modo-estado">
+            <small>enter para buscar<br />esc para volver</small>
+          </p>
+        </div>
+        <!-- Online: mientras se conecta y busca rival (lo escribe esc4-game.js). -->
+        <p class="game-modo-estado" id="game-modo-estado" hidden></p>
+        <!-- Que dice esta opcion: lo escribe esc4-game.js en el span segun
+             cual este apuntada (ver PIE_MODO). Arranca con el de la primera.
+             data-ancho es el texto del tutorial: da el ancho del renglon (y
+             con eso el del menu), que asi no cambia al pasar de una opcion a
+             otra (ver .game-modo-controles en styles.css). -->
+        <p
+          class="game-modo-controles"
+          data-ancho="Aprender a jugar y practicar"
+        >
+          <span id="game-modo-controles">Aprender a jugar y practicar</span>
+        </p>
+      </div>
+      <!-- Instrucciones del arranque (esc4-game.js las muestra de a un paso y
+           marca .pulsada en lo que se aprieta de verdad). Hay dos versiones, la
+           del teclado y la del joystick (la elige según haya uno conectado). -->
+      <div class="game-ayuda" id="game-ayuda">
+        <div class="game-ayuda-modo" data-modo="teclado">
+          <p class="game-ayuda-paso">
+            <span>Para moverte usa</span>
+            <span class="game-teclas">
+              <kbd class="game-tecla game-tecla--arriba" data-tecla="up">
+                <svg viewBox="0 0 24 24"><path d="M12 5 20 18H4Z" /></svg>
+              </kbd>
+              <kbd class="game-tecla game-tecla--izquierda" data-tecla="left">
+                <svg viewBox="0 0 24 24"><path d="M12 5 20 18H4Z" /></svg>
+              </kbd>
+              <kbd class="game-tecla game-tecla--abajo" data-tecla="down">
+                <svg viewBox="0 0 24 24"><path d="M12 5 20 18H4Z" /></svg>
+              </kbd>
+              <kbd class="game-tecla game-tecla--derecha" data-tecla="right">
+                <svg viewBox="0 0 24 24"><path d="M12 5 20 18H4Z" /></svg>
+              </kbd>
+            </span>
+          </p>
+          <p class="game-ayuda-paso">
+            <span>Usa</span>
+            <kbd class="game-tecla game-tecla--shift" data-tecla="shift"
+              >shift</kbd
+            >
+            <span>para potenciar la velocidad</span>
+          </p>
+          <p class="game-ayuda-paso">
+            <span>Podes usar</span>
+            <kbd class="game-tecla game-tecla--espacio" data-tecla="space">
+              <svg viewBox="0 0 48 12"><path d="M3 2v7h42V2" /></svg>
+            </kbd>
+            <span>para ver mas lejos</span>
+          </p>
+        </div>
+        <div class="game-ayuda-modo" data-modo="joystick" hidden>
+          <p class="game-ayuda-paso">
+            <span>Para moverte usa</span>
+            <!-- El stick izquierdo: la palanca se mueve como el stick de verdad
+                 y se ilumina la flecha de la dirección a la que se lo empuja. -->
+            <span class="game-stick">
+              <i
+                class="game-stick-flecha game-stick-flecha--arriba"
+                data-tecla="up"
+              >
+                <svg viewBox="0 0 24 24"><path d="M12 5 20 18H4Z" /></svg>
+              </i>
+              <i
+                class="game-stick-flecha game-stick-flecha--izquierda"
+                data-tecla="left"
+              >
+                <svg viewBox="0 0 24 24"><path d="M12 5 20 18H4Z" /></svg>
+              </i>
+              <i
+                class="game-stick-flecha game-stick-flecha--abajo"
+                data-tecla="down"
+              >
+                <svg viewBox="0 0 24 24"><path d="M12 5 20 18H4Z" /></svg>
+              </i>
+              <i
+                class="game-stick-flecha game-stick-flecha--derecha"
+                data-tecla="right"
+              >
+                <svg viewBox="0 0 24 24"><path d="M12 5 20 18H4Z" /></svg>
+              </i>
+              <span class="game-stick-base"
+                ><span class="game-stick-palanca"></span
+              ></span>
+            </span>
+          </p>
+          <p class="game-ayuda-paso">
+            <span>Usa</span>
+            <kbd class="game-tecla game-tecla--boton" data-tecla="shift"
+              >RB</kbd
+            >
+            <span>para potenciar la velocidad</span>
+          </p>
+          <p class="game-ayuda-paso">
+            <span>Podes usar</span>
+            <kbd class="game-tecla game-tecla--boton" data-tecla="space"
+              >LT</kbd
+            >
+            <span>para ver mas lejos</span>
+          </p>
+        </div>
+      </div>
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <div class="starry-cohete-pair" id="starry-cohete-pair">
+      <img
+        src="parallax/cohete_fondo.webp"
+        class="starry-cohete starry-cohete-fondo"
+        alt=""
+      />
+
+      <!-- Fuego: lo dibuja script.js (updateShipFire) sólo mientras la nave se
+           mueve. Va entre el sprite de atrás y el de adelante. -->
+      <canvas
+        class="starry-cohete starry-cohete-fuego"
+        width="203"
+        height="300"
+        aria-hidden="true"
+      ></canvas>
+
+      <img
+        src="parallax/cohete.webp"
+        class="starry-cohete starry-cohete-top"
+        alt=""
+      />
+    </div>
+
+    <!-- Pantalla negra del escenario 4 (ver .game-tapa en styles.css): va por
+         encima de todo, nave incluida. -->
+    <div class="game-tapa" id="game-tapa" aria-hidden="true"></div>
+
+    <!-- Lo que tiene que quedar por encima de la nave (que va por encima de
+         toda la escena del juego): el menu de la pausa (esc4-game.js lo trae
+         aca al pausar, ver abrirPausa) y el cartel de salir del online. Con
+         .velo, el blur de la pausa (ver .game-capa en styles.css). -->
+    <div class="game-capa" id="game-capa">
+      <!-- Presentación: si el navegador todavía no deja sonar nada (nadie tocó
+           la página), espera un toque en la pantalla negra (ver
+           empezarPresentacion en esc4-game.js). Spaceport no tiene tildes. -->
+      <p class="game-presenta-toque" id="game-presenta-toque" hidden>
+        presiona cualquier tecla
+      </p>
+      <!-- Presentación, primera pantalla: el logo en el medio de la pantalla
+           negra (ver empezarPresentacion en esc4-game.js). -->
+      <img
+        src="logo agus.png"
+        class="game-presenta-logo"
+        id="game-presenta-logo"
+        alt=""
+        hidden
+      />
+      <!-- Online, con Escape o el boton de menu del joystick: el juego no se
+           puede frenar (el rival sigue), asi que solo pregunta si salir. Se
+           elige con LB y RB, la cruceta o el stick, las flechas del teclado o
+           el mouse, y se confirma con A, enter, E o click (ver abrirSalir en esc4-game.js).
+           Lleva game-modo para tener las mismas letras y opciones que el menu,
+           pero una al lado de la otra. Spaceport no tiene el signo de pregunta: ese
+           cae a la fuente de respaldo. -->
+      <div class="game-modo game-salir" id="game-salir" hidden>
+        <p class="game-salir-pregunta">Salir?</p>
+        <div class="game-modo-opciones">
+          <button
+            class="game-ayuda-paso game-modo-opcion visible"
+            type="button"
+            tabindex="-1"
+            data-salir="no"
+          >
+            <span>continuar</span>
+          </button>
+          <button
+            class="game-ayuda-paso game-modo-opcion visible"
+            type="button"
+            tabindex="-1"
+            data-salir="si"
+          >
+            <span>salir</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Carga en dos tiempos (ver "Carga" en styles.css):
+         1) Las capas del parallax se revelan todas juntas cuando están bajadas
+            y decodificadas (o a los 4 s como tope, por si alguna falla o tarda:
+            nunca queda oculto).
+         2) Recién con la página lista y el navegador desocupado se pide lo de
+            los escenarios que no se ven (html.escenas-listas), para que no le
+            compita al primer pantallazo. -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var revelar = function () {
+          root.classList.remove("cargando");
+        };
+        var capas = document.querySelectorAll(".parallax-footer img");
+        var listas = Array.prototype.map.call(capas, function (img) {
+          return img.decode
+            ? img.decode().catch(function () {})
+            : Promise.resolve();
+        });
+        Promise.all(listas).then(revelar);
+        setTimeout(revelar, 4000);
+
+        var escenas = function () {
+          root.classList.add("escenas-listas");
+        };
+        // Medidor de rendimiento (fps, tirones, memoria): solo con ?perf=1.
+        if (/[?&]perf=1\b/.test(location.search)) {
+          var perf = document.createElement("script");
+          perf.src = "js/perf-debug.js";
+          perf.defer = true;
+          document.body.appendChild(perf);
+        }
+        window.addEventListener("load", function () {
+          if (window.requestIdleCallback)
+            requestIdleCallback(escenas, { timeout: 3000 });
+          else setTimeout(escenas, 1500);
+        });
+      })();
+    </script>
+
+    <!-- defer: el HTML se pinta sin esperar a los scripts (que antes lo
+    frenaban, y typed.js —un CDN externo— iba en el medio: si tardaba, todo lo
+    demás también). Siguen ejecutándose en este mismo orden. El tipeo del año
+    está ahora en script.js, sin dependencias. -->
+    <script src="js/calidad.js" defer></script>
+    <script src="js/esc4-game.js" defer></script>
+    <script src="script.js" defer></script>
+    <script src="js/p7-pintura.js" defer></script>
+  </body>
+</html>
