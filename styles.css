@@ -853,8 +853,8 @@ html.entra-juego .game-cuadrado {
 }
 /* Pausa (Escape o el botón de menú del joystick, ver abrirPausa en
    esc4-game.js): todo queda quieto, en blanco y negro y un poco borroso (ver
-   .game-capa.velo), y el menú de modos aparece en el medio dentro de un
-   recuadro negro. El cartel de salir del online (.game-salir) usa el mismo
+   .game-capa.velo), y el menú de modos aparece en el medio, en su recuadro
+   negro. El cartel de salir del online (.game-salir) usa el mismo
    recuadro. */
 /* Las instrucciones del tutorial se esconden: si no, asoman bajo el recuadro. */
 .game-scene.en-pausa .game-ayuda {
@@ -877,14 +877,17 @@ html.entra-juego .game-cuadrado {
   -webkit-backdrop-filter: grayscale(1) blur(4px);
   backdrop-filter: grayscale(1) blur(1px);
 }
+/* El menú de modos va siempre dentro del recuadro negro (sin borde), al abrir
+   y en la pausa: al abrir, con las estrellas del fondo alrededor. */
+.game-modo {
+  padding: 2.6em 3.2em;
+  border-radius: 0.35em;
+  background: #000;
+}
 .game-modo.pausa,
 .game-salir {
   top: 50%;
   z-index: 4;
-  padding: 2.6em 3.2em;
-  border: 2px solid rgba(255, 255, 255, 0.55);
-  border-radius: 0.35em;
-  background: #000;
 }
 /* Las opciones de los submenús van más chicas que el menú de modos: del tamaño
    del "esc para cancelar" de cuando se busca rival (el 0.8em de
@@ -937,6 +940,44 @@ html.entra-juego .game-cuadrado {
 .game-modo-estado small {
   font-size: 0.8em;
   color: rgba(255, 255, 255, 0.55);
+}
+/* Online, escribiendo la clave (ver abrirClave en esc4-game.js): solo queda
+   el recuadro de la clave. */
+.game-modo.con-clave > :not(.game-modo-clave) {
+  display: none;
+}
+.game-modo-clave {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4em;
+}
+.game-modo-clave[hidden] {
+  display: none;
+}
+.game-clave-campo {
+  width: 12em;
+  padding: 0.3em 0;
+  border: 0;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.55);
+  background: transparent;
+  color: #fff;
+  caret-color: #fff;
+  font-family: Spaceport, ui-monospace, Consolas, monospace;
+  font-size: 1.25em;
+  letter-spacing: 0.2em;
+  text-align: center;
+  outline: none;
+  pointer-events: auto;
+}
+.game-clave-campo:focus {
+  border-bottom-color: #fff;
+}
+/* Durante la presentación no hay opción apuntada (ver apagarMenu en
+   esc4-game.js): el renglón de abajo se esconde pero sigue ocupando su lugar,
+   así el recuadro no cambia de alto cuando aparece. */
+.game-modo.sin-elegir .game-modo-controles {
+  visibility: hidden;
 }
 /* El renglón de abajo del menú (qué es la opción apuntada, o quién usa qué con
    dos jugadores) va del tamaño de los submenús: el del "esc para cancelar". */
@@ -1006,6 +1047,14 @@ html.entra-juego .game-cuadrado {
 .starry-cohete-pair.in-game.color-rival {
   filter: drop-shadow(0 0 5px rgba(255, 90, 90, 0.95))
     drop-shadow(0 0 14px rgba(255, 90, 90, 0.55));
+}
+/* Calidad baja (js/calidad.js): un solo halo, el cercano, que es el que dice
+   el color; el ancho y tenue es el que más cuesta. */
+html[data-calidad="baja"] .starry-cohete-pair.in-game.multijugador {
+  filter: drop-shadow(0 0 5px rgba(90, 169, 255, 0.95));
+}
+html[data-calidad="baja"] .starry-cohete-pair.in-game.color-rival {
+  filter: drop-shadow(0 0 5px rgba(255, 90, 90, 0.95));
 }
 /* Recién vuelta de un golpe: parpadea bajando la opacidad (invulnerable). Va en
    los hijos porque la opacidad de la caja la escribe script.js en cada cuadro. */
@@ -1600,6 +1649,9 @@ html.entra-juego .game-cuadrado {
   --nave-luz-halo: drop-shadow(0 0 8px rgba(var(--luz-rgb, 255, 159, 154), 0.3))
     drop-shadow(0 0 20px rgba(var(--luz-rgb, 255, 159, 154), 0.15));
 }
+html[data-calidad="baja"] .starry-cohete-pair {
+  --nave-luz-halo: drop-shadow(0 0 8px rgba(var(--luz-rgb, 255, 159, 154), 0.4));
+}
 /* Luz de la nave, igual en todos los escenarios: además del resplandor del
    sprite (--nave-luz-halo), un degradado grande y suave alrededor de la nave (el
    mismo que dibuja el escenario 4 sobre su fondo, luzSprite en esc4-game.js: 4
@@ -1648,20 +1700,26 @@ html.entra-juego .game-cuadrado {
 .starry-cohete-pair.in-game {
   z-index: 253;
 }
-/* Acá la nave es blanco y negro (ver el filtro #nave-gris en index.html) pero su
+/* Acá la nave es blanco y negro (saturate: --nave-sat, que sube
+   js/esc4-game.js a medida que la nave se colorea) pero su
    luz es la de siempre (salmón). Por eso el filtro va
    en cada sprite y no en la caja: uno en la caja también volvería gris el
    resplandor. El de .starry-cohete-fondo lo pone script.js junto con el
    drop-shadow (ver scenes.game.light). */
 .starry-cohete-pair.in-game .starry-cohete-top,
 .starry-cohete-pair.in-game .starry-cohete-fuego {
-  filter: url(#nave-gris);
+  filter: saturate(var(--nave-sat, 0));
 }
 /* Solo apagada se ve oscura: con la luz prendida (script.js le pone luz-on a
-   la nave) el gris se levanta. */
+   la nave) el gris se levanta: cada canal pasa a 1,4 x + 0,1 (a color completo,
+   x tal cual; lo calcula esc4-game.js, ver aplicarColorNave). contrast y
+   brightness juntos hacen justo esa cuenta. Antes era un filtro SVG, que el
+   navegador recalcula en el procesador y en cada cuadro (el fuego es un canvas
+   que se redibuja siempre); estos los resuelve la placa de video. */
 .starry-cohete-pair.in-game.luz-on .starry-cohete-top,
 .starry-cohete-pair.in-game.luz-on .starry-cohete-fuego {
-  filter: url(#nave-gris-luz);
+  filter: saturate(var(--nave-sat, 0)) contrast(var(--nave-luz-c, 0.875))
+    brightness(var(--nave-luz-b, 1.6));
 }
 /* Intro del escenario 4: la nave llega a color y con la luz apagada, y sigue
    a color mientras la pantalla negra (.game-tapa) cae encima; esc4-game.js le

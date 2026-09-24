@@ -79,49 +79,6 @@
           yChannelSelector="G"
         />
       </filter>
-      <!-- Nave del escenario 4 (ver .in-game en styles.css): blanco y negro, sin
-           sombra. La saturación (#nave-sat-off / #nave-sat-luz) arranca en 0 y
-           la sube js/esc4-game.js a medida que la nave se colorea. -->
-      <filter
-        id="nave-gris"
-        x="0"
-        y="0"
-        width="100%"
-        height="100%"
-        color-interpolation-filters="sRGB"
-      >
-        <feColorMatrix
-          id="nave-sat-off"
-          in="SourceGraphic"
-          type="saturate"
-          values="0"
-        />
-      </filter>
-      <!-- Lo mismo con la luz de la nave prendida (.luz-on): el gris se
-           levanta -solo apagada se ve oscura-. Ese levantado (nave-luz-r/g/b)
-           lo va bajando js/esc4-game.js a medida que la nave se colorea, hasta
-           dejarla como el sprite original (igual que en el index). -->
-      <filter
-        id="nave-gris-luz"
-        x="0"
-        y="0"
-        width="100%"
-        height="100%"
-        color-interpolation-filters="sRGB"
-      >
-        <feColorMatrix
-          id="nave-sat-luz"
-          in="SourceGraphic"
-          type="saturate"
-          values="0"
-          result="gris0"
-        />
-        <feComponentTransfer in="gris0">
-          <feFuncR id="nave-luz-r" type="linear" slope="1.4" intercept="0.1" />
-          <feFuncG id="nave-luz-g" type="linear" slope="1.4" intercept="0.1" />
-          <feFuncB id="nave-luz-b" type="linear" slope="1.4" intercept="0.1" />
-        </feComponentTransfer>
-      </filter>
     </svg>
     <div class="site-content" id="site-content">
       <nav id="main-nav">
@@ -564,6 +521,26 @@
             <kbd class="game-tecla">4</kbd><span>online</span>
           </button>
         </div>
+        <!-- Online, antes de buscar: la clave (ver abrirClave en esc4-game.js).
+             Solo se juntan los que ponen la misma; vacia, con cualquiera. -->
+        <div class="game-modo-clave" id="game-modo-clave" hidden>
+          <p class="game-modo-estado">
+            clave<br /><small>la misma que tu rival<br />vacia para jugar con cualquiera</small>
+          </p>
+          <input
+            class="game-clave-campo"
+            id="game-clave"
+            type="text"
+            maxlength="16"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            aria-label="clave"
+          />
+          <p class="game-modo-estado">
+            <small>enter para buscar<br />esc para volver</small>
+          </p>
+        </div>
         <!-- Online: mientras se conecta y busca rival (lo escribe esc4-game.js). -->
         <p class="game-modo-estado" id="game-modo-estado" hidden></p>
         <!-- Que dice esta opcion: lo escribe esc4-game.js en el span segun
@@ -790,6 +767,7 @@
     frenaban, y typed.js —un CDN externo— iba en el medio: si tardaba, todo lo
     demás también). Siguen ejecutándose en este mismo orden. El tipeo del año
     está ahora en script.js, sin dependencias. -->
+    <script src="js/calidad.js" defer></script>
     <script src="js/esc4-game.js" defer></script>
     <script src="script.js" defer></script>
     <script src="js/p7-pintura.js" defer></script>

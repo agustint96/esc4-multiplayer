@@ -1948,6 +1948,7 @@ function drawStars() {
       }
     };
     const GAMEPAD_DEADZONE = 0.2;
+    const GAMEPAD_FULL = 0.95; // desde acá el stick cuenta como a fondo (muchos no llegan a 1)
     const GAMEPAD_THRUST_BASE = 0.3; // velocidad normal del stick/flechitas
     const GAMEPAD_THRUST_BOOST = 0.6; // velocidad con RB apretado
     const GAMEPAD_DAMPING = 0.9;
@@ -1965,10 +1966,23 @@ function drawStars() {
       for (let k = 0; k < pads.length; k++) if (pads[k]) return pads[k];
       return null;
     }
-    function applyDeadzone(v) {
-      if (Math.abs(v) < GAMEPAD_DEADZONE) return 0;
-      const sign = v < 0 ? -1 : 1;
-      return sign * ((Math.abs(v) - GAMEPAD_DEADZONE) / (1 - GAMEPAD_DEADZONE));
+    // El stick, llevado a lo mismo que dan las flechas: a fondo empuja igual
+    // que el teclado en cualquier dirección, también en diagonal (las flechas
+    // dan (1, 1) y el stick, que tiene la base redonda, llegaba a ~(0,7, 0,7)).
+    // La zona muerta va sobre la inclinación total y no eje por eje (eje por eje
+    // se comía el 20 % dos veces en la diagonal), y desde GAMEPAD_FULL ya es a
+    // fondo. Después, del círculo al cuadrado: se estira hasta que el eje más
+    // inclinado valga lo que la inclinación. A medio camino sigue yendo más
+    // despacio. Lo mismo hace stickNave en esc4-game.js (jugador 2).
+    function stickShip(x, y) {
+      const m = Math.hypot(x, y);
+      if (m < GAMEPAD_DEADZONE) return [0, 0];
+      const fuerza = Math.min(
+        1,
+        (m - GAMEPAD_DEADZONE) / (GAMEPAD_FULL - GAMEPAD_DEADZONE),
+      );
+      const k = fuerza / Math.max(Math.abs(x), Math.abs(y));
+      return [x * k, y * k];
     }
 
     (document.addEventListener("mousemove", (t) => {
@@ -2026,8 +2040,7 @@ function drawStars() {
         gamepadActive = false;
         gamepadMapViewT = 0;
         if (gp) {
-          gx = applyDeadzone(gp.axes[0] || 0);
-          gy = applyDeadzone(gp.axes[1] || 0);
+          [gx, gy] = stickShip(gp.axes[0] || 0, gp.axes[1] || 0);
 
           if (isPressed(gp, BTN_DPAD_LEFT)) gx = -1;
           else if (isPressed(gp, BTN_DPAD_RIGHT)) gx = 1;
@@ -2209,6 +2222,7 @@ function drawStars() {
           if (daVuelta) {
             e = vMax - (vMin - e);
             window.shipVueltas = (window.shipVueltas || 0) + 1; // esc4-game.js las cuenta
+            window.shipVueltaLado = -1; // y el lado por el que salió (ver anotarVuelta)
           } else {
             e = minX;
             n = 0;
@@ -2218,6 +2232,7 @@ function drawStars() {
           if (daVuelta) {
             e = vMin + (e - vMax);
             window.shipVueltas = (window.shipVueltas || 0) + 1;
+            window.shipVueltaLado = 1;
           } else {
             e = maxX;
             n = 0;

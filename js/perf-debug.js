@@ -5,6 +5,7 @@
 //   tareas     tareas largas (>50 ms) acumuladas: cantidad y ms totales
 //   heap       memoria de JS (solo Chrome/Edge)
 //   escena     el escenario en el que está la nave
+//   calidad    el nivel que eligió js/calidad.js (baja, media o alta)
 //   red, recib, hueco, ping   solo online: ver red() abajo
 // Para comparar antes/después de un cambio: mismo recorrido, mismo navegador.
 (function () {
@@ -64,6 +65,7 @@
         "\ntareas " + largas + " (" + Math.round(largasMs) + " ms)" +
         "\nheap   " + heap +
         "\nescena " + escena +
+        "\ncalidad " + (window.calidad ? window.calidad.nivel : "?") +
         red(ahora - desde);
       frames = 0;
       peor = 0;

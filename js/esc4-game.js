@@ -37,8 +37,8 @@
 // intro y en el final (solo decoración, no se chocan). En distintos puntos del mapa aparecen agujeros de
 // gusano de a pares: un circulito de estrellas con brillo girando muy rápido,
 // con el centro negro. Al entrar en uno la nave sale por el otro, y cada pasaje
-// la va pintando de color (sube la saturación de su filtro, ver
-// #nave-sat-off/#nave-sat-luz en index.html) hasta quedar con todos sus
+// la va pintando de color (sube la saturación de su filtro, ver --nave-sat
+// en styles.css y aplicarColorNave) hasta quedar con todos sus
 // colores: los agujeros hacen el mismo recorrido, arrancan blancos y terminan
 // naranja (el del parallax 7). Al perder todo vuelve a blanco y negro.
 //
@@ -133,6 +133,7 @@
   const AYUDA_ESPERA = 1; // segundos que se espera, ya usadas las teclas, antes de desvanecer el paso
   const AYUDA_FUNDIDO = 0.6; // segundos que tarda en desvanecerse un paso (igual que la transición de .game-ayuda-paso en styles.css)
   const AYUDA_VOZ_MAX = 6; // segundos: si una voz no termina (ej. el audio está bloqueado) no se la espera más
+  const LISTO_CARGA_MAX = 8; // segundos: lo más que se espera a que carguen las voces para decir "listo" (ver empezarArranque)
   // Qué teclas hay que apretar en cada paso (ver #game-ayuda en index.html: cada
   // tecla dibujada tiene su data-tecla). Las flechas y WASD valen lo mismo, como
   // en script.js.
@@ -562,6 +563,10 @@
     "drop-shadow(0 0 5px rgba(255, 90, 90, 0.95)) drop-shadow(0 0 14px rgba(255, 90, 90, 0.55))";
   const HALO_AZUL =
     "drop-shadow(0 0 5px rgba(90, 169, 255, 0.95)) drop-shadow(0 0 14px rgba(90, 169, 255, 0.55))";
+  // En calidad baja (js/calidad.js), solo el cercano, como la nave del jugador.
+  const HALO_ROJO_BAJA = "drop-shadow(0 0 5px rgba(255, 90, 90, 0.95))";
+  const HALO_AZUL_BAJA = "drop-shadow(0 0 5px rgba(90, 169, 255, 0.95))";
+  const calidadBaja = () => !!window.calidad && window.calidad.nivel === "baja";
 
   const scene = document.getElementById("game-scene");
   const canvas = document.getElementById("game-canvas");
@@ -668,6 +673,13 @@
   let introBuffer = null; // audio/Esc4/game sound/nivel4_intro.m4a decodificado
   let introGain = null;
   let introFuente = null; // fuente sonando ahora (o null)
+  // Se pidió la música del juego (o la de las instrucciones) antes de que
+  // terminara de cargar -pasa al entrar a un modo apenas abierta la página, ver
+  // reiniciarEnModo-: arranca apenas está (ver cargarMusica). frenarMusica y
+  // frenarMusicaIntro lo cancelan.
+  let musicaPendiente = false;
+  let introPendiente = false;
+  let vocesCargadas = false; // ya se decodificaron todas las voces
   let musicaIntro = null; // <audio> de respaldo
   // Instrucciones: null fuera de ellas, si no { modo, paso, fase, t, hechas }
   // (modo: la versión que se muestra, de modosAyuda). fase:
@@ -713,9 +725,11 @@
   const estrellasPorGrupo = GRUPOS_ESTRELLAS.map((_, g) =>
     estrellas.filter((e) => e.grupo === g),
   );
-  // px que quedaron corridas las estrellas para la izquierda: las corre la
-  // cámara de la presentación, y quedan así (si no, al terminar saltarían).
+  // px que quedaron corridas las estrellas para la izquierda (ver correrFondo).
+  // Dan la vuelta dentro del mismo ancho en el que nacen (el de la pantalla
+  // más ESTRELLAS_MARGEN de cada lado), así sin correr quedan donde nacieron.
   let estrellasCorridas = 0;
+  const ESTRELLAS_MARGEN = 0.12; // fracción del ancho, de cada lado
   let gusanoSprites = null; // anillos de los agujeros ya dibujados con brillo (ver armarSprites)
   let luzSprites = null; // la luz de la nave ya dibujada (degradado), en blanco y en salmón
   let cumulos = []; // cúmulos de estrellas azules en el mapa
@@ -727,16 +741,10 @@
   let colorNave = 0; // 0 = blanco y negro ... 1 = todos sus colores (lo que se ve)
   let colorObjetivo = 0; // hacia dónde va colorNave
   let colorEscalon = 0; // último escalón aplicado al filtro (ver aplicarColorNave)
-  // Primitivas de saturación de los filtros de la nave (index.html).
-  const satNave = ["nave-sat-off", "nave-sat-luz"]
-    .map((id) => document.getElementById(id))
-    .filter(Boolean);
-  // Levantado de brillo del filtro de la nave con la luz prendida (index.html):
-  // a color completo tiene que quedar sin tocar (slope 1, intercept 0) para que
-  // se vea como el sprite original, igual que en el index.
-  const luzNave = ["nave-luz-r", "nave-luz-g", "nave-luz-b"]
-    .map((id) => document.getElementById(id))
-    .filter(Boolean);
+  // Levantado de brillo del filtro de la nave con la luz prendida (styles.css,
+  // .luz-on): cada canal pasa a slope * x + intercept. A color completo tiene
+  // que quedar sin tocar (slope 1, intercept 0) para que se vea como el sprite
+  // original, igual que en el index.
   const LUZ_SLOPE_GRIS = 1.4;
   const LUZ_INTERCEPT_GRIS = 0.1;
   let enCentro = false; // la partida arrancó recolocando la nave: se la sostiene en el medio durante la gracia
@@ -835,6 +843,14 @@
       if (ev.code !== "Escape" && !ev.repeat) tocarEspera();
       return;
     }
+    if (claveAbierta()) {
+      // Escribiendo la clave, con el campo sin foco (se hizo click afuera):
+      // lo que se escribe en él no llega acá (ver claveCampo más abajo).
+      if (ev.code === "Enter" || ev.code === "NumpadEnter") buscarConClave();
+      else if (ev.code === "Escape") cerrarClave();
+      else claveCampo.focus();
+      return;
+    }
     if (modo && ev.code === "Escape") {
       alternarPausa();
     } else if (pausa === "salir") {
@@ -853,7 +869,10 @@
       const MODOS = { 1: "tutorial", 2: "pc", 3: "dos", 4: "online" };
       const n = /^(?:Digit|Numpad)([1-4])$/.exec(ev.code);
       const flecha = FLECHA_DE[ev.code];
-      if (n) elegirModo(MODOS[n[1]]);
+      if (n) {
+        sonarMenu("seleccion");
+        elegirModo(MODOS[n[1]]);
+      }
       else if (flecha === "ArrowUp" || flecha === "ArrowDown") {
         apuntarOpcion(opcionApuntada + (flecha === "ArrowDown" ? 1 : -1));
         ev.preventDefault(); // que no scrollee la página detrás
@@ -923,7 +942,10 @@
     pausarSonidos(true);
     scene.classList.add("en-pausa");
     // El menú arranca apuntando al modo que se está jugando.
-    apuntarOpcion(opcionesModo.findIndex((el) => el.dataset.elegir === modo));
+    apuntarOpcion(
+      opcionesModo.findIndex((el) => el.dataset.elegir === modo),
+      true,
+    );
     sincronizarPadMenu();
     if (capaEl) capaEl.classList.add("velo");
     if (modoEl) {
@@ -938,7 +960,7 @@
 
   function abrirSalir() {
     pausa = "salir";
-    apuntarSalir(0); // arranca en continuar
+    apuntarSalir(0, true); // arranca en continuar
     const gp = primerJoystick();
     padSalirLR = !!gp && (botonPad(gp, PAD_LB) || botonPad(gp, PAD_RB));
     padSalirA = !!gp && botonPad(gp, PAD_A);
@@ -1003,23 +1025,37 @@
         JSON.stringify({ modo: m, cambiados: controlesCambiados }),
       );
     } catch (e) {}
-    salirAlMenu();
+    recargarTrasSeleccion();
   }
 
-  // Las dos opciones del cartel de salir; da la vuelta.
-  function apuntarSalir(i) {
+  // Recarga la página (salirAlMenu) después de dejar sonar la "seleccion".
+  // Una sola vez: lo que se apriete mientras tanto no la vuelve a pedir.
+  let recargando = false;
+  function recargarTrasSeleccion() {
+    if (recargando) return;
+    recargando = true;
+    setTimeout(salirAlMenu, SELECCION_ANTES_DE_RECARGAR);
+  }
+
+  // Las dos opciones del cartel de salir; da la vuelta. Con los mismos sonidos
+  // que el menú de modos (callado al abrir el cartel).
+  function apuntarSalir(i, callado) {
     const n = opcionesSalir.length;
     if (!n) return;
-    salirApuntada = ((i % n) + n) % n;
+    const nueva = ((i % n) + n) % n;
+    const cambio = nueva !== salirApuntada;
+    salirApuntada = nueva;
     opcionesSalir.forEach((el, j) =>
       el.classList.toggle("elegida", j === salirApuntada),
     );
+    if (cambio && !callado) sonarMenu("selector");
   }
 
   function elegirSalir() {
     const el = opcionesSalir[salirApuntada];
     if (!el) return;
-    if (el.dataset.salir === "si") salirAlMenu();
+    sonarMenu("seleccion");
+    if (el.dataset.salir === "si") recargarTrasSeleccion();
     else cerrarPausa();
   }
 
@@ -1110,20 +1146,99 @@
   // con LB o RB, parado en "dos jugadores" (ver cambiarControles).
   let controlesCambiados = false;
 
+  // --- Sonidos del menú --------------------------------------------------------
+  // "selector" suena al pasar de una opción a otra (flechas, stick, cruceta o
+  // mouse; no cuando la apunta el juego solo) y "seleccion" al elegir una. Van
+  // por un AudioContext propio: el del juego se suspende en la pausa (ver
+  // pausarSonidos) y el menú de la pausa también tiene que sonar.
+  const SONIDOS_MENU = {
+    selector: {
+      url: "audio/Esc4/game sound/selector.mp3",
+      volumen: 0.12,
+      desde: 0,
+    },
+    // El archivo arranca con ~0,25 s de silencio: se lo saltea, así suena
+    // justo al elegir.
+    seleccion: {
+      url: "audio/Esc4/game sound/seleccion.mp3",
+      volumen: 0.15,
+      desde: 0.24,
+    },
+  };
+  // Elegir desde la pausa recarga la página (ver reiniciarEnModo): se espera
+  // esto antes de recargar, para que "seleccion" llegue a sonar.
+  const SELECCION_ANTES_DE_RECARGAR = 500; // ms
+  let menuCtx = null;
+
+  function cargarSonidosMenu() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    try {
+      menuCtx = new AC();
+    } catch (e) {
+      return;
+    }
+    for (const sonido of Object.values(SONIDOS_MENU)) {
+      sonido.gain = menuCtx.createGain();
+      sonido.gain.gain.value = sonido.volumen;
+      sonido.gain.connect(menuCtx.destination);
+      fetch(sonido.url)
+        .then((r) => r.arrayBuffer())
+        .then((datos) => menuCtx.decodeAudioData(datos))
+        .then((buffer) => (sonido.buffer = buffer))
+        .catch(() => {});
+    }
+  }
+
+  function sonarMenu(nombre) {
+    const sonido = SONIDOS_MENU[nombre];
+    if (!menuCtx || !sonido.buffer) return;
+    if (menuCtx.state !== "running") {
+      // Sin ningún toque en la página no se pide: si no, se encola y suena
+      // todo junto con el primer toque (ver sinToque).
+      if (!(navigator.userActivation && navigator.userActivation.hasBeenActive))
+        return;
+      menuCtx.resume().catch(() => {});
+    }
+    const fuente = menuCtx.createBufferSource();
+    fuente.buffer = sonido.buffer;
+    fuente.connect(sonido.gain);
+    fuente.start(0, sonido.desde);
+  }
+
+  // Durante la presentación el menú se ve pero sin ninguna opción apuntada (ni
+  // el renglón de abajo, que dice de qué se trata): recién cuando se va la nave
+  // se apunta la primera, con su "selector" (ver terminarPresentacion).
+  let menuApagado = false;
+  function apagarMenu() {
+    menuApagado = true;
+    opcionesModo.forEach((el) => el.classList.remove("elegida"));
+    if (modoEl) modoEl.classList.add("sin-elegir");
+  }
+
   // Apunta una opción; da la vuelta en los dos sentidos (de la última a la
-  // primera y al revés).
-  function apuntarOpcion(i) {
+  // primera y al revés). Si cambia, suena el "selector", salvo callado (cuando
+  // la apunta el juego y no la persona: al abrir la pausa, al volver al menú).
+  function apuntarOpcion(i, callado) {
     const n = opcionesModo.length;
     if (!n) return;
-    opcionApuntada = ((i % n) + n) % n;
+    const nueva = ((i % n) + n) % n;
+    const cambio = nueva !== opcionApuntada || menuApagado;
+    opcionApuntada = nueva;
+    menuApagado = false;
+    if (modoEl) modoEl.classList.remove("sin-elegir");
     opcionesModo.forEach((el, j) =>
       el.classList.toggle("elegida", j === opcionApuntada),
     );
+    if (cambio && !callado) sonarMenu("selector");
   }
 
-  function elegirApuntada() {
+  // callado: la elige el juego (al volver de la recarga con el modo que se
+  // había elegido en la pausa, que ya sonó).
+  function elegirApuntada(callado) {
     const el = opcionesModo[opcionApuntada];
-    if (el) elegirModo(el.dataset.elegir);
+    if (!el) return;
+    if (!callado) sonarMenu("seleccion");
+    elegirModo(el.dataset.elegir);
   }
 
   // Da vuelta quién usa el joystick y quién el teclado: con LB, RB o el stick
@@ -1164,7 +1279,7 @@
     // joystick siguen desde donde quedó el cursor y no desde otro lado.
     el.addEventListener("pointerenter", () => apuntarOpcion(i));
   });
-  apuntarOpcion(0);
+  apuntarOpcion(0, true);
 
   // Lo que en el joystick da vuelta los lados (ver cambiarControles).
   const cambiaLados = (gp, joy) =>
@@ -1236,11 +1351,110 @@
     padMenuLRT = MENU_PAD_ESPERA;
   }
 
+  // --- Clave del online -------------------------------------------------------
+  // Al elegir online se pide una clave: el emparejador solo junta a los que
+  // pusieron la misma (ver servidor/), y vacía es con cualquiera, como antes.
+  // null mientras no se eligió (la pide elegirModo), "" sin clave. La última
+  // que se usó queda escrita para la próxima (en este navegador).
+  const claveEl = document.getElementById("game-modo-clave");
+  const claveCampo = document.getElementById("game-clave");
+  const CLAVE_GUARDADA = "esc4-clave";
+  let clave = null;
+  let padMenuB = false; // si el botón B venía apretado (escribiendo la clave)
+  const claveAbierta = () => !!claveEl && !claveEl.hidden;
+
+  // Minúsculas, solo letras y números (Spaceport no tiene tildes ni eñe),
+  // hasta 16: lo mismo que hace el servidor, así se ve la clave tal cual viaja.
+  function limpiarClave(s) {
+    return (s || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
+  }
+
+  function abrirClave() {
+    if (!claveEl || !claveCampo) {
+      clave = "";
+      elegirModo("online");
+      return;
+    }
+    if (!claveCampo.value) {
+      try {
+        claveCampo.value = limpiarClave(localStorage.getItem(CLAVE_GUARDADA));
+      } catch (e) {}
+    }
+    modoEl.classList.add("con-clave");
+    claveEl.hidden = false;
+    // El foco recién después de esta tecla: si no, la que abrió la clave (el
+    // 4, la E) se escribiría en el campo.
+    setTimeout(() => {
+      if (!claveAbierta()) return;
+      claveCampo.focus();
+      claveCampo.select();
+    }, 0);
+    const gp = primerJoystick();
+    padMenuB = !!gp && botonPad(gp, PAD_B);
+  }
+
+  function cerrarClave() {
+    if (!claveAbierta()) return;
+    claveEl.hidden = true;
+    modoEl.classList.remove("con-clave");
+    claveCampo.blur();
+  }
+
+  function buscarConClave() {
+    clave = limpiarClave(claveCampo.value);
+    try {
+      localStorage.setItem(CLAVE_GUARDADA, clave);
+    } catch (e) {}
+    cerrarClave();
+    elegirModo("online");
+  }
+
+  if (claveCampo) {
+    claveCampo.addEventListener("input", () => {
+      const limpia = limpiarClave(claveCampo.value);
+      if (limpia !== claveCampo.value) claveCampo.value = limpia;
+    });
+    // Lo que se escribe es para la clave: no le llega al resto del juego (ni
+    // al menú, que con los números elige un modo, ni a la nave).
+    claveCampo.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      if (ev.code === "Enter" || ev.code === "NumpadEnter") {
+        sonarMenu("seleccion");
+        buscarConClave();
+      } else if (ev.code === "Escape") {
+        sonarMenu("selector");
+        cerrarClave();
+      }
+    });
+  }
+
+  // Joystick escribiendo la clave: con él no se puede escribir, pero A busca
+  // con lo que haya (vacía, con cualquiera) y B vuelve al menú. Por flanco.
+  function navegarClaveJoystick() {
+    const gp = primerJoystick();
+    const a = !!gp && botonPad(gp, PAD_A);
+    const b = !!gp && botonPad(gp, PAD_B);
+    if (a && !padMenuA) {
+      sonarMenu("seleccion");
+      buscarConClave();
+    } else if (b && !padMenuB) {
+      sonarMenu("selector");
+      cerrarClave();
+    }
+    padMenuA = a;
+    padMenuB = b;
+  }
+
   function elegirModo(m) {
     // Con un modo ya en juego, el menú solo se ve en la pausa: ahí elegir
     // arranca ese modo de cero.
     if (modo) {
       reiniciarEnModo(m);
+      return;
+    }
+    // Online, primero la clave (ver abrirClave): al buscar vuelve acá.
+    if (m === "online" && clave === null) {
+      abrirClave();
       return;
     }
     modo = m;
@@ -1350,12 +1564,18 @@
     el.innerHTML = texto;
   }
 
-  // Igual que applyDeadzone en script.js: sin respuesta hasta el 20 % y de ahí
-  // el recorrido completo, así el stick del jugador 2 responde como el del 1.
-  function zonaMuerta(v) {
+  // Igual que stickShip en script.js, así el stick del jugador 2 responde como
+  // el del 1: a fondo empuja igual que las flechas en cualquier dirección (en
+  // diagonal también), con la zona muerta sobre la inclinación total. Devuelve
+  // [x, y].
+  function stickNave(x, y) {
     const ZONA = 0.2;
-    if (Math.abs(v) < ZONA) return 0;
-    return Math.sign(v) * ((Math.abs(v) - ZONA) / (1 - ZONA));
+    const A_FONDO = 0.95;
+    const m = Math.hypot(x, y);
+    if (m < ZONA) return [0, 0];
+    const fuerza = Math.min(1, (m - ZONA) / (A_FONDO - ZONA));
+    const k = fuerza / Math.max(Math.abs(x), Math.abs(y));
+    return [x * k, y * k];
   }
   // La nave de la PC se arma igual que la del jugador en index.html: el sprite
   // de atrás, el fuego y el de adelante (cohete_on: en el juego la luz va
@@ -1482,8 +1702,13 @@
           prev.recargando = true;
         }
         const spr = spriteEstela(destino);
-        const n = Math.max(1, Math.round(d / ESTELA_PASO));
+        // En calidad baja, la mitad de bocanadas (el doble de separadas), cada
+        // una con la opacidad de dos superpuestas: se ve igual de densa y se
+        // dibuja la mitad.
+        const baja = calidadBaja();
+        const n = Math.max(1, Math.round(d / (ESTELA_PASO * (baja ? 2 : 1))));
         for (let i = 1; i <= n; i++) {
+          const a0 = 0.07 + Math.random() * 0.04;
           estela.push({
             x: prev.x + (dx * i) / n,
             y: prev.y + (dy * i) / n,
@@ -1493,7 +1718,7 @@
             life: 7 + Math.random() * 5,
             r0: (4 + Math.random() * 2) * esc,
             r1: (24 + Math.random() * 20) * esc,
-            a0: 0.07 + Math.random() * 0.04,
+            a0: baja ? 1 - (1 - a0) * (1 - a0) : a0,
             spr,
           });
         }
@@ -1864,6 +2089,7 @@
       } catch (e) {
         introBuffer = null;
       }
+      if (introBuffer && introPendiente) iniciarMusicaIntro();
       for (const { url } of MUSICA_FUENTES) {
         try {
           musicaBuffer = await decodificar(url);
@@ -1872,6 +2098,7 @@
           musicaBuffer = null;
         }
       }
+      if (musicaBuffer && musicaPendiente) iniciarMusica();
       try {
         notaBuffer = await decodificar(NOTA_URL);
       } catch (e) {
@@ -1907,6 +2134,9 @@
       musicaIntro.loop = true;
       musicaIntro.volume = MUSICA_VOLUMEN;
     }
+    // Sin Web Audio (o si no se pudo decodificar), con los <audio> de respaldo.
+    if (musicaPendiente) iniciarMusica();
+    if (introPendiente) iniciarMusicaIntro();
     if (!perderBuffer) {
       perder = new Audio(PERDER_URL);
       perder.volume = PERDER_VOLUMEN;
@@ -1949,6 +2179,7 @@
         }
       }),
     );
+    vocesCargadas = true;
   }
 
   const alAzar = (lista) => lista[Math.floor(Math.random() * lista.length)];
@@ -2167,7 +2398,7 @@
     } else if (musica) {
       musica.currentTime = 0;
       musica.play().catch(() => {}); // puede bloquearla si aún no hubo interacción
-    }
+    } else musicaPendiente = true; // todavía cargando: arranca al terminar
   }
 
   // Velocidad de la música según cuánto lleva sonando. Con Web Audio cambia
@@ -2224,12 +2455,13 @@
     } else if (musicaIntro) {
       musicaIntro.currentTime = 0;
       musicaIntro.play().catch(() => {});
-    }
+    } else introPendiente = true; // todavía cargando: arranca al terminar
   }
 
   // Con fundido = true se va apagando de a poco (al pasar a la música del
   // juego); si no, se corta de golpe.
   function frenarMusicaIntro(fundido) {
+    introPendiente = false;
     const fuente = introFuente;
     introFuente = null;
     if (fuente) {
@@ -2254,6 +2486,7 @@
   }
 
   function frenarMusica() {
+    musicaPendiente = false;
     if (musicaFuente) {
       try {
         musicaFuente.stop();
@@ -2421,7 +2654,11 @@
   function empezarArranque() {
     if (!rival && !esTutorial()) crearRival();
     ayuda = { modo: null, paso: 0, fase: "listo", t: 0, hechas: new Set() };
-    decirVoz(alAzar(vocesListo));
+    // Recién abierta la página (se eligió el modo desde la pausa, que recarga)
+    // las voces pueden no haber cargado todavía: sin esperarlas, el "listo" no
+    // sonaba y el juego arrancaba en el acto (ver actualizarAyuda).
+    if (vocesCargadas) decirVoz(alAzar(vocesListo));
+    else ayuda.esperaVoces = true;
   }
 
   function activarPaso() {
@@ -2488,6 +2725,13 @@
           frenarMusicaIntro(true); // fade out apenas suena el "listo"
           decirVoz(alAzar(vocesListo));
         }
+      }
+    } else if (ayuda.esperaVoces) {
+      // Fase "listo" esperando que carguen las voces (ver empezarArranque).
+      if (vocesCargadas || ayuda.t >= LISTO_CARGA_MAX) {
+        ayuda.esperaVoces = false;
+        ayuda.t = 0;
+        decirVoz(alAzar(vocesListo));
       }
     } else if (vozLibre()) {
       terminarAyuda(); // fase "listo": ya lo dijo, empieza el juego
@@ -2570,7 +2814,7 @@
   const PRESENTA_AGUJERO_EN = 0.9; // cuándo se abre el agujero de entrada
   const PRESENTA_LLEGA_EN = 1.8; // cuándo empieza a entrar la nave
   const PRESENTA_LLEGADA = 2.6; // lo que tarda en llegar
-  const PRESENTA_ENTRA_EN = 5.4; // cuándo se mete en el agujero
+  const PRESENTA_ENTRA_EN = 4.2; // cuándo se mete en el agujero: lo mira apenas (desde ~3,6 s, cuando casi llegó y se da vuelta hacia él)
   const PRESENTA_ENTRADA = 1.1; // lo que tarda en cruzar volando derecho hasta el centro del agujero (entra antes: al llegar a la zona de entrada)
   const PRESENTA_FUNDE = 0.7; // fundido a negro entre la entrada y la salida
   const PRESENTA_NEGRO_ENTRE = 0.3; // s de negro entre las dos pantallas
@@ -2619,6 +2863,9 @@
   function empezarPresentacion() {
     if (!presentaLogo || !tapa) return;
     presentada = true;
+    // Sin opción apuntada hasta que se vaya la nave (o se la saltee): ahí se
+    // apunta la primera, con su "selector" (ver terminarPresentacion).
+    apagarMenu();
     // fase: "logo", "espera" (el toque para poder sonar), "entrada" o
     // "salida"; f: segundos desde que empezó la fase. toque: null mientras se
     // averigua si puede sonar, false esperando que toquen algo, true si ya
@@ -3072,6 +3319,9 @@
       modoEl.hidden = false;
     }
     sincronizarPadMenu(); // que el A que la salteó no elija la primera opción
+    // Se fue la nave (o se salteó): recién ahora se apunta la primera opción,
+    // con su "selector" (callado si es porque se sale del escenario).
+    apuntarOpcion(0, !activo);
     tapa.style.transition = "";
     levantarTapa(false);
   }
@@ -3467,7 +3717,7 @@
   }
 
   // Saturación de la nave (0 = gris, 1 = con todos sus colores). Cambiar el
-  // filtro SVG de la nave obliga al navegador a repintarlo entero, y hacerlo en
+  // filtro de la nave obliga al navegador a repintarla entera, y hacerlo en
   // cada cuadro mientras se tiñe (varios segundos por pasaje) tiraba los cuadros
   // por segundo: por eso solo se toca cuando el valor cambia de escalón
   // (COLOR_PASOS escalones en total, imperceptibles uno a uno).
@@ -3476,12 +3726,16 @@
     if (escalon === colorEscalon) return;
     colorEscalon = escalon;
     const valor = (escalon / COLOR_PASOS).toFixed(3);
-    for (const el of satNave) el.setAttribute("values", valor);
+    ship.style.setProperty("--nave-sat", valor);
+    // slope * x + intercept con los filtros de CSS: contrast(c) es
+    // c * x + (1 - c) / 2 y brightness(b) multiplica por b, así que con
+    // b = slope + 2 * intercept y c = slope / b queda justo esa cuenta (y
+    // contrast nunca se sale de 0..1, así que no recorta antes de tiempo).
     const gris = 1 - escalon / COLOR_PASOS;
-    for (const el of luzNave) {
-      el.setAttribute("slope", (1 + (LUZ_SLOPE_GRIS - 1) * gris).toFixed(3));
-      el.setAttribute("intercept", (LUZ_INTERCEPT_GRIS * gris).toFixed(3));
-    }
+    const slope = 1 + (LUZ_SLOPE_GRIS - 1) * gris;
+    const brillo = slope + 2 * LUZ_INTERCEPT_GRIS * gris;
+    ship.style.setProperty("--nave-luz-b", brillo.toFixed(4));
+    ship.style.setProperty("--nave-luz-c", (slope / brillo).toFixed(4));
     // El sprite de atrás (el resplandor) también: su gris lo lee de esta variable
     // (ver scenes.game.light en script.js).
     ship.style.setProperty(
@@ -3925,6 +4179,7 @@
       for (let i = 0; i < nuevasRival * VUELTA_PIEDRAS; i++)
         poligonosRival.push(crearPoligono(rival, true, true));
     if (vueltas !== vueltasVistas) {
+      anotarVuelta("jugador", window.shipVueltaLado);
       presionJugador = Math.min(
         1,
         presionJugador +
@@ -4244,10 +4499,19 @@
       }
     }
     if (!hayMeta) {
+      // Sin agujeros se queda a un costado del jugador: el que tiene en la
+      // pantalla, y yendo derecho, sin cruzar el borde. Por el camino más
+      // corto (difVuelta), al arrancar -cada una en su esquina, justo a media
+      // vuelta- el empate a veces la mandaba por el borde de la derecha y
+      // reaparecía a la izquierda. Si ese costado queda fuera de la pantalla
+      // (el jugador pegado al borde), va al otro.
       const c = circulos[1];
       if (!c) return { x: 0, y: 0, boost: false };
-      const lado = difVuelta(rival.x - c.x) >= 0 ? 1 : -1;
-      mx = difVuelta(c.x + lado * 220 - rival.x);
+      const COSTADO = 220;
+      let lado = rival.x >= c.x ? 1 : -1;
+      const fuera = (x) => x < COSTADO / 2 || x > window.innerWidth - COSTADO / 2;
+      if (fuera(c.x + lado * COSTADO)) lado = -lado;
+      mx = c.x + lado * COSTADO - rival.x;
       my = c.y - 40 - rival.y;
       if (Math.hypot(mx, my) < 60) return { x: dx, y: dy, boost: false };
       mejor = Infinity; // volver a su lado no corre
@@ -4369,8 +4633,7 @@
       // La maneja el jugador 2 con el joystick, igual que el joystick a la nave
       // del jugador 1 en script.js: stick con zona muerta, la cruceta lo pisa y
       // RB acelera.
-      gx = zonaMuerta(pad.axes[0] || 0);
-      gy = zonaMuerta(pad.axes[1] || 0);
+      [gx, gy] = stickNave(pad.axes[0] || 0, pad.axes[1] || 0);
       const apretado = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed);
       if (apretado(PAD_CRUCETA.left)) gx = -1;
       else if (apretado(PAD_CRUCETA.right)) gx = 1;
@@ -4427,10 +4690,12 @@
       if (rival.x < minX) {
         rival.x = maxX - (minX - rival.x);
         vueltasRival++;
+        anotarVuelta("rival", -1);
         presionRival = Math.min(1, presionRival + PRESION_POR_VUELTA);
       } else if (rival.x > maxX) {
         rival.x = minX + (rival.x - maxX);
         vueltasRival++;
+        anotarVuelta("rival", 1);
         presionRival = Math.min(1, presionRival + PRESION_POR_VUELTA);
       }
     } else {
@@ -4680,6 +4945,14 @@
   const r4 = (v) => Math.round(v * 1e4) / 1e4; // fracciones de pantalla
   const r1 = (v) => Math.round(v * 10) / 10; // px y ángulos
 
+  // La dirección del emparejador, con la clave si hay (ver abrirClave).
+  function urlServidor() {
+    if (!clave) return SERVIDOR;
+    const url = new URL(SERVIDOR);
+    url.searchParams.set("clave", clave);
+    return url.href;
+  }
+
   function conectarOnline() {
     red = { ws: null, rol: null, estado: "conectando" };
     infoRed.ultimo = 0; // el silencio se cuenta desde el primer estado que llegue
@@ -4687,7 +4960,7 @@
     mostrarEstadoOnline();
     let ws;
     try {
-      ws = new WebSocket(SERVIDOR);
+      ws = new WebSocket(urlServidor());
     } catch (e) {
       red.estado = "sin-conexion";
       mostrarEstadoOnline();
@@ -4842,7 +5115,11 @@
     el.hidden = false;
     const textos = {
       conectando: "conectando",
-      esperando: "buscando rival<br /><small>esc para cancelar</small>",
+      esperando: clave
+        ? "buscando rival<br /><small>con la clave " +
+          clave +
+          "<br />esc para cancelar</small>"
+        : "buscando rival<br /><small>esc para cancelar</small>",
       "sin-conexion":
         "sin conexion con el servidor<br /><small>esc para volver</small>",
     };
@@ -4874,6 +5151,8 @@
       infoRed.ping = performance.now() - m.t;
     } else if (m.tipo === "rival-se-fue") {
       rivalSeFue();
+    } else if (m.tipo === "fondo") {
+      if (!soyAnfitrion()) correrFondo(m.lado === -1 ? -1 : 1);
     } else if (m.tipo === "formas") {
       recibirFormas(m);
     } else if (m.tipo === "formas?") {
@@ -5044,6 +5323,9 @@
     pedirFormasQueFaltan(m);
     const ultimo = estadosRival[estadosRival.length - 1];
     if (ultimo && t <= ultimo.t) return; // llegó desordenado: ya hay uno más nuevo
+    // Dio la vuelta por un costado: saltó de un lado de la pantalla al otro.
+    if (ultimo && Math.abs(m.x * W - ultimo.x) > W / 2)
+      anotarVuelta("rival", m.x * W < ultimo.x ? 1 : -1);
     estadosRival.push({
       t,
       x: m.x * W,
@@ -5315,7 +5597,13 @@
       ") brightness(" +
       (1 + (iluminada ? 0.35 : 0) * gris).toFixed(3) +
       ") " +
-      (esAzul() ? HALO_ROJO : HALO_AZUL);
+      (calidadBaja()
+        ? esAzul()
+          ? HALO_ROJO_BAJA
+          : HALO_AZUL_BAJA
+        : esAzul()
+          ? HALO_ROJO
+          : HALO_AZUL);
     // El sprite va pegado a la izquierda de su caja.
     ctx.drawImage(lienzoRival, -lado / 2, -lado / 2, ancho, lado);
     ctx.restore();
@@ -5340,6 +5628,57 @@
     }
   }
 
+  function renovarEstrella(e) {
+    e.fy = -0.15 + Math.random() * 1.3;
+    e.r = 0.6 + Math.random() * 1.1;
+  }
+
+  // --- El fondo se corre ------------------------------------------------------
+  // Si las dos naves dan la vuelta por el mismo costado casi a la vez (las dos
+  // yendo para el mismo lado), el cielo se corre un tramo para ese lado: las
+  // estrellas viejas se van para el otro y entran nuevas (ver dibujarEstrellas),
+  // como si juntas hubieran avanzado. Es solo el fondo: las piedras y los
+  // agujeros siguen donde están. Online lo decide el anfitrión y le avisa al
+  // invitado ("fondo"), así las dos pantallas se corren juntas.
+  const FONDO_JUNTAS = 1.2; // s que puede haber entre las dos vueltas
+  const FONDO_TRAMO = 0.2; // cuánto se corre, en fracción del ancho
+  const FONDO_DURA = 1.4; // s que tarda en correrse
+  const vueltaDe = { jugador: null, rival: null }; // la última de cada nave: { lado, t }
+  let fondoCorre = null; // { desde, hasta, t (0 a 1) } mientras se corre
+
+  // lado: 1 si salió por la derecha, -1 por la izquierda.
+  function anotarVuelta(quien, lado) {
+    if (!lado || esTutorial() || (enLinea() && !soyAnfitrion())) return;
+    const otra = vueltaDe[quien === "jugador" ? "rival" : "jugador"];
+    if (otra && otra.lado === lado && reloj - otra.t <= FONDO_JUNTAS) {
+      vueltaDe.jugador = vueltaDe.rival = null;
+      correrFondo(lado);
+      if (enLinea()) enviarOnline({ tipo: "fondo", lado });
+    } else {
+      vueltaDe[quien] = { lado, t: reloj };
+    }
+  }
+
+  // Si ya se estaba corriendo, el tramo nuevo se suma al que faltaba.
+  function correrFondo(lado) {
+    const meta = fondoCorre ? fondoCorre.hasta : estrellasCorridas;
+    fondoCorre = {
+      desde: estrellasCorridas,
+      hasta: meta + lado * window.innerWidth * FONDO_TRAMO,
+      t: 0,
+    };
+  }
+
+  // Arranca y frena suave (smoothstep): no pega un tirón al empezar.
+  function moverFondo(dt) {
+    if (!fondoCorre) return;
+    const f = fondoCorre;
+    f.t = Math.min(1, f.t + dt / FONDO_DURA);
+    const k = f.t * f.t * (3 - 2 * f.t);
+    estrellasCorridas = f.desde + (f.hasta - f.desde) * k;
+    if (f.t >= 1) fondoCorre = null;
+  }
+
   // Estrellas del fondo (decoración, no se chocan). Se ven siempre: en el juego,
   // en la intro y en el final, sobre el fondo negro o el starry. Son blancas, y
   // en la intro y en el final algunas (ciertos grupos) son salmón. 4 fills en
@@ -5347,6 +5686,8 @@
   function dibujarEstrellas() {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const margen = w * ESTRELLAS_MARGEN;
+    const largo = w + margen * 2;
     const conSalmon = !negro || ganado; // intro y final
     for (let g = 0; g < GRUPOS_ESTRELLAS.length; g++) {
       const grupo = GRUPOS_ESTRELLAS[g];
@@ -5356,9 +5697,13 @@
         0.3 + 0.6 * (0.5 + 0.5 * Math.sin(reloj * grupo.vel + grupo.fase));
       ctx.beginPath();
       for (const e of estrellasPorGrupo[g]) {
-        const x = estrellasCorridas
-          ? (((e.fx * w - estrellasCorridas) % w) + w) % w
-          : e.fx * w;
+        const crudo = e.fx * w - estrellasCorridas + margen;
+        // La que da la vuelta entra por el otro lado como una estrella nueva
+        // (otra altura y otro tamaño): el fondo corrido muestra cielo nuevo.
+        const vuelta = Math.floor(crudo / largo);
+        if (e.vuelta !== undefined && e.vuelta !== vuelta) renovarEstrella(e);
+        e.vuelta = vuelta;
+        const x = crudo - vuelta * largo - margen;
         const y = e.fy * h;
         ctx.moveTo(x + e.r, y);
         ctx.arc(x, y, e.r, 0, Math.PI * 2);
@@ -5753,9 +6098,12 @@
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(Math.atan2(sy - py, sx - px)); // mira hacia donde quedó la nave
-    // Rellena sólida y con su resplandor, el mismo de los halos de las naves.
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 12;
+    // Rellena sólida y con su resplandor, el mismo de los halos de las naves
+    // (en calidad baja, sin resplandor: el shadowBlur es caro).
+    if (!calidadBaja()) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
+    }
     ctx.fillStyle = color;
     // Equilátero: los tres lados miden PUNTERO_LADO (la punta y la base
     // quedan a 2/3 y 1/3 de la altura del centroide, que es el punto que se
@@ -5778,7 +6126,8 @@
     // nunca negativo: el timestamp del primer cuadro puede ser anterior al
     // performance.now() de setActive, y un dt < 0 dejaba introT en negativo
     // (la intro se salteaba entera).
-    const dt = Math.max(0, Math.min((ahora - ultimo) / 1000, 0.05));
+    const intervalo = ahora - ultimo;
+    const dt = Math.max(0, Math.min(intervalo / 1000, 0.05));
     ultimo = ahora;
     avanzarPosicionMusica();
 
@@ -5813,10 +6162,12 @@
     }
     const circulos = circulosNave();
     reloj += dt;
+    moverFondo(dt);
     if (!modo) {
       // Eligiendo el modo: todo espera, con la nave quieta en el medio abajo.
       if (window.shipMove) window.shipMove(0, 0);
-      navegarMenuJoystick(dt);
+      if (claveAbierta()) navegarClaveJoystick();
+      else navegarMenuJoystick(dt);
       mostrarControles();
       dibujar(circulos[1]);
       return;
@@ -5974,6 +6325,9 @@
       (((modo === "dos" || modo === "pc") && luzRival ? 1 : 0) -
         luzNivelRival) *
       Math.min(1, dt * 6);
+    // Jugando: la calidad automática mide cuánto tardan los cuadros (si cambia
+    // de nivel, el canvas se reajusta acá mismo, antes de dibujar).
+    if (window.calidad) window.calidad.cuadro(intervalo);
     dibujar(circulos[1]); // la luz sale del cuerpo de la nave
     // Online: lo que ve el rival de esta nave, 20 veces por segundo.
     if (enLinea() && red && red.estado === "jugando") {
@@ -6010,7 +6364,11 @@
     // Tope de 1,5x: en pantallas muy densas (2x o más) el canvas de 2x tiene el
     // doble de píxeles que cuesta rellenar en cada cuadro y el juego, casi todo
     // negro con formas chicas, no gana nada.
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    // La calidad (js/calidad.js) lo baja a 1x en las PCs que no llegan y lo
+    // sube a 2x en las pantallas muy densas que andan sobradas.
+    dpr = window.calidad
+      ? window.calidad.dpr()
+      : Math.min(window.devicePixelRatio || 1, 1.5);
     canvas.width = Math.round(window.innerWidth * dpr);
     canvas.height = Math.round(window.innerHeight * dpr);
   }
@@ -6018,6 +6376,10 @@
   window.addEventListener("resize", () => {
     if (activo) ajustarCanvas();
   });
+  if (window.calidad)
+    window.calidad.alCambiar(() => {
+      if (activo) ajustarCanvas();
+    });
 
   window.esc4Game = {
     // script.js: zoom de la cámara y punto de la pantalla que queda fijo.
@@ -6057,6 +6419,7 @@
         if (!musicaIniciada) {
           musicaIniciada = true;
           cargarMusica(); // que esté lista cuando termina la intro
+          cargarSonidosMenu();
         }
         reiniciar(false, true);
         saltearIntro();
@@ -6068,7 +6431,7 @@
         window.j2Teclado = false;
         window.tecladoAlReves = false;
         if (modoEl) modoEl.hidden = false;
-        apuntarOpcion(0); // el menú arranca de nuevo en la primera opción
+        apuntarOpcion(0, true); // el menú arranca de nuevo en la primera opción
         padMenuY = 0;
         padMenuT = 0;
         padMenuA = false;
@@ -6087,8 +6450,8 @@
           : -1;
         if (i >= 0) {
           controlesCambiados = !!dePausa.cambiados;
-          apuntarOpcion(i);
-          entrarConSonido(elegirApuntada);
+          apuntarOpcion(i, true);
+          entrarConSonido(() => elegirApuntada(true));
         } else if (!presentada) {
           empezarPresentacion();
         }

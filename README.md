@@ -16,7 +16,11 @@ queda en el medio, y ahí la nave sigue de largo (vuelve al elegir un modo).
 Como los navegadores no dejan sonar nada hasta que se toca la página, si
 todavía no se la tocó, al irse el logo la pantalla negra dice "presiona
 cualquier tecla" y la presentación sigue con ese toque. Ya en marcha,
-cualquier tecla, un click o el botón A la saltean. Después se elige el modo con el teclado. Durante el juego, el botón **MENU**
+cualquier tecla, un click o el botón A la saltean. Mientras la nave mira el
+menú no hay ninguna opción marcada: recién cuando se va se marca la primera.
+Después se elige el modo con el teclado. Al pasar de una opción a otra suena
+`selector.mp3` y al elegir una, `seleccion.mp3` (en `audio/Esc4/game sound/`),
+también en la pausa y en el cartel de salir del online. Durante el juego, el botón **MENU**
 (arriba a la izquierda) o **Escape** vuelven a esta elección.
 
 - **1 · tutorial**: el juego del sitio con una sola nave, sin las navecitas de
@@ -37,13 +41,20 @@ cualquier tecla, un click o el botón A la saltean. Después se elige el modo co
   lo muestran hasta que se toca).
 - **4 · online**: busca a alguien que también esté buscando y juegan cada uno
   en su PC, con los controles de siempre y la cámara siguiendo a tu nave.
+  Antes de buscar pide una **clave**: solo se juntan los que escriben la
+  misma, y vacía es con cualquiera (los que no pusieron clave). Se guarda en
+  minúsculas, solo letras y números, hasta 16, y queda escrita para la
+  próxima vez. Con el joystick no se puede escribir: A busca con la que haya
+  y B vuelve al menú.
   MENU o Escape cancelan la búsqueda o te sacan de la partida; salir cuenta
   como irse: al rival le aparece EL RIVAL SE FUE y vuelve a su elección.
 
 ## Online
 
 El emparejador está en `servidor/` (un Worker de Cloudflare con un Durable
-Object): junta de a dos a los que buscan y reenvía lo que manda cada uno.
+Object): junta de a dos a los que buscan y reenvía lo que manda cada uno. Hay
+una espera por clave (`/buscar?clave=...`); sin clave es la de cualquiera, así
+que un juego de antes de las claves sigue encontrando rival.
 Cada PC maneja su nave y su lluvia y le manda al otro 20 veces por segundo
 dónde está, sus piedras y si está golpeada; cada una detecta sola los golpes
 a su nave. La forma de cada piedra (sus puntas) no cambia nunca, así que viaja
@@ -96,6 +107,11 @@ probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
   los 10 goles.
 - Cuando las naves se acercan se repelen un poco, sin llegar a chocarse
   (nadie se lastima ni pierde el control).
+- Si las dos dan la vuelta por el mismo costado casi a la vez (menos de
+  1,2 s entre una y otra), el fondo se corre un tramo para ese lado: las
+  estrellas viejas se van y entran nuevas. Es solo el fondo (las piedras y
+  los agujeros no se mueven). Online lo decide el anfitrión y se lo avisa al
+  invitado. En el tutorial no pasa (ahí no se da la vuelta).
 - Al terminar aparece un cartel (GANASTE / GANO LA PC, o GANO J1 / GANO J2)
   y arranca otra partida en el mismo modo.
 
@@ -105,16 +121,37 @@ probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
   escenario no tiene bordes de salida y hay un `shipPush` para empujar la
   nave sin sacarle el control (la repulsión entre naves); con dos jugadores
   las flechas y el Shift derecho no mueven la nave del jugador 1 y la cámara
-  va sin zoom.
+  va sin zoom. El stick del joystick (`stickShip`) a fondo empuja igual que
+  las flechas en cualquier dirección, también en diagonal (antes iba bastante
+  más lento que el teclado); `stickNave` en `js/esc4-game.js` hace lo mismo
+  para el jugador 2.
 - `js/esc4-game.js`: la PC (bloque "Modo contra la PC"), las dos lluvias, el
   golpe con 3 s fuera de juego en vez de reiniciar la partida, el marcador, la
   voz contando para arriba, y sin la intro ni el final de las navecitas (se
   arranca en la oscuridad con el tutorial).
 - `styles.css`: colores del marcador, halo azul de tu nave, la nave oculta
   mientras está fuera de juego y el parpadeo al volver.
+- `js/calidad.js` (nuevo): la calidad automática (ver abajo). El filtro gris
+  de la nave pasó de SVG (`#nave-gris` en `index.html`) a CSS (`--nave-sat`).
 
 El resto es el sitio original sin tocar. Si cambiás el juego en el portfolio
-y querés traer esos cambios acá, hay que volver a aplicar esas tres cosas.
+y querés traer esos cambios acá, hay que volver a aplicar esas cosas.
+
+## Calidad automática
+
+Mientras se juega, `js/calidad.js` mide cuánto tardan los cuadros. En una PC
+que anda bien no cambia nada (calidad **media**, el juego de siempre). Si no
+llega a 40 cuadros por segundo, pasa a **baja**: el canvas a 1x, un solo halo
+en las naves, el puntero sin resplandor y la estela con la mitad de bocanadas
+(más opacas, se ve igual de densa). En pantallas de más de 1,5x que andan
+sobradas prueba **alta** (el canvas a 2x, más nítido) y, si los cuadros se
+resienten, vuelve a media y no lo intenta más. Lo elegido queda guardado en
+el navegador; una PC que quedó en baja vuelve a probar media a la semana.
+Nada de esto cambia cómo se juega: el movimiento va por tiempo, no por
+cuadros.
+
+Para probar un nivel a mano: `?calidad=baja`, `?calidad=media` o
+`?calidad=alta` en la URL. Con `?perf=1` se ven los cuadros por segundo.
 
 ## Cómo correrlo
 

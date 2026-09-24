@@ -3,6 +3,9 @@
 // junta (uno es el "anfitrion", que decide agujeros y goles, y el otro el
 // "invitado") y desde ahí todo lo que manda uno le llega al otro, tal cual.
 // El servidor no entiende el juego: solo junta y reenvía.
+//
+// Con /buscar?clave=algo solo se juntan los que pusieron la misma clave: hay
+// una espera por clave, y la de sin clave ("") es la de cualquiera.
 
 export default {
   async fetch(req, env) {
@@ -27,7 +30,7 @@ function sala(env) {
 
 export class Emparejador {
   constructor() {
-    this.esperando = null; // el que está buscando rival (uno por vez)
+    this.esperando = new Map(); // clave -> el que está buscando rival con ella
     this.pareja = new Map(); // cada socket -> el de su rival
   }
 
@@ -41,11 +44,12 @@ export class Emparejador {
     }
     const [cliente, servidor] = Object.values(new WebSocketPair());
     servidor.accept();
-    this.entrar(servidor);
+    const clave = limpiarClave(new URL(req.url).searchParams.get("clave"));
+    this.entrar(servidor, clave);
     return new Response(null, { status: 101, webSocket: cliente });
   }
 
-  entrar(ws) {
+  entrar(ws, clave) {
     ws.addEventListener("message", (ev) => {
       const rival = this.pareja.get(ws);
       if (rival) enviar(rival, ev.data);
@@ -54,21 +58,22 @@ export class Emparejador {
     ws.addEventListener("close", salir);
     ws.addEventListener("error", salir);
 
-    if (this.esperando) {
-      const otro = this.esperando;
-      this.esperando = null;
+    const otro = this.esperando.get(clave);
+    if (otro) {
+      this.esperando.delete(clave);
       this.pareja.set(otro, ws);
       this.pareja.set(ws, otro);
       enviar(otro, JSON.stringify({ tipo: "emparejado", rol: "anfitrion" }));
       enviar(ws, JSON.stringify({ tipo: "emparejado", rol: "invitado" }));
     } else {
-      this.esperando = ws;
+      this.esperando.set(clave, ws);
       enviar(ws, JSON.stringify({ tipo: "esperando" }));
     }
   }
 
   salir(ws) {
-    if (this.esperando === ws) this.esperando = null;
+    for (const [clave, w] of this.esperando)
+      if (w === ws) this.esperando.delete(clave);
     const rival = this.pareja.get(ws);
     this.pareja.delete(ws);
     if (rival) {
@@ -79,6 +84,12 @@ export class Emparejador {
       } catch (e) {}
     }
   }
+}
+
+// La misma limpieza que hace el juego (ver limpiarClave en esc4-game.js):
+// minúsculas, solo letras y números, hasta 16.
+function limpiarClave(clave) {
+  return (clave || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
 }
 
 function enviar(ws, datos) {
