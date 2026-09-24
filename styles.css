@@ -670,6 +670,68 @@ html.entra-juego .game-cuadrado {
   opacity: 1;
   transition: none;
 }
+/* Para cambiar el fondo de golpe, sin la transición de arriba (ver fondoDeGolpe
+   en esc4-game.js): si no, al abrir la página se veía un instante el starry a
+   pleno de la intro fundiéndose a negro. */
+.game-scene.fondo-instantaneo::before {
+  transition: none;
+}
+/* Presentación al abrir la página (esc4-game.js, ver empezarPresentacion): el
+   planeta del escenario 2 en el medio, apagado igual que allá (.space-planet) y
+   flotando igual. Es pixel art: se agranda sin suavizar. */
+.game-presenta {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.game-presenta[hidden] {
+  display: none;
+}
+.game-presenta-planeta {
+  width: min(62vmin, 80vw);
+  height: auto;
+  image-rendering: pixelated;
+  opacity: 0.5;
+  filter: drop-shadow(0 0 8px rgba(126, 184, 201, 0.12)) brightness(0.65);
+  animation: floatPlanet 11s ease-in-out infinite;
+}
+/* "presiona cualquier tecla" en la pantalla negra, mientras la presentación
+   espera un toque para poder sonar. Mismas letras que el pie del menú, titilando. */
+.game-presenta-toque {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  transform: translateY(-50%);
+  font-family: Spaceport, ui-monospace, Consolas, monospace;
+  font-size: clamp(0.6rem, 1.4vmin, 0.85rem);
+  letter-spacing: 0.2em;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+  animation: presentaTitila 1.6s ease-in-out infinite;
+}
+.game-presenta-toque[hidden] {
+  display: none;
+}
+@keyframes presentaTitila {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+/* Se prende con la misma animación que en el escenario 2 (planetBulbBlow). */
+.game-presenta-planeta.encendido {
+  animation:
+    floatPlanet 11s ease-in-out infinite,
+    planetBulbBlow 3s ease-in-out;
+}
 .game-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

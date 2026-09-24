@@ -8,7 +8,13 @@ persona en el mismo teclado o en otra PC por internet.
 
 ## Modos
 
-Al arrancar se elige con el teclado. Durante el juego, el botón **MENU**
+Al abrir la página hay una presentación: de negro se aclara y aparece el
+planeta del escenario 2 apagado, llega la nave (a color), lo mira, el planeta
+se prende como allá (con su sonido) y la nave se va por la derecha. Como los
+navegadores no dejan sonar nada hasta que se toca la página, si todavía no se
+la tocó la pantalla negra dice "presiona cualquier tecla" y la presentación
+arranca con ese toque. Ya en marcha, cualquier tecla, un click o el botón A la
+saltean. Después se elige el modo con el teclado. Durante el juego, el botón **MENU**
 (arriba a la izquierda) o **Escape** vuelven a esta elección.
 
 - **1 · tutorial**: el juego del sitio con una sola nave, sin las navecitas de

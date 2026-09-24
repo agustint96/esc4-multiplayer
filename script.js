@@ -2199,7 +2199,13 @@ function drawStars() {
         const vMin = alBorde ? -65 : minX;
         const vMax = alBorde ? window.innerWidth - 65 : maxX;
         let touchedEdge = null;
-        if (e < vMin) {
+        // La presentación del escenario 4 (window.shipLibre, lo pone
+        // esc4-game.js) hace entrar y salir a la nave desde bien afuera de la
+        // pantalla: ahí los bordes no la frenan.
+        const libre = window.shipLibre;
+        if (libre) {
+          // sin bordes
+        } else if (e < vMin) {
           if (daVuelta) {
             e = vMax - (vMin - e);
             window.shipVueltas = (window.shipVueltas || 0) + 1; // esc4-game.js las cuenta
@@ -2218,7 +2224,9 @@ function drawStars() {
           }
           touchedEdge = "right";
         }
-        if (a < minY) {
+        if (libre) {
+          // sin bordes
+        } else if (a < minY) {
           a = minY;
           r = 0;
           touchedEdge = "top";

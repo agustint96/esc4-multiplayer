@@ -508,6 +508,17 @@
       <div class="game-cuadrado">
         <span class="game-timer" id="game-timer">0.0</span>
       </div>
+      <!-- Presentación al abrir la página (ver empezarPresentacion en
+           esc4-game.js): el planeta del escenario 2, apagado, en el medio. La
+           nave llega, lo mira, se prende como en el escenario 2 y se va. -->
+      <div class="game-presenta" id="game-presenta" hidden>
+        <img
+          src="parallax/everyone planeta.webp"
+          class="game-presenta-planeta"
+          id="game-presenta-planeta"
+          alt=""
+        />
+      </div>
       <!-- Elección del modo al arrancar (esc4-game.js): tutorial, contra la PC,
            dos jugadores en el mismo teclado u online. Se recorre con las
            flechas, con el stick o la cruceta del joystick y con el mouse, y se
@@ -701,6 +712,12 @@
          aca al pausar, ver abrirPausa) y el cartel de salir del online. Con
          .velo, el blur de la pausa (ver .game-capa en styles.css). -->
     <div class="game-capa" id="game-capa">
+      <!-- Presentación: si el navegador todavía no deja sonar nada (nadie tocó
+           la página), espera un toque en la pantalla negra (ver
+           empezarPresentacion en esc4-game.js). Spaceport no tiene tildes. -->
+      <p class="game-presenta-toque" id="game-presenta-toque" hidden>
+        presiona cualquier tecla
+      </p>
       <!-- Online, con Escape o el boton de menu del joystick: el juego no se
            puede frenar (el rival sigue), asi que solo pregunta si salir. Se
            elige con LB y RB, la cruceta o el stick, las flechas del teclado o

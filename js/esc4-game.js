@@ -822,6 +822,10 @@
     if (TECLAS_J2[ev.code]) teclasJ2[TECLAS_J2[ev.code]] = true;
     if (TECLAS_J2_WASD[ev.code]) teclasJ2Wasd[TECLAS_J2_WASD[ev.code]] = true;
     if (!activo) return;
+    if (presenta) {
+      tocarPresentacion(); // cualquier tecla
+      return;
+    }
     if (modo && ev.code === "Escape") {
       alternarPausa();
     } else if (pausa === "salir") {
@@ -2269,9 +2273,273 @@
     introT = INTRO_JUEGO;
     oscuro = true;
     negro = true;
-    scene.classList.remove("game-intro");
+    // De golpe: reiniciar acaba de poner el starry a pleno de la intro y, con
+    // la transición, se lo veía fundirse a negro al abrir la página.
+    fondoDeGolpe(() => scene.classList.remove("game-intro"));
     ship.classList.remove("game-color");
     centrarNave();
+  }
+
+  // Cambia el fondo starry (game-intro, --fondo-color) sin su fundido.
+  function fondoDeGolpe(cambiar) {
+    scene.classList.add("fondo-instantaneo");
+    cambiar();
+    void scene.offsetWidth;
+    scene.classList.remove("fondo-instantaneo");
+  }
+
+  // --- Presentación -----------------------------------------------------------
+  // Al abrir la página, antes del menú: pantalla negra que se aclara (no del
+  // todo: el fondo queda como con 4 agujeros tomados) y deja ver el planeta del
+  // escenario 2 en el medio, apagado. Llega la nave desde la izquierda, a color,
+  // y se queda mirándolo; el planeta se prende como allá (planetBulbBlow, con el
+  // mismo sonido) y la nave se va. Se funde a negro y aparece el menú. Cualquier
+  // tecla, un click o el botón A la saltean. Una sola vez por página.
+  //
+  // Los navegadores no dejan sonar nada hasta que la persona toca la página (una
+  // tecla o un click). Si todavía no se tocó, la pantalla negra dice "presiona
+  // cualquier tecla" y la presentación arranca recién con ese toque, así el
+  // planeta se prende con su sonido. Si ya se puede sonar, arranca sola.
+  const PRESENTA_NEGRO = 0.6; // s de negro antes de empezar a aclarar
+  const PRESENTA_ACLARA = 2.4; // lo que tarda en aclarar
+  const PRESENTA_FONDO = 4 / CUMULOS_PARA_COLOR; // el fondo como con 4 agujeros
+  const PRESENTA_LLEGA_EN = 2.2; // cuándo empieza a entrar la nave
+  const PRESENTA_LLEGADA = 2.6; // lo que tarda en llegar
+  const PRESENTA_PRENDE_EN = 6.2; // cuándo se prende el planeta
+  const PRESENTA_PRENDIDO = 3; // lo que dura planetBulbBlow (styles.css)
+  const PRESENTA_SALE_EN = PRESENTA_PRENDE_EN + 1.7; // se va con el planeta prendido
+  const PRESENTA_GIRO = 0.4; // s que gira antes de arrancar
+  const PRESENTA_VUELO = 1.5; // s desde que arranca hasta salir por la derecha
+  const PRESENTA_CAE_EN = PRESENTA_PRENDE_EN + PRESENTA_PRENDIDO + 0.5;
+  const PRESENTA_CAIDA = 1; // lo que tarda en fundirse a negro al final
+  const PRESENTA_CAIDA_SALTEO = 0.35; // lo mismo, al saltearla
+  const PRESENTA_ESPERA_MAX = 3; // s de negro esperando la imagen, como mucho
+  const presentaEl = document.getElementById("game-presenta");
+  const presentaPlaneta = document.getElementById("game-presenta-planeta");
+  const presentaToque = document.getElementById("game-presenta-toque");
+  // Un WAV mudo de 8 muestras: para probar si el navegador deja sonar.
+  const SILENCIO =
+    "data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YRAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  let presenta = null; // en curso: { t, cae, toque, ... }
+  let presentada = false;
+
+  // ¿Puede sonar algo ya, sin que se haya tocado la página? (Promise de true o
+  // false.) Si ya se la tocó, sí; si el navegador lo dice (Firefox), lo que
+  // diga; si no, se prueba con un sonido mudo: el navegador que no deja lo
+  // rechaza con NotAllowedError.
+  function puedeSonar() {
+    if (navigator.userActivation && navigator.userActivation.hasBeenActive)
+      return Promise.resolve(true);
+    if (navigator.getAutoplayPolicy)
+      return Promise.resolve(
+        navigator.getAutoplayPolicy("mediaelement") === "allowed",
+      );
+    const prueba = new Audio(SILENCIO);
+    return prueba.play().then(
+      () => {
+        prueba.pause();
+        return true;
+      },
+      (err) => !err || err.name !== "NotAllowedError",
+    );
+  }
+
+  // Rotación de la nave para mirar hacia (dx, dy) (0° = nariz arriba).
+  const rumbo = (dx, dy) => (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+
+  function empezarPresentacion() {
+    if (!presentaEl || !presentaPlaneta || !tapa) return;
+    presentada = true;
+    // toque: null mientras se averigua si puede sonar, false esperando que
+    // toquen algo, true en marcha.
+    presenta = {
+      t: 0,
+      espera: 0,
+      listo: false,
+      cae: null,
+      pos: null,
+      toque: null,
+    };
+    const gp = primerJoystick();
+    presenta.padA = !!gp && botonPad(gp, PAD_A);
+    // Arranca en negro, por encima de todo (la nave incluida), y abajo ya está
+    // armado lo que se va a ver al aclarar.
+    tapa.style.transition = "none";
+    tapa.classList.add("cae");
+    void tapa.offsetWidth;
+    if (modoEl) modoEl.hidden = true;
+    presentaEl.hidden = false;
+    fondoDeGolpe(() =>
+      scene.style.setProperty("--fondo-color", PRESENTA_FONDO.toFixed(3)),
+    );
+    ship.classList.add("game-color"); // a color toda la presentación
+    window.shipLibre = true; // puede estar fuera de la pantalla
+    moverNavePresentacion();
+    // Que el planeta no aparezca a medio cargar: se espera a que esté listo.
+    const listo = () => {
+      if (presenta) presenta.listo = true;
+    };
+    if (presentaPlaneta.decode) presentaPlaneta.decode().then(listo, listo);
+    else if (presentaPlaneta.complete) listo();
+    else presentaPlaneta.addEventListener("load", listo);
+    puedeSonar().then((puede) => {
+      if (!presenta || presenta.toque !== null) return; // ya tocaron
+      presenta.toque = puede;
+      if (!puede && presentaToque) presentaToque.hidden = false;
+    });
+  }
+
+  // Una tecla, un click o el botón A durante la presentación: si estaba
+  // esperando el toque, arranca; si ya estaba en marcha, la saltea.
+  function tocarPresentacion() {
+    if (!presenta) return;
+    if (presenta.toque === true) {
+      saltarPresentacion();
+      return;
+    }
+    presenta.toque = true;
+    if (presentaToque) presentaToque.hidden = true;
+  }
+
+  function actualizarPresentacion(dt) {
+    const p = presenta;
+    // Botón A del joystick: arranca o saltea (solo al apretarlo, no si venía
+    // apretado).
+    const gp = primerJoystick();
+    const a = !!gp && botonPad(gp, PAD_A);
+    if (a && !p.padA) tocarPresentacion();
+    p.padA = a;
+    if (p.toque !== true && p.cae === null) return; // esperando el toque
+    if (!p.listo && p.cae === null) {
+      p.espera += dt;
+      if (p.espera < PRESENTA_ESPERA_MAX) return;
+      p.listo = true;
+    }
+    p.t += dt;
+    if (!p.aclara && p.cae === null && p.t >= PRESENTA_NEGRO) {
+      p.aclara = true;
+      tapa.style.transition = `opacity ${PRESENTA_ACLARA}s ease`;
+      tapa.classList.remove("cae");
+    }
+    if (!p.prende && p.cae === null && p.t >= PRESENTA_PRENDE_EN) {
+      p.prende = true;
+      presentaPlaneta.classList.add("encendido");
+      if (typeof sfxPlay === "function") sfxPlay("planeta");
+    }
+    if (p.cae === null && p.t >= PRESENTA_CAE_EN)
+      caerPresentacion(PRESENTA_CAIDA);
+    if (p.cae !== null && p.t >= p.cae) {
+      terminarPresentacion();
+      return;
+    }
+    moverNavePresentacion();
+  }
+
+  // Dónde está la nave (centro, en px de la pantalla) y hacia dónde mira: llega
+  // desde afuera por la izquierda frenando hasta quedar abajo a la izquierda del
+  // planeta, flota mirándolo y después gira y se va acelerando.
+  function moverNavePresentacion() {
+    const p = presenta;
+    if (!window.shipPlace || !window.shipFace) return;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    // El dibujo del planeta ocupa el 67 % del ancho de la imagen y el 42 % del
+    // alto, centrado.
+    const lado = presentaPlaneta.offsetWidth || 400;
+    const planeta = { x: w / 2, y: h / 2 };
+    const medioAncho = lado * 0.34;
+    let destino = {
+      x: planeta.x - medioAncho - 110,
+      y: planeta.y + lado * 0.12,
+    };
+    // Si a la izquierda no entra (celular parado), abajo del planeta.
+    if (destino.x < 70)
+      destino = {
+        x: planeta.x - medioAncho * 0.6,
+        y: planeta.y + lado * 0.21 + 95,
+      };
+    const desde = { x: -160, y: destino.y + 60 };
+    let pos;
+    let mira;
+    if (p.t < PRESENTA_SALE_EN || !p.pos) {
+      const u = Math.max(
+        0,
+        Math.min(1, (p.t - PRESENTA_LLEGA_EN) / PRESENTA_LLEGADA),
+      );
+      const suave = 1 - Math.pow(1 - u, 3); // llega rápido y frena suave
+      pos = {
+        x:
+          desde.x +
+          (destino.x - desde.x) * suave +
+          Math.sin(p.t * 1.7) * NAVE_FLOTA.x * suave,
+        y:
+          desde.y +
+          (destino.y - desde.y) * suave +
+          Math.sin(p.t * 2.3 + 1) * NAVE_FLOTA.y * suave,
+      };
+      // Mira hacia donde va y, ya casi llegando, al planeta.
+      mira =
+        u < 0.7
+          ? rumbo(destino.x - desde.x, destino.y - desde.y)
+          : rumbo(planeta.x - pos.x, planeta.y - pos.y);
+      p.pos = pos;
+    } else {
+      // Se va por la derecha: gira y recién ahí arranca, acelerando, en una
+      // curva que pasa por debajo del planeta (así no lo tapa) y sale por el
+      // borde derecho. La curva es una Bézier cuadrática: desde donde estaba
+      // (a), bajando por debajo del dibujo (b), hasta afuera a la derecha (c).
+      const a = p.pos;
+      const b = {
+        x: planeta.x - medioAncho,
+        y: planeta.y + lado * 0.21 + 260,
+      };
+      const c = { x: w + 200, y: planeta.y + lado * 0.1 };
+      const s = Math.max(0, p.t - PRESENTA_SALE_EN - PRESENTA_GIRO);
+      const u = Math.min(1, Math.pow(s / PRESENTA_VUELO, 2)); // acelera
+      const v = 1 - u;
+      pos = {
+        x: v * v * a.x + 2 * v * u * b.x + u * u * c.x,
+        y: v * v * a.y + 2 * v * u * b.y + u * u * c.y,
+      };
+      // Mira hacia donde va (la tangente de la curva).
+      mira = rumbo(
+        v * (b.x - a.x) + u * (c.x - b.x),
+        v * (b.y - a.y) + u * (c.y - b.y),
+      );
+    }
+    window.shipPlace(pos.x, pos.y, true);
+    window.shipFace(mira);
+  }
+
+  // Funde a negro (dur segundos) y, ya en negro, termina.
+  function caerPresentacion(dur) {
+    presenta.cae = presenta.t + dur;
+    tapa.style.transition = `opacity ${dur}s ease`;
+    tapa.classList.add("cae");
+  }
+
+  function saltarPresentacion() {
+    if (presenta && presenta.cae === null)
+      caerPresentacion(PRESENTA_CAIDA_SALTEO);
+  }
+  document.addEventListener("pointerdown", tocarPresentacion);
+
+  // Ya en negro: todo vuelve a como estaba (fondo negro, nave en blanco y negro
+  // en el medio abajo) y aparece el menú.
+  function terminarPresentacion() {
+    presenta = null;
+    window.shipLibre = false;
+    presentaEl.hidden = true;
+    if (presentaToque) presentaToque.hidden = true;
+    presentaPlaneta.classList.remove("encendido");
+    ship.classList.remove("game-color");
+    colorEscalon = -1; // fuerza a aplicar el color (0) a la nave y al fondo
+    fondoDeGolpe(aplicarColorNave);
+    centrarNave();
+    if (modoEl) modoEl.hidden = false;
+    sincronizarPadMenu(); // que el A que la salteó no elija la primera opción
+    tapa.style.transition = "";
+    levantarTapa(false);
   }
 
   function centrarNave() {
@@ -4986,6 +5254,10 @@
       if (pausa === "salir") navegarSalirJoystick();
     }
 
+    if (presenta) {
+      actualizarPresentacion(dt);
+      return;
+    }
     const circulos = circulosNave();
     reloj += dt;
     if (!modo) {
@@ -5263,11 +5535,14 @@
           controlesCambiados = !!dePausa.cambiados;
           apuntarOpcion(i);
           elegirApuntada();
+        } else if (!presentada) {
+          empezarPresentacion();
         }
         ultimo = performance.now();
         raf = requestAnimationFrame(cuadro);
       } else {
         cancelAnimationFrame(raf);
+        if (presenta) terminarPresentacion();
         if (pausa) cerrarPausa();
         if (modoEl) modoEl.hidden = true;
         if (menuEl) menuEl.hidden = true;
