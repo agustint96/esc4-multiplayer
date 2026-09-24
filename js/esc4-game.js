@@ -1377,6 +1377,223 @@
   const fuegoRival = { nivel: 0, fase: 0 };
   // Cámara (ver arriba): zoom y punto de la pantalla que queda fijo (la nave).
   const cam = { z: 1, ox: window.innerWidth / 2, oy: window.innerHeight / 2 };
+
+  // --- Estela de la nave -----------------------------------------------------
+  // Sale de los motores de la nave mientras se mueve y se sostiene el botón de
+  // la estela: X (jugador 1) o M (jugador 2) en el teclado, y B en el joystick
+  // (a quien lo tenga: casi siempre el jugador 1, y el 2 con dos jugadores si
+  // el joystick le tocó a él, ver window.j2Joystick). Es una fila de bocanadas
+  // blandas y transparentes que se ensanchan y se disuelven de a poco (7 a
+  // 12 s). Siempre es del color de la nave: salmón del sitio en el tutorial, y
+  // el de cada nave (azul o rojo, ver colorPropio y colorRival) con más de un
+  // jugador. Viven en el mundo (el espacio), no en la pantalla: quedan donde las
+  // soltó la nave y se mueven con la cámara igual que las piedras. La PC no tiene.
+  //
+  // Cada jugador tiene un tanque de ESTELA_TANQUE s de estela. Se gasta solo
+  // mientras sale estela (botón apretado y nave en movimiento) y lo que queda
+  // se guarda para la próxima vez. Recién cuando se vacía del todo se vuelve a
+  // llenar, en ESTELA_RECARGA s, y mientras se llena no sale estela.
+  const PAD_B = 1;
+  const ESTELA_MAX = 2500; // bocanadas vivas como mucho
+  const ESTELA_PASO = 3; // px del mundo entre una bocanada y la siguiente
+  const ESTELA_MOTOR_Y = 112; // altura de donde nace la estela en la caja de la nave (130x130): la punta del fuego, para que no asome detrás de él
+  const ESTELA_SALMON = "#f19280"; // salmón del sitio (--accent en styles.css)
+  const ESTELA_TANQUE = 3; // s de estela con el tanque lleno
+  const ESTELA_RECARGA = 3; // s que tarda en llenarse el tanque vacío
+  const estela = [];
+  // Dónde estaba el motor el cuadro anterior (x, y, ok), y el tanque: tanque es
+  // lo que queda (s) y recargando, si se vació y se está llenando.
+  const estelaJ1 = { x: 0, y: 0, ok: false, tanque: ESTELA_TANQUE, recargando: false };
+  const estelaJ2 = { x: 0, y: 0, ok: false, tanque: ESTELA_TANQUE, recargando: false };
+  const estelaTecla = { j1: false, j2: false };
+  document.addEventListener("keydown", (ev) => {
+    if (ev.code === "KeyX") estelaTecla.j1 = true;
+    else if (ev.code === "KeyM") estelaTecla.j2 = true;
+  });
+  document.addEventListener("keyup", (ev) => {
+    if (ev.code === "KeyX") estelaTecla.j1 = false;
+    else if (ev.code === "KeyM") estelaTecla.j2 = false;
+  });
+  // Al perder el foco no llega el keyup: se sueltan.
+  window.addEventListener("blur", () => {
+    estelaTecla.j1 = estelaTecla.j2 = false;
+  });
+  let estelaT = 0;
+  const estelaSprites = new Map(); // "#rrggbb" -> sprite blando de ese color
+  function spriteEstela(hex) {
+    let sp = estelaSprites.get(hex);
+    if (sp) return sp;
+    sp = document.createElement("canvas");
+    sp.width = sp.height = 64;
+    const g = sp.getContext("2d");
+    const rgb = parseInt(hex.slice(1), 16);
+    const c = (rgb >> 16) + "," + ((rgb >> 8) & 255) + "," + (rgb & 255);
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, "rgba(" + c + ",1)");
+    grad.addColorStop(0.4, "rgba(" + c + ",0.5)");
+    grad.addColorStop(1, "rgba(" + c + ",0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    estelaSprites.set(hex, sp);
+    return sp;
+  }
+  function vaciarEstela() {
+    estela.length = 0;
+    for (const j of [estelaJ1, estelaJ2]) {
+      j.ok = false;
+      j.tanque = ESTELA_TANQUE;
+      j.recargando = false;
+    }
+  }
+  // El tanque vacío se llena de a poco; mientras, no hay estela.
+  function recargarEstela(j, dt) {
+    if (!j.recargando) return;
+    j.tanque += (dt * ESTELA_TANQUE) / ESTELA_RECARGA;
+    if (j.tanque >= ESTELA_TANQUE) {
+      j.tanque = ESTELA_TANQUE;
+      j.recargando = false;
+    }
+  }
+  // ¿Está apretado el botón de la estela del jugador 1 o del 2?
+  function quiereEstela(jugador) {
+    const gp = primerJoystick();
+    const b = !!gp && botonPad(gp, PAD_B);
+    const padJ2 = !!window.j2Joystick; // con dos jugadores, el joystick lo tiene el 2
+    // Con un solo jugador (tutorial, contra la PC, online) X y M son lo mismo.
+    if (jugador === 1)
+      return (
+        estelaTecla.j1 || (modo !== "dos" && estelaTecla.j2) || (b && !padJ2)
+      );
+    return modo === "dos" && (estelaTecla.j2 || (b && padJ2));
+  }
+  // Suelta bocanadas entre donde estaba el motor y donde está ahora, y gasta
+  // del tanque el tiempo que salió estela (dt).
+  function sembrarEstela(prev, x, y, destino, esc, dt) {
+    if (prev.ok) {
+      const dx = x - prev.x;
+      const dy = y - prev.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 1) return; // quieta: no sale nada (ni se gasta)
+      if (d < 300) {
+        // (un salto grande es la vuelta de pantalla o una recolocada: no se une)
+        prev.tanque -= dt;
+        if (prev.tanque <= 0) {
+          prev.tanque = 0;
+          prev.recargando = true;
+        }
+        const spr = spriteEstela(destino);
+        const n = Math.max(1, Math.round(d / ESTELA_PASO));
+        for (let i = 1; i <= n; i++) {
+          estela.push({
+            x: prev.x + (dx * i) / n,
+            y: prev.y + (dy * i) / n,
+            vx: (Math.random() - 0.5) * 0.1,
+            vy: (Math.random() - 0.5) * 0.1,
+            age: 0,
+            life: 7 + Math.random() * 5,
+            r0: (4 + Math.random() * 2) * esc,
+            r1: (24 + Math.random() * 20) * esc,
+            a0: 0.07 + Math.random() * 0.04,
+            spr,
+          });
+        }
+        if (estela.length > ESTELA_MAX)
+          estela.splice(0, estela.length - ESTELA_MAX);
+      }
+    }
+    prev.x = x;
+    prev.y = y;
+    prev.ok = true;
+  }
+  function emitirEstela(dt) {
+    recargarEstela(estelaJ1, dt);
+    recargarEstela(estelaJ2, dt);
+    const jugando =
+      modo && negro && !final && !choque && !ganado && !esperandoRival();
+    const factor = cajaNave / CAJA_NAVE;
+    const mitad = cajaNave / 2;
+    // Los motores, en la caja de la nave y relativos a su centro.
+    const px = 44 * factor - mitad;
+    const py = ESTELA_MOTOR_Y * factor - mitad;
+
+    // Jugador 1: el mismo cálculo que circulosNave (de la pantalla al mundo).
+    const p = window.shipPose;
+    if (
+      jugando &&
+      p &&
+      p.listo &&
+      !ship.classList.contains("fuera-de-juego") &&
+      !estelaJ1.recargando &&
+      quiereEstela(1)
+    ) {
+      const rad = (p.rot * Math.PI) / 180;
+      const ma = p.escala * Math.cos(rad);
+      const mb = p.escala * Math.sin(rad);
+      const sx = ma * px - mb * py + p.x + mitad;
+      const sy = mb * px + ma * py + p.y + mitad;
+      sembrarEstela(
+        estelaJ1,
+        cam.ox + (sx - cam.ox) / cam.z,
+        cam.oy + (sy - cam.oy) / cam.z,
+        esTutorial() ? ESTELA_SALMON : colorPropio(),
+        (factor * Math.abs(p.escala)) / cam.z,
+        dt,
+      );
+    } else estelaJ1.ok = false;
+
+    // Jugador 2 (solo con dos jugadores): el mismo cálculo que circulosRival.
+    if (
+      jugando &&
+      modo === "dos" &&
+      rival &&
+      !(rival.stun > 0) &&
+      !estelaJ2.recargando &&
+      quiereEstela(2)
+    ) {
+      const k = escalaNaveMundo();
+      const rad = (rival.rot * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+        sembrarEstela(
+        estelaJ2,
+        rival.x + (px * cos - py * sin) * k,
+        rival.y + (px * sin + py * cos) * k,
+        colorRival(),
+        factor * k,
+        dt,
+      );
+    } else estelaJ2.ok = false;
+  }
+  function dibujarEstela() {
+    const ahora = performance.now();
+    const dt = Math.min(0.05, Math.max(0, (ahora - estelaT) / 1000));
+    estelaT = ahora;
+    emitirEstela(dt);
+    if (!estela.length) return;
+    // Se dibuja en el mundo, con el zoom de la cámara que ya tiene ctx (ver
+    // dibujar): la estela queda en el espacio y la cámara la sigue como a todo.
+    ctx.save();
+    let j = 0;
+    for (let i = 0; i < estela.length; i++) {
+      const b = estela[i];
+      b.age += dt;
+      if (b.age >= b.life) continue;
+      const t = b.age / b.life;
+      b.vx += (Math.random() - 0.5) * 0.015 + 0.002;
+      b.vy += (Math.random() - 0.5) * 0.015 - 0.001;
+      b.vx *= 0.995;
+      b.vy *= 0.995;
+      b.x += b.vx * dt * 30;
+      b.y += b.vy * dt * 30;
+      const r = b.r0 + (b.r1 - b.r0) * Math.pow(t, 0.55);
+      // Aparece de a poco (0,3 s): recién nacida no se ve una mancha pegada al fuego.
+      ctx.globalAlpha = b.a0 * Math.pow(1 - t, 1.6) * Math.min(1, b.age / 0.3);
+      ctx.drawImage(b.spr, b.x - r, b.y - r, r * 2, r * 2);
+      estela[j++] = b;
+    }
+    estela.length = j;
+    ctx.restore();
+  }
   let luz = false; // luz de la nave prendida (la maneja script.js)
   let luzNivel = 0; // 0..1, sigue a luz suavizado
   // Con dos jugadores, la luz del rival (jugador 2): la prende y apaga él
@@ -1536,6 +1753,7 @@
   // empieza de nuevo. Al entrar al escenario (conIntro = true) no se la
   // mueve: llega desde el borde y arranca donde está, con la intro.
   function reiniciar(recolocar, conIntro) {
+    vaciarEstela();
     poligonos = [];
     tiempo = 0;
     rival = null; // se crea de nuevo cuando arranca el juego
@@ -1735,6 +1953,26 @@
 
   const alAzar = (lista) => lista[Math.floor(Math.random() * lista.length)];
 
+  // Sin ningún toque en la página el navegador no deja sonar: el audio queda
+  // suspendido y lo que se le pide se encola y salta todo junto con el primer
+  // toque, cuando ya no tiene sentido. Por eso los sonidos sueltos (voces,
+  // agujeros, nota, perder) no se piden si todavía no se puede sonar. La música
+  // sí se deja en cola: arranca con el primer toque (ver desbloquearAudio).
+  const sinToque = () =>
+    !!audioCtx &&
+    audioCtx.state === "suspended" &&
+    !(navigator.userActivation && navigator.userActivation.hasBeenActive);
+
+  // El primer toque (una tecla o un click) reanuda el audio. No en la pausa, que
+  // lo suspende a propósito (ver pausarSonidos).
+  const desbloquearAudio = (ev) => {
+    if (ev.type === "keydown" && (ev.code === "Escape" || ev.repeat)) return;
+    if (pausa || !audioCtx || audioCtx.state !== "suspended") return;
+    audioCtx.resume().catch(() => {});
+  };
+  document.addEventListener("keydown", desbloquearAudio);
+  document.addEventListener("pointerup", desbloquearAudio);
+
   // Corta la voz que esté sonando (y cancela lo que tenía encadenado).
   function cortarVoz() {
     vozId++;
@@ -1757,6 +1995,7 @@
   function decirVoz(s, alTerminar) {
     cortarVoz();
     if (!s.buffer && !s.audio) return; // todavía no cargó
+    if (s.buffer && sinToque()) return; // todavía no se puede sonar: no se encola
     vozSonando = true;
     const id = vozId;
     const fin = () => {
@@ -1870,6 +2109,7 @@
   // La nota del último agujero: suena una vez desde el principio.
   function sonarNota() {
     if (notaBuffer) {
+      if (sinToque()) return; // todavía no se puede sonar
       audioCtx.resume().catch(() => {});
       notaFuente = audioCtx.createBufferSource();
       notaFuente.buffer = notaBuffer;
@@ -1884,6 +2124,7 @@
   // El sonido de un agujero nuevo: suena una vez desde el principio.
   function sonarPortal() {
     if (portalBuffer) {
+      if (sinToque()) return; // todavía no se puede sonar
       audioCtx.resume().catch(() => {});
       portalFuente = audioCtx.createBufferSource();
       portalFuente.buffer = portalBuffer;
@@ -1898,6 +2139,7 @@
   // El sonido de cruzar un agujero: suena una vez desde el principio.
   function sonarCruce() {
     if (portalCruceBuffer) {
+      if (sinToque()) return; // todavía no se puede sonar
       audioCtx.resume().catch(() => {});
       portalCruceFuente = audioCtx.createBufferSource();
       portalCruceFuente.buffer = portalCruceBuffer;
@@ -1912,6 +2154,7 @@
   // El sonido de perder: suena una vez desde el principio.
   function sonarPerder() {
     if (perderBuffer) {
+      if (sinToque()) return; // todavía no se puede sonar
       audioCtx.resume().catch(() => {});
       perderFuente = audioCtx.createBufferSource();
       perderFuente.buffer = perderBuffer;
@@ -2322,11 +2565,15 @@
   // Cualquier tecla, un click o el botón A la saltean. Una sola vez por página.
   //
   // Los navegadores no dejan sonar nada hasta que la persona toca la página (una
-  // tecla o un click). Si todavía no se tocó, al irse el logo la pantalla negra
-  // dice "presiona cualquier tecla" y sigue recién con ese toque, así los
-  // agujeros suenan. Si ya se puede sonar, sigue sola.
+  // tecla o un click). Con PRESENTA_PIDE_TOQUE en true, si todavía no se tocó, al
+  // irse el logo la pantalla negra dice "presiona cualquier tecla" y sigue recién
+  // con ese toque, así los agujeros suenan. En false (lo de ahora) no hay tal
+  // pantalla: la presentación corre sola y, si el navegador no deja sonar, los
+  // sonidos de antes del primer toque simplemente no suenan (ver sinToque). Si ya
+  // se puede sonar, suena igual en los dos casos.
   //
   // Todo lo de la presentación se dibuja en coordenadas de pantalla.
+  const PRESENTA_PIDE_TOQUE = false; // true: "presiona cualquier tecla" antes de la intro y antes de entrar a un modo desde la pausa
   const PRESENTA_LOGO_ENTRA = 0.8; // s que tarda en aparecer el logo
   const PRESENTA_LOGO_QUEDA = 1.8; // s que se queda a la vista
   const PRESENTA_LOGO_SALE = 0.8; // s que tarda en irse
@@ -2433,7 +2680,7 @@
   // podía, la saltea.
   function tocarPresentacion() {
     if (!presenta) return;
-    if (presenta.toque === true) {
+    if (!PRESENTA_PIDE_TOQUE || presenta.toque === true) {
       saltarPresentacion();
       return;
     }
@@ -2501,7 +2748,7 @@
       return;
     }
     if (p.fase === "espera") {
-      if (p.toque !== true) {
+      if (PRESENTA_PIDE_TOQUE && p.toque !== true) {
         // Todavía no puede sonar: lo pide (si todavía se está averiguando,
         // espera en negro sin decir nada).
         if (p.toque === false && presentaToque) presentaToque.hidden = false;
@@ -2755,7 +3002,10 @@
   // quedaban mudos toda la partida (con una recarga común no pasaba: ahí la
   // presentación espera un toque). Igual que ella, si no se puede sonar se
   // espera en la pantalla negra un toque -una tecla, un click o el botón A- y
-  // recién ahí arranca el modo. Si ya se puede sonar, entra sin más.
+  // recién ahí arranca el modo. Si ya se puede sonar, entra sin más. (Todo esto
+  // solo con PRESENTA_PIDE_TOQUE en true; si no, entra directo y la música, que
+  // queda en cola en el audio suspendido, arranca con el primer toque: ver
+  // desbloquearAudio.)
   let esperaToque = null; // mientras espera: { entrar, padA }; si no, null
 
   // ¿Puede sonar el audio del juego (Web Audio) sin que se toque nada? Se lo
@@ -2772,6 +3022,10 @@
   }
 
   function entrarConSonido(entrar) {
+    if (!PRESENTA_PIDE_TOQUE) {
+      entrar(); // sin pantalla de toque: ver PRESENTA_PIDE_TOQUE
+      return;
+    }
     // Pantalla negra, sin menú ni nave, mientras se averigua (si ya se puede
     // sonar, ni se nota: la escena ya es negra).
     if (modoEl) modoEl.hidden = true;
@@ -5310,7 +5564,14 @@
       // v = 0: blanco (se apaga con k); v = 1: naranja (aparece con k).
       const alfa = v === 0 ? 1 - k : k;
       dibujarAnilloSprite(gusanoSprites.afuera[v], x, y, ang, esc, alfa);
-      dibujarAnilloSprite(gusanoSprites.adentro[v], x, y, -ang * 1.7, esc, alfa);
+      dibujarAnilloSprite(
+        gusanoSprites.adentro[v],
+        x,
+        y,
+        -ang * 1.7,
+        esc,
+        alfa,
+      );
     }
     ctx.globalAlpha = 1;
   }
@@ -5416,7 +5677,13 @@
     // (sin esta luz grande; ver game-color y game-luz-index en styles.css). Con
     // dos jugadores, la del jugador 2 (rival) es la misma luz, en su nave.
     if (negro && !final) {
-      if (centro)
+      // Con game-color o game-luz-index la luz ya la pone el CSS (el ::before
+      // de la nave, ver styles.css): las dos juntas se verían como un halo
+      // doble, con el del canvas unos px más arriba (52 contra 58 de la caja).
+      const luzCss =
+        ship.classList.contains("game-color") ||
+        ship.classList.contains("game-luz-index");
+      if (centro && !luzCss)
         dibujarLuz(
           centro.x,
           centro.y,
@@ -5427,6 +5694,7 @@
         dibujarLuz(rival.x, rival.y, luzNivelRival, esAzul() ? "rojo" : "azul");
     }
 
+    dibujarEstela();
     dibujarCumulos();
     dibujarIntro();
 
