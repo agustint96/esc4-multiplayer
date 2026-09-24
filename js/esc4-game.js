@@ -277,7 +277,6 @@
     "5- final/buenisimoo.m4a",
     "5- final/siii.m4a",
   ];
-  const VOZ_REEMPLAZA = 0.5; // probabilidad de que reemplace al "1" (si no, suena después)
   // Momentos de la partida con voz propia, con VOZ_HITO_CHANCE de sonar cada
   // vez: el gol número 9 de cualquiera de los dos ("uno más", en ultimopunto) y
   // el 9 a 9 ("empate"; ahí no suena la de "uno más", que ya no vale: el que
@@ -291,10 +290,11 @@
   const VOZ_EMPATE = ["empate/peleadisimo.m4a", "empate/sedefine.m4a"];
   const VOZ_HITO_GOL = 9;
   const VOZ_HITO_CHANCE = 0.5;
-  // Conteo regresivo: cada vez que la nave entra a un agujero de gusano suena
-  // el número que sigue, del 10 al 1 (un pasaje por número: CUMULOS_PARA_COLOR
-  // tiene que ser igual a la cantidad de números). De cada número hay una o
-  // más variantes (audio/Esc4/conteo) y en cada pasaje suena una al azar.
+  // Los números de los goles: cada vez que la nave entra a un agujero de
+  // gusano suena el número del gol (ver decirGol), del 1 al 10. La lista va
+  // del 10 al 1 (un pasaje por número: CUMULOS_PARA_COLOR tiene que ser igual
+  // a la cantidad de números). De cada número hay una o más variantes
+  // (audio/Esc4/conteo) y en cada pasaje suena una al azar.
   const CONTEO_URL = VOZ_URL + "conteo/";
   const CONTEO_ARCHIVOS = [
     ["10.m4a", "10 (1).m4a"],
@@ -2019,9 +2019,6 @@
     }
   }
 
-  // El conteo del pasaje número i (0 = el 10, 9 = el 1): suena una de las
-  // variantes al azar. En el último pasaje, además, la felicitación: a veces
-  // después del "1" y a veces en su lugar.
   // La voz del gol n (1..10). conteo va de "10" a "1", así que el gol n es
   // conteo[10 - n]; en el último, además, felicita.
   // luego (opcional): otra voz que sigue al número (ver vozDeHito).
@@ -2060,19 +2057,6 @@
   function decirHitoRival() {
     const hito = vozDeHito(false);
     if (hito) decirVoz(hito);
-  }
-
-  function sonarConteo(i) {
-    const variantes = conteo[i];
-    if (!variantes) return;
-    const numero = alAzar(variantes);
-    if (i < conteo.length - 1) {
-      decirVoz(numero);
-      return;
-    }
-    const felicita = alAzar(vocesFelicita);
-    if (Math.random() < VOZ_REEMPLAZA) decirVoz(felicita);
-    else decirVoz(numero, () => decirVoz(felicita));
   }
 
   // Las voces de ánimo y de cansancio, según el segundo de la partida: las de
@@ -3844,16 +3828,16 @@
       cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
       cumulosTomados++;
       if (esTutorial()) {
-        // Como en el sitio: en el de salida las estrellas forman el número del
-        // pasaje, 10 en el primero ... 1 en el último (como la voz), y la nave
-        // se pinta 1/10 por pasaje. Con el último, en vez del final de las
-        // navecitas, GANASTE (con la nota) y después al menú.
+        // Como en los otros modos: en el de salida las estrellas forman el
+        // número del pasaje, 1 en el primero ... 10 en el último (como la voz),
+        // y la nave se pinta 1/10 por pasaje. Con el último, en vez del final
+        // de las navecitas, GANASTE (con la nota) y después al menú.
         // Blancas al principio y, a medida que se cuentan pasajes, cada vez más
         // salmón (el del sitio), como el segundero.
         crearNumeroEstrellas(
           salida.x,
           salida.y,
-          CUMULOS_PARA_COLOR - cumulosTomados + 1,
+          cumulosTomados,
           mezclarHex(
             "#ffffff",
             TIMER_COLOR_FIN,
@@ -3861,7 +3845,7 @@
           ),
         );
         sonarCruce();
-        sonarConteo(cumulosTomados - 1);
+        decirGol(cumulosTomados);
         colorObjetivo = Math.min(1, cumulosTomados / CUMULOS_PARA_COLOR);
         if (cumulosTomados >= CUMULOS_PARA_COLOR) terminarPartida("vos");
       } else {

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Estela de avión</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
+html,body{height:100%;margin:0;background:#000;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;background:#000;touch-action:none;cursor:crosshair}
+#hint{position:fixed;left:0;right:0;top:45%;text-align:center;color:#fff;opacity:.55;font-size:18px;letter-spacing:.04em;pointer-events:none;transition:opacity 1s}
+#clear{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:8px 16px;font-size:14px;cursor:pointer}
+#clear:hover{background:rgba(255,255,255,.2)}
+#bar{position:fixed;left:16px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:min(220px,40vw);height:6px;border-radius:3px;background:rgba(255,255,255,.15)}
+#bar::before{content:"COMBUSTIBLE";position:absolute;top:-16px;left:0;font-size:10px;letter-spacing:.12em;color:#fff;opacity:.5}
+#fill{display:block;height:100%;width:100%;border-radius:3px;background:#fff;opacity:.8}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">Haz clic y arrastra para dibujar una estela</div>
+<div id="bar"><i id="fill"></i></div>
+<button id="clear">Limpiar y recargar</button>
+<script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'),hint=document.getElementById('hint');
+let W,H,dpr;
+function resize(){dpr=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+addEventListener('resize',resize);resize();
+
+// soft sprite
+const spr=document.createElement('canvas');spr.width=spr.height=64;
+const sg=spr.getContext('2d'),g=sg.createRadialGradient(32,32,0,32,32,32);
+g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.4,'rgba(255,255,255,.5)');g.addColorStop(1,'rgba(255,255,255,0)');
+sg.fillStyle=g;sg.fillRect(0,0,64,64);
+
+let parts=[],drawing=false,last=null,moved=false;
+const MAX=7000;
+
+function emit(x,y,nx,ny){
+  for(const s of [0]){
+    parts.push({x:x+nx*s*5,y:y+ny*s*5,vx:nx*s*.12+(Math.random()-.5)*.1,vy:ny*s*.12+(Math.random()-.5)*.1,
+      age:0,life:7+Math.random()*5,r0:2+Math.random()*1.5,r1:22+Math.random()*22,a0:.07+Math.random()*.04});
+  }
+  if(parts.length>MAX)parts.splice(0,parts.length-MAX);
+}
+const RANGE=900,fill=document.getElementById('fill');let fuel=1;
+function setFuel(v){
+  fuel=Math.max(0,Math.min(1,v));fill.style.width=fuel*100+'%';
+  if(fuel<=0){hint.textContent='Sin combustible · pulsa "Limpiar y recargar"';hint.style.opacity=.8}
+  else if(hint.textContent.startsWith('Sin')){hint.textContent='Haz clic y arrastra para dibujar una estela';hint.style.opacity=0}
+}
+function pos(e){return{x:e.clientX,y:e.clientY}}
+
+cv.addEventListener('pointerdown',e=>{
+  cv.setPointerCapture(e.pointerId);
+  drawing=true;moved=false;last=pos(e);if(fuel>0)hint.style.opacity=0;
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drawing)return;
+  const p=pos(e);let dx=p.x-last.x,dy=p.y-last.y,d=Math.hypot(dx,dy);
+  if(d<1)return;
+  if(fuel<=0){last=p;return}
+  const max=fuel*RANGE;
+  if(d>max){dx*=max/d;dy*=max/d;d=max}
+  moved=true;
+  const nx=-dy/d,ny=dx/d,step=3,n=Math.max(1,Math.ceil(d/step));
+  for(let i=1;i<=n;i++){emit(last.x+dx*i/n,last.y+dy*i/n,nx,ny)}
+  setFuel(fuel-d/RANGE);
+  last={x:last.x+dx,y:last.y+dy};
+});
+function up(){
+  if(drawing&&!moved&&last&&fuel>0){setFuel(fuel-.01); // simple click: little puff
+    for(let i=0;i<14;i++){const a=Math.random()*6.28;emit(last.x+Math.cos(a)*4,last.y+Math.sin(a)*4,Math.cos(a),Math.sin(a))}
+  }
+  drawing=false;
+}
+cv.addEventListener('pointerup',up);
+cv.addEventListener('pointercancel',up);
+document.getElementById('clear').onclick=()=>{parts=[];setFuel(1)};
+addEventListener('keydown',e=>{if(e.key==='c'||e.key==='C'){parts=[];setFuel(1)}});
+
+let prev=performance.now();
+function frame(now){
+  const dt=Math.min((now-prev)/1000,.05);prev=now;
+  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  ctx.globalCompositeOperation='lighter';
+  let j=0;
+  for(let i=0;i<parts.length;i++){
+    const p=parts[i];p.age+=dt;
+    if(p.age>=p.life)continue;
+    const t=p.age/p.life;
+    p.vx+=(Math.random()-.5)*.015+.002;p.vy+=(Math.random()-.5)*.015-.001;
+    p.vx*=.995;p.vy*=.995;
+    p.x+=p.vx*dt*60*.5;p.y+=p.vy*dt*60*.5;
+    const r=p.r0+(p.r1-p.r0)*Math.pow(t,.55);
+    const a=p.a0*Math.pow(1-t,1.6);
+    ctx.globalAlpha=a;
+    ctx.drawImage(spr,p.x-r,p.y-r,r*2,r*2);
+    parts[j++]=p;
+  }
+  parts.length=j;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
