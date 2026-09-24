@@ -576,6 +576,15 @@
   const ayudaEl = document.getElementById("game-ayuda"); // instrucciones del arranque
   const modoEl = document.getElementById("game-modo"); // elección: contra la PC o dos jugadores
   if (!scene || !canvas || !timerEl || !ship || !ayudaEl) return;
+  // Adentro del portfolio (agustint96.github.io lo muestra en un iframe en su
+  // escenario 4): sin el logo de la presentación, que ya se está en el sitio, y
+  // con "volver al sitio" en el menú (ver volverAlSitio). Suelto, esa opción no
+  // va.
+  const embebido = window.parent !== window;
+  if (!embebido && modoEl) {
+    const volver = modoEl.querySelector('[data-elegir="volver"]');
+    if (volver) volver.remove();
+  }
   // Las dos versiones de las instrucciones (ver #game-ayuda en index.html), cada
   // una con sus pasos y con el dibujo de cada tecla o botón ("up", "shift"...).
   const modosAyuda = {};
@@ -853,6 +862,8 @@
     }
     if (modo && ev.code === "Escape") {
       alternarPausa();
+    } else if (!modo && ev.code === "Escape") {
+      volverAlSitio(); // solo hace algo adentro del portfolio
     } else if (pausa === "salir") {
       // Online, el cartel de salir: las flechas pasan de una opción a la otra
       // (también mueven la nave: el juego sigue). Las opciones están una al
@@ -867,9 +878,10 @@
         elegirSalir();
     } else if (!modo || pausa === "menu") {
       const MODOS = { 1: "tutorial", 2: "pc", 3: "dos", 4: "online" };
-      const n = /^(?:Digit|Numpad)([1-4])$/.exec(ev.code);
+      if (embebido) MODOS[5] = "volver";
+      const n = /^(?:Digit|Numpad)([1-5])$/.exec(ev.code);
       const flecha = FLECHA_DE[ev.code];
-      if (n) {
+      if (n && MODOS[n[1]]) {
         sonarMenu("seleccion");
         elegirModo(MODOS[n[1]]);
       }
@@ -1445,7 +1457,22 @@
     padMenuB = b;
   }
 
+  // Adentro del portfolio: le pide al sitio que cierre el juego y devuelva la
+  // nave al escenario principal (ver abrirEsc4 en el script.js del sitio).
+  // Online es como irse: al cerrarse el iframe se cae la conexión y al rival
+  // le aparece EL RIVAL SE FUE.
+  function volverAlSitio() {
+    if (!embebido) return;
+    try {
+      window.parent.postMessage({ tipo: "esc4-volver" }, location.origin);
+    } catch (e) {}
+  }
+
   function elegirModo(m) {
+    if (m === "volver") {
+      volverAlSitio();
+      return;
+    }
     // Con un modo ya en juego, el menú solo se ve en la pausa: ahí elegir
     // arranca ese modo de cero.
     if (modo) {
@@ -1552,6 +1579,7 @@
           ? CONTROLES_JOYSTICK_AL_REVES
           : CONTROLES_JOYSTICK,
     online: () => "Encontrar a alguien en red",
+    volver: () => "Seguir en el portfolio",
   };
   let controlesMostrados = "";
   function mostrarControles() {
@@ -6452,7 +6480,7 @@
           controlesCambiados = !!dePausa.cambiados;
           apuntarOpcion(i, true);
           entrarConSonido(() => elegirApuntada(true));
-        } else if (!presentada) {
+        } else if (!presentada && !embebido) {
           empezarPresentacion();
         }
         ultimo = performance.now();

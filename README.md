@@ -49,6 +49,19 @@ también en la pausa y en el cartel de salir del online. Durante el juego, el bo
   MENU o Escape cancelan la búsqueda o te sacan de la partida; salir cuenta
   como irse: al rival le aparece EL RIVAL SE FUE y vuelve a su elección.
 
+## Adentro del portfolio
+
+El escenario 4 de [agustint96.github.io](https://agustint96.github.io) ya no
+tiene su propio juego: muestra este (`/esc4-multiplayer/`) en un iframe que
+tapa todo, así lo que se cambia acá aparece allá sin copiar nada. Adentro del
+iframe no está el logo de la presentación (se arranca en el menú) y el menú
+suma **5 · volver al sitio**; con eso, o con Escape en el menú, el juego le
+avisa al sitio (`esc4-volver`) y la nave vuelve al escenario principal por el
+borde derecho. Suelto, en su propia página, todo sigue como siempre.
+
+Como el sitio carga lo que esté publicado acá, hay que subir este repo antes
+que un cambio del sitio que dependa de algo nuevo de acá.
+
 ## Online
 
 El emparejador está en `servidor/` (un Worker de Cloudflare con un Durable
