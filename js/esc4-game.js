@@ -517,9 +517,11 @@
   // es window.naveFisica, la misma ficha con la que script.js mueve la del
   // jugador 1 (empuje, boost, freno, stick y cuánto se puede salir de la
   // pantalla). Ver moverRival.
-  // La dificultad de la PC (se elige antes de jugar, ver abrirDificultad). Se
+  // La dificultad de la PC (se elige en el menú, ver cambiarDificultad). Se
   // mueve siempre con la misma física que el jugador: lo que cambia es cómo
   // decide (ver rumboRival y moverRival).
+  // - atencion: s que tarda en salir a buscar un agujero nuevo (contra el
+  //   jugador es una carrera por cada agujero: es lo que más se nota).
   // - reflejos: s que tarda en darse cuenta de una piedra que se le acerca.
   // - peligro: px del mundo desde los que una piedra la espanta.
   // - error: qué tan seguido se equivoca: va al agujero más lejano del par (el
@@ -528,21 +530,23 @@
   //   de RIVAL_BOOST_DIST px y no hay piedras encima, con una energía que se
   //   gasta a "gasto" por segundo y vuelve a "recupera"; para volver a
   //   acelerar tiene que juntar RIVAL_BOOST_MIN. null: sin límite, como el
-  //   jugador.
+  //   jugador; false: no acelera nunca.
   const DIFICULTADES = {
     facil: {
-      reflejos: 0.45,
-      peligro: 110,
-      error: 0.35,
-      boost: { gasto: 0.8, recupera: 0.12 },
+      atencion: 1.5,
+      reflejos: 1,
+      peligro: 60,
+      error: 0.5,
+      boost: false,
     },
     regular: {
-      reflejos: 0.25,
-      peligro: 140,
-      error: 0.12,
+      atencion: 0.8,
+      reflejos: 0.35,
+      peligro: 130,
+      error: 0.2,
       boost: { gasto: 0.4, recupera: 0.25 },
     },
-    dificil: { reflejos: 0, peligro: 170, error: 0, boost: null },
+    dificil: { atencion: 0, reflejos: 0, peligro: 180, error: 0, boost: null },
   };
   const RIVAL_BOOST_DIST = 320;
   const RIVAL_BOOST_MIN = 0.4;
@@ -921,29 +925,6 @@
       if (ev.code !== "Escape" && !ev.repeat) tocarEspera();
       return;
     }
-    if (dificultadAbierta()) {
-      // Eligiendo la dificultad: flechas (o W y S), 1 a 3, enter o E, y
-      // Escape para volver al menú.
-      const f = FLECHA_DE[ev.code];
-      const n = /^(?:Digit|Numpad)([1-3])$/.exec(ev.code);
-      if (f === "ArrowUp" || f === "ArrowDown") {
-        apuntarDificultad(dificultadApuntada + (f === "ArrowDown" ? 1 : -1));
-        ev.preventDefault();
-      } else if (n) {
-        apuntarDificultad(Number(n[1]) - 1, true);
-        elegirDificultad();
-      } else if (
-        ev.code === "Enter" ||
-        ev.code === "NumpadEnter" ||
-        ev.code === "KeyE"
-      ) {
-        elegirDificultad();
-      } else if (ev.code === "Escape") {
-        sonarMenu("selector");
-        cerrarDificultad();
-      }
-      return;
-    }
     if (claveAbierta()) {
       // Escribiendo la clave, con el campo sin foco (se hizo click afuera):
       // lo que se escribe en él no llega acá (ver claveCampo más abajo).
@@ -981,7 +962,8 @@
         apuntarOpcion(opcionApuntada + (flecha === "ArrowDown" ? 1 : -1));
         ev.preventDefault(); // que no scrollee la página detrás
       } else if (flecha === "ArrowLeft" || flecha === "ArrowRight") {
-        cambiarControles(); // solo hace algo parado en dos jugadores
+        // Solo hace algo parado en dos jugadores o en contra la PC.
+        cambiarControles(flecha === "ArrowRight" ? 1 : -1);
         ev.preventDefault();
       } else if (
         ev.code === "Enter" ||
@@ -1350,17 +1332,17 @@
     elegirModo(el.dataset.elegir);
   }
 
-  // Da vuelta quién usa el joystick y quién el teclado: con LB, RB o el stick
-  // o la cruceta para los costados, las flechas de los costados del teclado o
-  // la ruedita del mouse (y A y D en el teclado). Solo tiene sentido parado en
-  // "dos jugadores" (es la única opción con dos controles). Sin joystick los
-  // dos juegan en el teclado y lo que se da vuelta es quién usa WASD y quién
-  // las flechas. El renglón de abajo del menú lo muestra solo en el próximo
-  // cuadro (mostrarControles).
-  function cambiarControles() {
+  // Los costados del menú (LB y RB, el stick o la cruceta para los costados,
+  // las flechas de los costados del teclado, A y D, o la ruedita del mouse).
+  // dir: -1 izquierda, 1 derecha. Parado en "dos jugadores" dan vuelta quién
+  // usa el joystick y quién el teclado (sin joystick, quién usa WASD y quién
+  // las flechas); parado en "contra la PC" cambian la dificultad. El renglón
+  // de abajo del menú lo muestra solo en el próximo cuadro (mostrarControles).
+  function cambiarControles(dir) {
     const opcion = opcionesModo[opcionApuntada];
-    if (!opcion || opcion.dataset.elegir !== "dos") return;
-    controlesCambiados = !controlesCambiados;
+    if (!opcion) return;
+    if (opcion.dataset.elegir === "dos") controlesCambiados = !controlesCambiados;
+    else if (opcion.dataset.elegir === "pc") cambiarDificultad(dir);
   }
 
   // La ruedita del mouse también da vuelta los lados, con el menú a la vista.
@@ -1374,7 +1356,7 @@
       if (!activo || (modo && pausa !== "menu") || !ev.deltaY) return;
       if (ev.timeStamp - ruedaAntes < RUEDA_ESPERA) return;
       ruedaAntes = ev.timeStamp;
-      cambiarControles();
+      cambiarControles(ev.deltaY > 0 ? 1 : -1);
     },
     { passive: true },
   );
@@ -1391,11 +1373,13 @@
   apuntarOpcion(0, true);
 
   // Lo que en el joystick da vuelta los lados (ver cambiarControles).
+  // -1 (LB o izquierda), 1 (RB o derecha) o 0.
   const cambiaLados = (gp, joy) =>
-    botonPad(gp, PAD_LB) ||
-    botonPad(gp, PAD_RB) ||
-    joy.teclas.has("left") ||
-    joy.teclas.has("right");
+    botonPad(gp, PAD_LB) || joy.teclas.has("left")
+      ? -1
+      : botonPad(gp, PAD_RB) || joy.teclas.has("right")
+        ? 1
+        : 0;
 
   // Joystick en el menú, un cuadro a la vez (lo llama cuadro() mientras no hay
   // modo elegido). El stick se comporta como una tecla: un paso al empujarlo y
@@ -1429,11 +1413,11 @@
     if (lr !== padMenuLR) {
       padMenuLR = lr;
       padMenuLRT = MENU_PAD_ESPERA;
-      if (lr) cambiarControles();
+      if (lr) cambiarControles(lr);
     } else if (lr) {
       padMenuLRT -= dt;
       if (padMenuLRT <= 0) {
-        cambiarControles();
+        cambiarControles(lr);
         padMenuLRT = MENU_PAD_REPITE;
       }
     }
@@ -1567,104 +1551,26 @@
   }
 
   // --- Dificultad de la PC ------------------------------------------------------
-  // Al elegir "contra la PC" se elige qué tan difícil (ver DIFICULTADES), en
-  // una pantalla como la del menú: flechas, stick o cruceta, mouse o 1 a 3, y
-  // enter, E, A o click. Escape o B vuelven al menú. Arranca en la última que
-  // se eligió (en este navegador), o en regular.
-  const dificultadEl = document.getElementById("game-modo-dificultad");
-  const opcionesDificultad = dificultadEl
-    ? [...dificultadEl.querySelectorAll("[data-dificultad]")]
-    : [];
+  // Se elige en el menú, parado en "contra la PC": los costados (LB y RB, el
+  // stick o la cruceta, las flechas, A y D o la ruedita) la cambian, dando la
+  // vuelta, y el renglón de abajo la muestra (ver PIE_MODO). Queda guardada en
+  // este navegador.
+  const DIFICULTAD_ORDEN = ["facil", "regular", "dificil"];
   const DIFICULTAD_GUARDADA = "esc4-dificultad";
   let dificultad = "regular";
   try {
     const guardada = localStorage.getItem(DIFICULTAD_GUARDADA);
     if (DIFICULTADES[guardada]) dificultad = guardada;
   } catch (e) {}
-  let dificultadElegida = false;
-  let dificultadApuntada = 1;
-  let padDificultadY = 0; // hacia dónde venía empujado el stick
-  const dificultadAbierta = () => !!dificultadEl && !dificultadEl.hidden;
 
-  function apuntarDificultad(i, callado) {
-    const n = opcionesDificultad.length;
-    if (!n) return;
-    const nueva = ((i % n) + n) % n;
-    if (nueva !== dificultadApuntada && !callado) sonarMenu("selector");
-    dificultadApuntada = nueva;
-    opcionesDificultad.forEach((el, j) =>
-      el.classList.toggle("elegida", j === dificultadApuntada),
-    );
-  }
-
-  function abrirDificultad() {
-    if (!dificultadEl || !opcionesDificultad.length) {
-      dificultadElegida = true;
-      elegirModo("pc");
-      return;
-    }
-    modoEl.classList.add("con-dificultad");
-    dificultadEl.hidden = false;
-    apuntarDificultad(
-      Math.max(
-        0,
-        opcionesDificultad.findIndex((el) => el.dataset.dificultad === dificultad),
-      ),
-      true,
-    );
-    // Los botones del joystick que abrieron esta pantalla no cuentan de nuevo.
-    const gp = primerJoystick();
-    padMenuA = !!gp && botonPad(gp, PAD_A);
-    padMenuB = !!gp && botonPad(gp, PAD_B);
-    padDificultadY = 0;
-  }
-
-  function cerrarDificultad() {
-    if (!dificultadAbierta()) return;
-    dificultadEl.hidden = true;
-    modoEl.classList.remove("con-dificultad");
-  }
-
-  function elegirDificultad() {
-    const el = opcionesDificultad[dificultadApuntada];
-    if (!el) return;
-    sonarMenu("seleccion");
-    dificultad = el.dataset.dificultad;
+  function cambiarDificultad(dir) {
+    const n = DIFICULTAD_ORDEN.length;
+    const i = DIFICULTAD_ORDEN.indexOf(dificultad);
+    dificultad = DIFICULTAD_ORDEN[(((i + dir) % n) + n) % n];
     try {
       localStorage.setItem(DIFICULTAD_GUARDADA, dificultad);
     } catch (e) {}
-    dificultadElegida = true;
-    cerrarDificultad();
-    elegirModo("pc");
-  }
-
-  opcionesDificultad.forEach((el, i) => {
-    el.addEventListener("click", () => {
-      apuntarDificultad(i, true);
-      elegirDificultad();
-    });
-    el.addEventListener("pointerenter", () => apuntarDificultad(i));
-  });
-
-  // Joystick en la pantalla de la dificultad: stick o cruceta para arriba y
-  // abajo (un paso por empujón), A elige y B vuelve al menú.
-  function navegarDificultadJoystick() {
-    const gp = primerJoystick();
-    if (!gp) return;
-    const joy = leerJoystick();
-    const dir = joy.teclas.has("down") ? 1 : joy.teclas.has("up") ? -1 : 0;
-    if (dir && dir !== padDificultadY)
-      apuntarDificultad(dificultadApuntada + dir);
-    padDificultadY = dir;
-    const a = botonPad(gp, PAD_A);
-    const b = botonPad(gp, PAD_B);
-    if (a && !padMenuA) elegirDificultad();
-    else if (b && !padMenuB) {
-      sonarMenu("selector");
-      cerrarDificultad();
-    }
-    padMenuA = a;
-    padMenuB = b;
+    sonarMenu("selector");
   }
 
   function elegirModo(m) {
@@ -1681,11 +1587,6 @@
     // Online, primero la clave (ver abrirClave): al buscar vuelve acá.
     if (m === "online" && clave === null) {
       abrirClave();
-      return;
-    }
-    // Contra la PC, primero la dificultad (ver abrirDificultad).
-    if (m === "pc" && !dificultadElegida) {
-      abrirDificultad();
       return;
     }
     modo = m;
@@ -1774,7 +1675,20 @@
     // vez: el renglón dice con qué está jugando. El navegador solo devuelve un
     // joystick después de que se lo tocó, así que si aparece es porque se lo
     // está usando de verdad.
-    pc: () => (primerJoystick() ? "J1 joystick" : "J1 teclado"),
+    // Abajo, la dificultad (la elegida encendida): se cambia con los costados.
+    pc: () =>
+      '<span class="game-modo-pc"><span>' +
+      (primerJoystick() ? "J1 joystick" : "J1 teclado") +
+      '</span><span class="game-modo-dificultades">' +
+      DIFICULTAD_ORDEN.map(
+        (d) =>
+          '<span class="game-modo-dif' +
+          (d === dificultad ? " elegida" : "") +
+          '">' +
+          d +
+          "</span>",
+      ).join("") +
+      "</span></span>",
     dos: () =>
       !primerJoystick()
         ? controlesCambiados
@@ -3917,6 +3831,16 @@
     const claseMia = esAzul() ? "marcador-jugador" : "marcador-rival";
     const claseRival = esAzul() ? "marcador-rival" : "marcador-jugador";
     const celda = (clase, n) => '<span class="' + clase + '">' + n + "</span>";
+    const goles = esAzul()
+      ? celda(claseMia, cumulosTomados) +
+        '<span class="marcador-separador"></span>' +
+        celda(claseRival, golesRival)
+      : celda(claseRival, golesRival) +
+        '<span class="marcador-separador"></span>' +
+        celda(claseMia, cumulosTomados);
+    // El cartel del final, con el resultado abajo.
+    const conResultado = (cartel) =>
+      cartel + '<span class="marcador-final">' + goles + "</span>";
     // En el tutorial, el segundero del sitio (y GANASTE al completar los 10).
     const texto = esTutorial()
       ? fin
@@ -3926,24 +3850,22 @@
         ? fin.ganador === "abandono"
           ? "EL RIVAL SE FUE"
           : fin.ganador === "vos"
-            ? celda(claseMia, modo === "dos" ? "GANO J1" : "GANASTE")
-            : celda(
-                claseRival,
-                modo === "dos"
-                  ? "GANO J2"
-                  : enLinea()
-                    ? "GANO EL RIVAL"
-                    : "GANO LA PC",
+            ? conResultado(
+                celda(claseMia, modo === "dos" ? "GANO J1" : "GANASTE"),
+              )
+            : conResultado(
+                celda(
+                  claseRival,
+                  modo === "dos"
+                    ? "GANO J2"
+                    : enLinea()
+                      ? "GANO EL RIVAL"
+                      : "GANO LA PC",
+                ),
               )
         : golDeOroHasta > tiempo
           ? celda("marcador-oro", "GOL DE ORO")
-          : esAzul()
-          ? celda(claseMia, cumulosTomados) +
-            '<span class="marcador-separador"></span>' +
-            celda(claseRival, golesRival)
-          : celda(claseRival, golesRival) +
-            '<span class="marcador-separador"></span>' +
-            celda(claseMia, cumulosTomados);
+          : goles;
     if (texto === ultimoTexto) return;
     ultimoTexto = texto;
     timerEl.innerHTML = texto;
@@ -3995,21 +3917,27 @@
     );
   }
 
-  // Un agujero de gusano nuevo en un punto al azar de lo que se ve, lejos de la
-  // nave y (si se pasa) del otro agujero del par.
+  // Un agujero de gusano nuevo en un punto al azar, lejos de las naves y (si se
+  // pasa) del otro agujero del par.
   function crearCumulo(objetivo, otro) {
-    // Online, en cualquier lugar de la pantalla y no solo donde mira el
-    // anfitrión (que es quien los crea): si no, siempre le quedarían cerca a él.
-    const v = enLinea()
-      ? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }
-      : vista();
+    // Con dos naves, en cualquier lugar del mapa y no solo donde mira la cámara
+    // del jugador (o del anfitrión, que es quien los crea online): si no,
+    // siempre le quedarían cerca a él. En el tutorial, como en el sitio: en lo
+    // que se ve.
+    const v = esTutorial()
+      ? vista()
+      : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+    // Lejos de las dos naves por igual (no solo de la de esta pantalla).
+    const naves = [objetivo];
+    if (rival && !esTutorial()) naves.push({ x: rival.x, y: rival.y });
     const margen = 90;
     for (let intento = 0; intento < 20; intento++) {
       const x = v.x + margen + Math.random() * Math.max(1, v.w - margen * 2);
       const y = v.y + margen + Math.random() * Math.max(1, v.h - margen * 2);
       if (
-        objetivo &&
-        Math.hypot(x - objetivo.x, y - objetivo.y) < CUMULO_DISTANCIA_MIN
+        naves.some(
+          (n) => n && Math.hypot(x - n.x, y - n.y) < CUMULO_DISTANCIA_MIN,
+        )
       )
         continue;
       if (otro && Math.hypot(x - otro.x, y - otro.y) < CUMULO_DISTANCIA_PAR)
@@ -4027,6 +3955,11 @@
   }
 
   // Un par de agujeros de gusano, cada uno apuntando al otro.
+  // Online los crea el anfitrión y al invitado le llegan un rato después (lo
+  // que tarda el mensaje, más la espera hasta el próximo estado): para que no
+  // los vea antes, en su pantalla se prenden recién a esa edad (prendeT, en s):
+  // hasta ahí no se ven, no suenan y no se puede entrar. Así aparecen a la vez
+  // en las dos pantallas.
   function crearPar(objetivo) {
     const a = crearCumulo(objetivo, null);
     if (!a) return;
@@ -4034,9 +3967,16 @@
     if (!b) return;
     a.par = b;
     b.par = a;
+    const prendeT = enLinea()
+      ? latenciaRed() / 1000 + ENVIO_CADA / 2 // en s
+      : 0;
+    a.prendeT = b.prendeT = prendeT;
     cumulos.push(a, b);
-    sonarPortal();
+    if (!prendeT) sonarPortal(); // si no, suena al prenderse (ver actualizarCumulos)
   }
+
+  // Si ya se ve y se puede entrar (ver prendeT en crearPar).
+  const prendido = (c) => !c.prendeT || c.t >= c.prendeT;
 
   // Dónde van las estrellas de un número, relativas a su centro (px del mundo):
   // se dibuja el número en un canvas aparte con una tipografía sans-serif en
@@ -4275,18 +4215,25 @@
         Math.random() * (CUMULO_INTERVALO[1] - CUMULO_INTERVALO[0]);
       crearPar(circulos[1]);
     }
+    let recienPrendido = false;
     for (const c of cumulos) {
+      const antes = prendido(c);
       c.t += dt;
       c.ang += CUMULO_GIRO * dt;
+      if (!antes && prendido(c)) recienPrendido = true;
     }
+    if (recienPrendido) sonarPortal();
     cumulos = cumulos.filter((c) => c.t < CUMULO_VIDA);
-    // Fuera de juego (golpeada) la nave no puede entrar a un agujero.
+    // Fuera de juego (golpeada) la nave no puede entrar a un agujero, y a uno
+    // que todavía no se prendió tampoco.
     let entrado =
       stunJugador <= 0 &&
-      cumulos.find((c) =>
-        circulos.some(
-          (n) => Math.hypot(n.x - c.x, n.y - c.y) < n.r + CUMULO_RADIO,
-        ),
+      cumulos.find(
+        (c) =>
+          prendido(c) &&
+          circulos.some(
+            (n) => Math.hypot(n.x - c.x, n.y - c.y) < n.r + CUMULO_RADIO,
+          ),
       );
     if (entrado && enLinea() && !soyAnfitrion()) {
       // Invitado: no decide el gol, avisa que entró (una vez por agujero) y
@@ -4805,12 +4752,17 @@
     if (rival.duda) return { x: dx, y: dy, boost: false };
 
     // El agujero al que va: el más cercano, contando también el camino por el
-    // costado (el mapa da la vuelta). Con errores, a veces elige el otro del
-    // par, el más lejano. Lo elige una vez y va a ese hasta que se cierra.
-    let meta = cumulos.find((c) => c.id === rival.meta);
-    if (!meta && cumulos.length) {
+    // costado (el mapa da la vuelta), recién cuando se dio cuenta de que está
+    // (dif.atencion s después de que aparece). Con errores, a veces elige el
+    // otro del par, el más lejano. Lo elige una vez y va a ese hasta que se
+    // cierra.
+    const vistos = cumulos.filter(
+      (c) => prendido(c) && c.t - (c.prendeT || 0) >= dif.atencion,
+    );
+    let meta = vistos.find((c) => c.id === rival.meta);
+    if (!meta && vistos.length) {
       let dMejor = Infinity;
-      for (const c of cumulos) {
+      for (const c of vistos) {
         const d = Math.hypot(difVuelta(c.x - rival.x), c.y - rival.y);
         if (d < dMejor) {
           dMejor = d;
@@ -5001,7 +4953,9 @@
       const boost = (DIFICULTADES[dificultad] || DIFICULTADES.regular).boost;
       let e = rival.energia ?? 1;
       const quiere =
-        r.boost && (!boost || (rival.boosteando ? e > 0 : e >= RIVAL_BOOST_MIN));
+        r.boost &&
+        boost !== false &&
+        (!boost || (rival.boosteando ? e > 0 : e >= RIVAL_BOOST_MIN));
       rival.boosteando = quiere;
       if (boost) e += (quiere ? -boost.gasto : boost.recupera) * dt;
       rival.energia = Math.max(0, Math.min(1, e));
@@ -5321,6 +5275,58 @@
   const r4 = (v) => Math.round(v * 1e4) / 1e4; // fracciones de pantalla
   const r1 = (v) => Math.round(v * 10) / 10; // px y ángulos
 
+  // --- El mapa del online ---------------------------------------------------------
+  // El juego se mueve en píxeles (la nave, las piedras, las distancias), así
+  // que online los dos tienen que jugar en un mapa del mismo tamaño: si no, el
+  // de la pantalla chica tiene todo más cerca y lo cruza más rápido. Al
+  // emparejarse cada uno le manda al otro el tamaño de su ventana
+  // ("pantalla") y los dos calculan lo mismo: la forma de la ventana más
+  // angosta (así ninguno ve más mapa que el otro) y el alto de la más alta
+  // (así en la chica el juego se achica, que se ve mejor que agrandarlo). El
+  // marco (index.html) pone el juego de ese tamaño y lo escala a la ventana;
+  // lo que sobra son franjas de estrellas. Fuera del online el juego ocupa
+  // toda la ventana, como siempre.
+  const MAPA_ESPERA_OTRO = 3000; // ms: si el otro no manda su pantalla (una versión vieja), se juega con la propia
+  const MAPA_ESPERA_MARCO = 1500; // ms: si el marco no cambia el tamaño, se juega igual
+
+  function acordarMapa() {
+    if (red.mapa) return;
+    const yo = { w: window.innerWidth, h: window.innerHeight };
+    const otro = red.otraPantalla;
+    const forma = Math.min(yo.w / yo.h, otro.w / otro.h);
+    const h = Math.max(yo.h, otro.h);
+    const w = Math.round(h * forma);
+    red.mapa = { w, h, hasta: performance.now() + MAPA_ESPERA_MARCO };
+    // Suelto, sin el marco (juego.html abierto directo), no hay quién lo
+    // cambie: se juega con la ventana.
+    if (window.parent === window) {
+      empezarOnline();
+      return;
+    }
+    window.parent.postMessage({ tipo: "esc4-mapa", w, h }, location.origin);
+  }
+
+  // Cada cuadro mientras se mide: arranca cuando el juego ya tiene el tamaño
+  // acordado (o si se cansó de esperar).
+  function revisarMapa() {
+    if (!red || red.estado !== "midiendo") return;
+    const ahora = performance.now();
+    const m = red.mapa;
+    if (m) {
+      const listo =
+        window.innerWidth === m.w && window.innerHeight === m.h;
+      if (listo || ahora > m.hasta) empezarOnline();
+    } else if (ahora > red.midiendoHasta) {
+      empezarOnline();
+    }
+  }
+
+  function empezarOnline() {
+    red.estado = "jugando";
+    if (modoEl) modoEl.hidden = true;
+    centrarNave(); // en su esquina del mapa ya acordado
+  }
+
   // La dirección del emparejador, con la clave si hay (ver abrirClave).
   function urlServidor() {
     if (!clave) return SERVIDOR;
@@ -5491,6 +5497,7 @@
     el.hidden = false;
     const textos = {
       conectando: "conectando",
+      midiendo: "rival encontrado",
       esperando: clave
         ? "buscando rival<br /><small>con la clave " +
           clave +
@@ -5508,16 +5515,28 @@
       mostrarEstadoOnline();
     } else if (m.tipo === "emparejado") {
       red.rol = m.rol;
-      red.estado = "jugando";
-      if (modoEl) modoEl.hidden = true;
       // Recién acá se sabe el color: el anfitrión (el que esperaba) es el
       // azul, el invitado el rojo (ver esAzul) -y con él, la esquina.
       ship.classList.toggle("multijugador", soyAnfitrion());
       ship.classList.toggle("color-rival", !soyAnfitrion());
-      centrarNave();
       conectarDirecto();
       // El mismo cielo en las dos pantallas: la semilla del anfitrión.
       if (soyAnfitrion()) enviarOnline({ tipo: "cielo", semilla: semillaCielo });
+      // Antes de jugar, el mapa (ver "El mapa del online").
+      red.estado = "midiendo";
+      red.midiendoHasta = performance.now() + MAPA_ESPERA_OTRO;
+      mostrarEstadoOnline();
+      enviarOnline({
+        tipo: "pantalla",
+        w: window.innerWidth,
+        h: window.innerHeight,
+      });
+      if (red.otraPantalla) acordarMapa();
+    } else if (m.tipo === "pantalla") {
+      if (m.w > 0 && m.h > 0) {
+        red.otraPantalla = { w: m.w, h: m.h };
+        if (red.estado === "midiendo") acordarMapa();
+      }
     } else if (m.tipo === "cielo") {
       if (!soyAnfitrion() && Number.isFinite(m.semilla)) armarCielo(m.semilla);
     } else if (m.tipo === "rtc") {
@@ -6441,12 +6460,13 @@
     // propio reloj, a la velocidad normal.
     const ritmo = compasMusica();
     for (const c of cumulos) {
+      if (!prendido(c)) continue; // todavía no (ver prendeT en crearPar)
       const compas = ritmo ? ritmo.compas : MUSICA_COMPAS_RESPALDO;
       const pos = ritmo ? ritmo.pos : c.t % compas;
       // Aparecen y se van achicándose (no con transparencia); en el medio
       // pulsan (ver pulsoCumulo).
       const esc =
-        Math.min(1, c.t / 0.5, (CUMULO_VIDA - c.t) / 1.5) *
+        Math.min(1, (c.t - (c.prendeT || 0)) / 0.5, (CUMULO_VIDA - c.t) / 1.5) *
         (1 +
           CUMULO_PULSO_AMPLITUD *
             pulsoCumulo(pos, compas / MUSICA_TIEMPOS_COMPAS));
@@ -6596,15 +6616,39 @@
     // Y la del jugador. shipPose viene en pantalla y pegada a la izquierda de
     // su caja (ver circulosNave), así que el centro es media caja más allá.
     const p = window.shipPose;
-    if (p && p.listo && !ship.classList.contains("fuera-de-juego"))
-      puntero(p.x + cajaNave / 2, p.y + cajaNave / 2, colorPropio());
+    const yo = p && p.listo ? { x: p.x + cajaNave / 2, y: p.y + cajaNave / 2 } : null;
+    if (yo && !ship.classList.contains("fuera-de-juego"))
+      puntero(yo.x, yo.y, colorPropio());
+    // Los agujeros aparecen en cualquier lugar del mapa (ver crearCumulo): si
+    // no se ve ninguno, una flecha al más cercano a la nave, que se ve como un
+    // agujero: negra por dentro y con el borde y el brillo del color de su
+    // anillo (blanco al principio y cada vez más salmón, como ellos).
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const agujeros = cumulos.filter(prendido).map((c) => ({
+      x: aPantalla(c.x, cam.ox),
+      y: aPantalla(c.y, cam.oy),
+    }));
+    const seVe = (a) => a.x >= 0 && a.x <= W && a.y >= 0 && a.y <= H;
+    if (!agujeros.length || agujeros.some(seVe)) return;
+    const desde = yo || { x: W / 2, y: H / 2 };
+    const cerca = (a) => Math.hypot(a.x - desde.x, a.y - desde.y);
+    const masCerca = agujeros.reduce((m, a) => (cerca(a) < cerca(m) ? a : m));
+    puntero(
+      masCerca.x,
+      masCerca.y,
+      mezclaAgujeros(Math.max(0, Math.min(1, colorNave))),
+      "#000",
+    );
   }
 
   // Del mundo a la pantalla: la inversa de lo que hace circulosNave, y lo mismo
   // que el transform del canvas (ver dibujar).
   const aPantalla = (v, origen) => origen + (v - origen) * cam.z;
 
-  function puntero(sx, sy, color) {
+  // relleno (opcional): el de adentro, y color queda para el borde y el
+  // resplandor (la de los agujeros); si no, toda del color.
+  function puntero(sx, sy, color, relleno) {
     const W = window.innerWidth;
     const H = window.innerHeight;
     if (sx >= 0 && sx <= W && sy >= 0 && sy <= H) return; // se ve: no hay nada que marcar
@@ -6620,7 +6664,7 @@
       ctx.shadowColor = color;
       ctx.shadowBlur = 12;
     }
-    ctx.fillStyle = color;
+    ctx.fillStyle = relleno || color;
     // Equilátero: los tres lados miden PUNTERO_LADO (la punta y la base
     // quedan a 2/3 y 1/3 de la altura del centroide, que es el punto que se
     // clava en el borde).
@@ -6633,6 +6677,12 @@
     ctx.lineTo(base, PUNTERO_LADO / 2);
     ctx.closePath();
     ctx.fill();
+    if (relleno) {
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = color;
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -6683,7 +6733,6 @@
       // Eligiendo el modo: todo espera, con la nave quieta en el medio abajo.
       if (window.shipMove) window.shipMove(0, 0);
       if (claveAbierta()) navegarClaveJoystick();
-      else if (dificultadAbierta()) navegarDificultadJoystick();
       else navegarMenuJoystick(dt);
       mostrarControles();
       dibujar(circulos[1]);
@@ -6691,7 +6740,8 @@
     }
     if (esperandoRival()) {
       // Online, buscando rival: igual que eligiendo, hasta que el emparejador
-      // junta a los dos.
+      // junta a los dos y se acuerda el mapa (ver revisarMapa).
+      revisarMapa();
       if (window.shipMove) window.shipMove(0, 0);
       dibujar(circulos[1]);
       return;

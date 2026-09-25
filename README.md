@@ -29,11 +29,16 @@ también en la pausa y en el cartel de salir del online. Durante el juego, el bo
   todo. Al completar los 10 agujeros, GANASTE y de vuelta al menú.
 - **2 · contra la PC**: vos con WASD o flechas (Shift acelera, Espacio aleja
   la cámara), sin tutorial: arranca el juego directo. La nave de la PC se ve
-  semitransparente. Antes se elige la **dificultad** (fácil, regular o
-  difícil; queda recordada la última). La PC se mueve siempre con la misma
-  física que vos: la dificultad solo cambia cómo decide (qué tan rápido se da
-  cuenta de una piedra, desde qué distancia la esquiva, cuánto se equivoca
-  de agujero o duda, y si su boost tiene límite). Ver `DIFICULTADES` en
+  semitransparente. La **dificultad** (fácil, regular o difícil) se elige
+  en el menú, parado en esta opción: aparece abajo de "J1 teclado" y se
+  cambia con los costados (LB y RB, el stick o la cruceta, las flechas, A y D
+  o la ruedita), dando la vuelta; queda recordada. La PC se mueve siempre con la misma
+  física que vos: la dificultad solo cambia cómo decide (cuánto tarda en
+  salir a buscar un agujero nuevo, qué tan rápido se da cuenta de una
+  piedra, desde qué distancia la esquiva, cuánto se equivoca de agujero o
+  duda, y si usa el boost). Medido con la PC sola: tarda en promedio 4,6 s
+  en meterse en un agujero en fácil, 3,2 en regular y 2,1 en difícil, y la
+  golpean 7, 5,5 y 4 veces por minuto. Ver `DIFICULTADES` en
   `js/esc4-game.js`. Cuando no hay agujeros pasea por el mapa por su cuenta.
 - **3 · dos jugadores**: sin tutorial, y la cámara muestra el mapa entero para
   que nadie quede fuera de pantalla.
@@ -54,15 +59,19 @@ también en la pausa y en el cartel de salir del online. Durante el juego, el bo
   MENU o Escape cancelan la búsqueda o te sacan de la partida; salir cuenta
   como irse: al rival le aparece EL RIVAL SE FUE y vuelve a su elección.
 
-## El mapa, igual en cualquier pantalla
+## El mapa del online
 
-El juego está en `juego.html` y corre siempre en un mapa de **1920 × 1080**,
-el mismo en cualquier pantalla. `index.html` es solo el marco: lo agranda o
-lo achica para que entre entero en la ventana, y si la pantalla tiene otra
-forma (16:10, ultra ancha) lo que sobra son franjas de estrellas, sin juego.
-Así nadie ve más mapa ni lo cruza más rápido por tener otra pantalla: online
-los dos juegan exactamente en el mismo mapa. En pantallas de más de 1920 de
-ancho se ve apenas menos nítido (el juego se agranda).
+El juego está en `juego.html`; `index.html` es el marco que lo muestra.
+Normalmente el juego ocupa toda la ventana, como siempre. Online no alcanza:
+el juego se mueve en píxeles, así que con pantallas distintas cada uno
+jugaría en un mapa distinto (el de la pantalla chica tendría todo más cerca y
+lo cruzaría más rápido). Por eso, al emparejarse, cada uno le manda al otro
+el tamaño de su ventana y los dos acuerdan el mismo mapa: con la forma de la
+ventana más angosta (así ninguno ve más mapa que el otro) y el alto de la
+más alta (así en la chica el juego se achica, que se ve mejor que
+agrandarlo). El marco pone el juego de ese tamaño y lo escala a la ventana;
+lo que sobra son franjas de estrellas, sin juego. Si los dos tienen pantallas
+parecidas, casi no hay franjas. Al salir del online vuelve a toda la ventana.
 
 Lo que venga en la dirección (`?servidor=`, `?calidad=`, `?perf=1`) el marco
 se lo pasa al juego.
@@ -93,7 +102,7 @@ dónde está, sus piedras y si está golpeada; cada una detecta sola los golpes
 a su nave. La forma de cada piedra (sus puntas) no cambia nunca, así que viaja
 una sola vez apenas nace, por el camino que no pierde nada, y en el estado va
 solo dónde está; si a alguno igual le falta una, la pide. Como el mapa mide
-lo mismo en las dos PCs (ver "El mapa, igual en cualquier pantalla"), los dos
+lo mismo en las dos PCs (ver "El mapa del online"), los dos
 juegan en el mismo mapa aunque los monitores sean de distinto tamaño.
 
 Los agujeros y los goles los decide el anfitrión (el que estaba esperando),
@@ -138,7 +147,11 @@ probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
   juego o parpadeando no nacen piedras suyas y las que venían dejan de
   perseguirla.
 - Los **agujeros de gusano** aparecen de a pares, como siempre: el primero que
-  entra a uno suma un gol y sale por el otro.
+  entra a uno suma un gol y sale por el otro. Aparecen en cualquier lugar del
+  mapa (no solo en lo que ve tu cámara) y nunca pegados a ninguna de las dos
+  naves, así no le quedan más cerca a una. Online los crea el anfitrión, pero
+  en su pantalla se prenden recién cuando al invitado ya le llegaron: los dos
+  los ven aparecer a la vez.
 - Gana el primero en llegar a **10**. El marcador está en el cuadrado del
   medio (tus goles en blanco, los de la PC en rojo) y la voz cuenta 1, 2, 3…
 - Si las dos naves llegan al mismo par de agujeros casi juntas (menos de
@@ -209,8 +222,8 @@ Para probar un nivel a mano: `?calidad=baja`, `?calidad=media` o
 ## Cómo correrlo
 
 Necesita servirse por http (no abriendo el `index.html` directo). Se abre
-`index.html` (el marco); `juego.html` solo también anda, pero con el mapa del
-tamaño de la ventana:
+`index.html` (el marco); `juego.html` solo también anda, pero online sin el
+mapa acordado (cada uno con su ventana):
 
 ```
 npx http-server .

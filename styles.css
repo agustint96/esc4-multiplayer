@@ -955,20 +955,7 @@ html.entra-juego .game-cuadrado {
 .game-modo-clave[hidden] {
   display: none;
 }
-/* Contra la PC, eligiendo la dificultad (ver abrirDificultad en esc4-game.js):
-   solo queda esa pantalla, con sus tres opciones como las del menú. */
-.game-modo.con-dificultad > :not(.game-modo-dificultad) {
-  display: none;
-}
-.game-modo-dificultad {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.8em;
-}
-.game-modo-dificultad[hidden] {
-  display: none;
-}
+
 .game-clave-campo {
   width: 12em;
   padding: 0.3em 0;
@@ -1030,6 +1017,26 @@ html.entra-juego .game-cuadrado {
   flex: none;
   white-space: nowrap;
 }
+/* Contra la PC: con qué juega J1 y, abajo, la dificultad (ver PIE_MODO en
+   esc4-game.js). Las tres a la vista, la elegida encendida. */
+.game-modo-pc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5em;
+}
+.game-modo-dificultades {
+  display: flex;
+  gap: 1.4em;
+}
+.game-modo-dif {
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.12s ease;
+}
+.game-modo-dif.elegida {
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
+}
 /* Contra la PC el segundero es el marcador: tus goles en azul y los de la PC en
    rojo, los mismos colores del borde de las piedras de cada una y de los halos
    de las dos naves (ver esc4-game.js). */
@@ -1043,6 +1050,14 @@ html.entra-juego .game-cuadrado {
    esc4-game.js). */
 .marcador-oro {
   color: #ffd166;
+}
+/* El resultado debajo del cartel del final (GANASTE, GANO LA PC...), más
+   chico. */
+.marcador-final {
+  display: block;
+  margin-top: 0.4em;
+  font-size: 0.7em;
+  text-align: center;
 }
 .marcador-separador {
   display: inline-block;
