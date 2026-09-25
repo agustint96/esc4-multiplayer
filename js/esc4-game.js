@@ -6847,9 +6847,15 @@
       if (ayuda) actualizarAyuda(dt);
       if (ayuda) {
         // Instrucciones: el tiempo no corre (sin segundero ni polígonos ni
-        // agujeros) y la nave se mueve libre.
+        // agujeros) y la nave se mueve libre. Con rival (el "listo" antes de
+        // arrancar), la otra nave también: la PC, el jugador 2 o, online, la
+        // del otro tal como llega (si no, una arrancaba adelantada).
         tQuieta = 0;
         navePrev = null;
+        if (!esTutorial()) {
+          if (enLinea()) seguirRivalOnline(dt);
+          else actualizarRival(dt, circulos);
+        }
       } else {
         // La música del juego acelera de a muy poquito.
         if (musicaFuente || (musica && !musica.paused)) {
@@ -6866,7 +6872,10 @@
         if (tiempo < gracia) {
           // Quieta por la gracia: no cuenta para las piedras que buscan a la nave.
           tQuieta = 0;
-          if (enCentro) centrarNave();
+          // En el tutorial la nave se sostiene en el medio durante la gracia.
+          // Con rival no: las dos vienen moviéndose libres desde el "listo" y
+          // sostener solo esta la dejaba atrás.
+          if (enCentro && esTutorial()) centrarNave();
         }
         if (fin) {
           // Alguien llegó a 10: el cartel, un segundo más en cámara lenta y
