@@ -747,6 +747,7 @@ html.entra-juego .game-cuadrado {
   place-items: center;
 }
 .game-timer {
+  position: relative; /* para el cartel de arriba (.marcador-cartel) */
   font-family: Spaceport, ui-monospace, Consolas, monospace;
   font-size: clamp(1rem, 4.5vmin, 2.75rem);
   color: #fff; /* esc4-game.js lo va llevando al salmón (--accent) al colorearse la nave */
@@ -1051,13 +1052,15 @@ html.entra-juego .game-cuadrado {
 .marcador-oro {
   color: #ffd166;
 }
-/* El resultado debajo del cartel del final (GANASTE, GANO LA PC...), más
-   chico. */
-.marcador-final {
-  display: block;
-  margin-top: 0.4em;
-  font-size: 0.7em;
-  text-align: center;
+/* Un cartel arriba del marcador (GANASTE, GANO LA PC, GOL DE ORO...): con la
+   misma letra, y flotando, así el marcador no se mueve ni cambia de tamaño. */
+.marcador-cartel {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.3em;
+  white-space: nowrap;
 }
 .marcador-separador {
   display: inline-block;

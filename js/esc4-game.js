@@ -978,8 +978,14 @@
 
   // Volver a la elección del modo, desde cualquier modo. Se recarga la página:
   // así todo arranca limpio. Online es como irse: al rival le llega que se fue
-  // (se cierra la conexión) y a él le aparece el cartel.
+  // (se cierra la conexión) y a él le aparece el cartel. Se vuelve directo al
+  // menú, sin la presentación (ver CLAVE_AL_MENU en setActive); recargar la
+  // página a mano sí la muestra.
+  const CLAVE_AL_MENU = "esc4-al-menu";
   function salirAlMenu() {
+    try {
+      sessionStorage.setItem(CLAVE_AL_MENU, "1");
+    } catch (e) {}
     location.reload();
   }
 
@@ -3838,9 +3844,10 @@
       : celda(claseRival, golesRival) +
         '<span class="marcador-separador"></span>' +
         celda(claseMia, cumulosTomados);
-    // El cartel del final, con el resultado abajo.
+    // Un cartel (el del final, el de GOL DE ORO) va arriba del marcador, con
+    // la misma letra, sin moverlo ni achicarlo (ver .marcador-cartel).
     const conResultado = (cartel) =>
-      cartel + '<span class="marcador-final">' + goles + "</span>";
+      '<span class="marcador-cartel">' + cartel + "</span>" + goles;
     // En el tutorial, el segundero del sitio (y GANASTE al completar los 10).
     const texto = esTutorial()
       ? fin
@@ -3848,7 +3855,7 @@
         : tiempo.toFixed(1)
       : fin
         ? fin.ganador === "abandono"
-          ? "EL RIVAL SE FUE"
+          ? conResultado("EL RIVAL SE FUE")
           : fin.ganador === "vos"
             ? conResultado(
                 celda(claseMia, modo === "dos" ? "GANO J1" : "GANASTE"),
@@ -3864,7 +3871,7 @@
                 ),
               )
         : golDeOroHasta > tiempo
-          ? celda("marcador-oro", "GOL DE ORO")
+          ? conResultado(celda("marcador-oro", "GOL DE ORO"))
           : goles;
     if (texto === ultimoTexto) return;
     ultimoTexto = texto;
@@ -7009,9 +7016,12 @@
         // directo, sin pasar por el menú. Una sola vez: si no, cada recarga
         // volvería a ese modo.
         let dePausa = null;
+        let alMenu = false; // se volvió al menú (ver salirAlMenu): sin presentación
         try {
           dePausa = JSON.parse(sessionStorage.getItem(CLAVE_MODO_PAUSA));
           sessionStorage.removeItem(CLAVE_MODO_PAUSA);
+          alMenu = sessionStorage.getItem(CLAVE_AL_MENU) === "1";
+          sessionStorage.removeItem(CLAVE_AL_MENU);
         } catch (e) {}
         const i = dePausa
           ? opcionesModo.findIndex((el) => el.dataset.elegir === dePausa.modo)
@@ -7020,6 +7030,10 @@
           controlesCambiados = !!dePausa.cambiados;
           apuntarOpcion(i, true);
           entrarConSonido(() => elegirApuntada(true));
+        } else if (alMenu) {
+          // Como después de la presentación: el menú sin la nave (vuelve al
+          // elegir un modo, ver elegirModo).
+          ship.classList.add("game-sin-nave");
         } else if (!presentada && !embebido) {
           empezarPresentacion();
         }
