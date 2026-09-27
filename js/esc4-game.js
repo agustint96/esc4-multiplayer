@@ -1785,6 +1785,10 @@
     { id: "alax", nombre: "X-Wing" },
     { id: "platillo", nombre: "Invasor" },
     { id: "iss", nombre: "ISS" },
+    { id: "tie", nombre: "Caza TIE" },
+    { id: "estrella", nombre: "Estrella de la Muerte" },
+    { id: "van", nombre: "Breaking Bad" },
+    { id: "delorean", nombre: "DeLorean" },
   ].map((n) => {
     const dir = n.id === "cohete" ? "parallax/" : `naves/nuevas/${n.id}/`;
     const off = `${dir}${n.id}.webp`;
