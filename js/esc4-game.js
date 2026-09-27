@@ -464,6 +464,10 @@
   const MUSICA_COMPASES_BUCLE = 60; // compases que dura el bucle entero
   const MUSICA_PULSO_TIEMPO = 0; // en qué tiempo del compás cae el pulso (0 = el primero, 4 = el último): para correrlo si se siente desfasado
   const MUSICA_COMPAS_RESPALDO = 2.0604; // segundos del compás a velocidad normal: se usa si no se puede saber dónde va la música
+  // La batería entra al empezar el compás 7 (12,36 s; medido sobre el audio). En
+  // el tutorial, cada partida arranca la música ahí, ya con la batería; al dar
+  // la vuelta el bucle sigue desde el principio, como siempre.
+  const MUSICA_BATERIA_COMPASES = 6;
   // Final (victoria): la intro otra vez, con los parallax 7 en blanco y negro,
   // junto a la nave del jugador (que las mira) y con el zoom a la nave. Los
   // tiempos son los de la intro (INTRO_LLEGADA, INTRO_SALIDA...), salvo la espera.
@@ -548,6 +552,14 @@
     },
     dificil: { atencion: 0, reflejos: 0, peligro: 180, error: 0, boost: null },
   };
+  // A ciegas: con el centro fuera de la pantalla (abajo; por arriba no puede
+  // salirse) la PC no ve dónde está, igual que el jugador cuando se le va la
+  // nave. Solo ve las piedras que están en pantalla, y con los reflejos de
+  // CIEGA_REFLEJOS s si los suyos son mejores. A los CIEGA_DARSE_CUENTA s se
+  // da cuenta y vuelve a la pantalla antes de seguir con los agujeros. Igual
+  // en todas las dificultades: no es habilidad, es que no ve.
+  const CIEGA_REFLEJOS = 0.35;
+  const CIEGA_DARSE_CUENTA = 0.3;
   const RIVAL_BOOST_DIST = 320;
   const RIVAL_BOOST_MIN = 0.4;
   const DUDA_POR_SEG = 0.5; // con error 1, dudas por segundo (con 0,35, una cada ~6 s)
@@ -916,13 +928,19 @@
     if (TECLAS_J2_WASD[ev.code]) teclasJ2Wasd[TECLAS_J2_WASD[ev.code]] = true;
     if (!activo) return;
     if (presenta) {
-      tocarPresentacion(); // cualquier tecla
+      // Cualquier tecla, pero no la que se repite por tenerla apretada: la de
+      // la carátula saltearía también el logo.
+      if (!ev.repeat) tocarPresentacion();
       return;
     }
     if (esperaToque) {
       // Ni Escape ni una tecla que se repite por tenerla apretada cuentan como
       // toque para el navegador: no desbloquean el audio.
       if (ev.code !== "Escape" && !ev.repeat) tocarEspera();
+      return;
+    }
+    if (selector) {
+      teclaSelector(ev);
       return;
     }
     if (claveAbierta()) {
@@ -1261,6 +1279,14 @@
       volumen: 0.15,
       desde: 0.24,
     },
+    // El ruidito del foquito del planeta del escenario 2, para el logo de la
+    // presentación (ver PRESENTA_LOGO_SUENA). Va por acá porque suena apenas
+    // hubo un toque (el de la carátula), aunque el juego todavía no cargó lo suyo.
+    foquito: {
+      url: "audio/Esc2/everyone.m4a",
+      volumen: 0.5,
+      desde: 0,
+    },
   };
   // Elegir desde la pausa recarga la página (ver reiniciarEnModo): se espera
   // esto antes de recargar, para que "seleccion" llegue a sonar.
@@ -1590,6 +1616,12 @@
       reiniciarEnModo(m);
       return;
     }
+    // Contra la PC, con dos jugadores y online, primero la nave (ver "El
+    // selector de naves"): al elegirla vuelve acá.
+    if ((m === "pc" || m === "dos" || m === "online") && navesElegidas !== m) {
+      abrirSelector(m);
+      return;
+    }
     // Online, primero la clave (ver abrirClave): al buscar vuelve acá.
     if (m === "online" && clave === null) {
       abrirClave();
@@ -1603,12 +1635,10 @@
     // de nuevo apenas arranca.
     padSalirAntes = padSalirApretado();
     window.dosJugadores = m === "dos";
-    // Con dos jugadores y contra la PC los costados dan la vuelta (script.js
-    // para la nave propia, moverRival para la del rival); online y en el
-    // tutorial frenan como siempre.
-    window.vueltaCostados = m === "dos" || m === "pc" || m === "online";
+    // En todos los modos los costados dan la vuelta (script.js para la nave
+    // propia, moverRival para la del rival). Solo frenan mientras se elige.
+    window.vueltaCostados = true;
     window.vueltaMargen = margenVuelta(); // script.js da la vuelta con el mismo
-    window.naveMargenY = margenVertical(); // y frena arriba y abajo en el mismo lugar
     actualizarControles();
     if (menuEl) menuEl.hidden = false;
     if (m === "online") {
@@ -1738,6 +1768,136 @@
   const lienzoRival = document.createElement("canvas"); // las tres capas juntas
   lienzoRival.width = 203;
   lienzoRival.height = 300;
+
+  // --- Naves y fuegos ------------------------------------------------------------
+  // Las naves que se pueden elegir (ver "El selector de naves") y los fuegos.
+  // Todas vuelan igual y chocan con los mismos tres círculos (NAVE_CIRCULOS):
+  // cambia solo el dibujo. Cada una tiene su sprite apagado y prendido de
+  // 203x300 (el de las nuevas está en naves/nuevas/) y el de atrás, que lleva
+  // el resplandor de la luz: el cohete tiene su silueta y las demás usan el
+  // propio dibujo (misma forma).
+  const NAVES_JUEGO = [
+    { id: "cohete", nombre: "Clasico" },
+    { id: "atomica", nombre: "Atomica" },
+    { id: "cuadros", nombre: "X-FLR6" },
+    { id: "saturno", nombre: "Saturno V" },
+    { id: "falcon", nombre: "Falcon 9" },
+    { id: "alax", nombre: "X-Wing" },
+    { id: "platillo", nombre: "Invasor" },
+  ].map((n) => {
+    const dir = n.id === "cohete" ? "parallax/" : `naves/nuevas/${n.id}/`;
+    const off = `${dir}${n.id}.webp`;
+    const on = `${dir}${n.id}_on.webp`;
+    return {
+      ...n,
+      off,
+      on,
+      fondo: n.id === "cohete" ? "parallax/cohete_fondo.webp" : on,
+      img: n.id === "cohete" ? imgRivalTop : cargarImagen(on),
+      imgFondo: n.id === "cohete" ? imgRivalFondo : null,
+    };
+  });
+  // Los fuegos: el dibujo de cohete_fuego.webp tal cual (clásico) o
+  // recoloreado (ver fuegoTenido): la parte de afuera y la de adentro (la
+  // celeste) pasan cada una a un degradé de dos colores según lo clara que
+  // sea, y el contorno oscuro queda igual.
+  const FUEGOS = [
+    { id: "clasico", nombre: "clasico" },
+    { id: "fuego", nombre: "fuego", afuera: ["#b8321c", "#ffb35c"], adentro: ["#ff8a1f", "#fff1a8"] },
+    { id: "hielo", nombre: "hielo", afuera: ["#3f7fb8", "#d8f2ff"], adentro: ["#8fd8ff", "#ffffff"] },
+    { id: "plasma", nombre: "plasma", afuera: ["#6a2bb0", "#e7a8ff"], adentro: ["#ff4fc0", "#ffe0f6"] },
+    { id: "veneno", nombre: "veneno", afuera: ["#2f7f2a", "#b8f070"], adentro: ["#9be03c", "#f4ffc0"] },
+  ];
+  const naveDe = (id) => NAVES_JUEGO.find((n) => n.id === id) || NAVES_JUEGO[0];
+  const fuegoDe = (id) => FUEGOS.find((f) => f.id === id) || FUEGOS[0];
+
+  const fuegosTenidos = new Map(); // id -> lienzo de 203x300
+  // El dibujo del fuego de ese tipo (el clásico es la imagen misma), o null
+  // si todavía no cargó.
+  function fuegoTenido(id) {
+    const f = fuegoDe(id);
+    if (!f.afuera) return imgFuego;
+    if (fuegosTenidos.has(f.id)) return fuegosTenidos.get(f.id);
+    if (!imgFuego.complete || !imgFuego.naturalWidth) return null;
+    const lienzo = document.createElement("canvas");
+    lienzo.width = imgFuego.naturalWidth;
+    lienzo.height = imgFuego.naturalHeight;
+    const c = lienzo.getContext("2d");
+    c.drawImage(imgFuego, 0, 0);
+    const datos = c.getImageData(0, 0, lienzo.width, lienzo.height);
+    const px = datos.data;
+    const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const afuera = f.afuera.map(rgb);
+    const adentro = f.adentro.map(rgb);
+    for (let i = 0; i < px.length; i += 4) {
+      if (!px[i + 3]) continue;
+      const r = px[i];
+      const g = px[i + 1];
+      const b = px[i + 2];
+      const luz = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      if (luz < 0.22) continue; // el contorno
+      const t = Math.min(1, (luz - 0.22) / 0.78);
+      const [o, cl] = (g + b) / 2 > r + 8 ? adentro : afuera;
+      for (let k = 0; k < 3; k++) px[i + k] = Math.round(o[k] + (cl[k] - o[k]) * t);
+    }
+    c.putImageData(datos, 0, 0);
+    fuegosTenidos.set(f.id, lienzo);
+    return lienzo;
+  }
+
+  // Lo elegido la última vez (se arranca con eso en el selector).
+  const NAVES_GUARDADAS = "esc4-naves";
+  function naveGuardada() {
+    const vacia = { j1: { nave: "cohete", fuego: "clasico" }, j2: { nave: "cohete", fuego: "clasico" } };
+    try {
+      const g = JSON.parse(localStorage.getItem(NAVES_GUARDADAS));
+      for (const j of ["j1", "j2"])
+        if (g && g[j]) vacia[j] = { nave: naveDe(g[j].nave).id, fuego: fuegoDe(g[j].fuego).id };
+    } catch (e) {}
+    return vacia;
+  }
+  function guardarNaves(eleccion) {
+    try {
+      localStorage.setItem(NAVES_GUARDADAS, JSON.stringify(eleccion));
+    } catch (e) {}
+  }
+
+  // La nave del jugador 1 (la de script.js, en el DOM): los sprites y el
+  // fuego (window.naveJ1 y window.fuegoJ1, los lee script.js).
+  let eleccionJ1 = { nave: "cohete", fuego: "clasico" };
+  function aplicarNaveJugador(eleccion) {
+    eleccionJ1 = { nave: naveDe(eleccion.nave).id, fuego: fuegoDe(eleccion.fuego).id };
+    const n = naveDe(eleccionJ1.nave);
+    window.naveJ1 = n.id === "cohete" ? null : { off: n.off, on: n.on };
+    const top = ship.querySelector(".starry-cohete-top");
+    const fondo = ship.querySelector(".starry-cohete-fondo");
+    if (top) top.src = ship.classList.contains("luz-on") ? n.on : n.off;
+    if (fondo) fondo.src = n.fondo;
+    const f = fuegoDe(eleccionJ1.fuego);
+    window.fuegoJ1 = f.afuera ? fuegoTenido(f.id) : null;
+    // Si el fuego todavía no se pudo teñir (no había cargado), en cuanto cargue.
+    if (f.afuera && !window.fuegoJ1)
+      imgFuego.addEventListener("load", () => aplicarNaveJugador(eleccionJ1), { once: true });
+  }
+
+  // La nave del rival (la de la PC, el jugador 2 u online), que dibuja este
+  // archivo (ver dibujarRival y actualizarFuegoRival). Arranca como el cohete.
+  const naveRival = { id: "cohete", img: imgRivalTop, fondo: imgRivalFondo, fuego: "clasico" };
+  function aplicarNaveRival(eleccion) {
+    const n = naveDe(eleccion && eleccion.nave);
+    naveRival.id = n.id;
+    naveRival.img = n.img;
+    naveRival.fondo = n.imgFondo;
+    naveRival.fuego = fuegoDe(eleccion && eleccion.fuego).id;
+  }
+  // Contra la PC: una nave y un fuego al azar en cada partida.
+  function naveRivalAlAzar() {
+    aplicarNaveRival({
+      nave: NAVES_JUEGO[Math.floor(Math.random() * NAVES_JUEGO.length)].id,
+      fuego: FUEGOS[Math.floor(Math.random() * FUEGOS.length)].id,
+    });
+  }
+
   const fuegoRival = { nivel: 0, fase: 0 };
   // Cámara (ver arriba): zoom y punto de la pantalla que queda fijo (la nave).
   const cam = { z: 1, ox: window.innerWidth / 2, oy: window.innerHeight / 2 };
@@ -2535,6 +2695,9 @@
   function iniciarMusica() {
     frenarMusica();
     musicaT = 0;
+    // Compases que se saltea (ver MUSICA_BATERIA_COMPASES): enteros, así los
+    // agujeros siguen pulsando a tiempo.
+    const compases = esTutorial() ? MUSICA_BATERIA_COMPASES : 0;
     if (musicaBuffer) {
       // El navegador puede tenerla suspendida hasta la primera interacción.
       audioCtx.resume().catch(() => {});
@@ -2542,12 +2705,14 @@
       musicaFuente.buffer = musicaBuffer;
       musicaFuente.loop = true;
       musicaFuente.connect(musicaGain);
-      musicaFuente.start();
-      musicaPos = 0;
+      const desde =
+        (compases * musicaBuffer.duration) / MUSICA_COMPASES_BUCLE;
+      musicaFuente.start(0, desde);
+      musicaPos = desde;
       musicaRelojPrev = audioCtx.currentTime;
       musicaLatencia = audioCtx.outputLatency || audioCtx.baseLatency || 0;
     } else if (musica) {
-      musica.currentTime = 0;
+      musica.currentTime = compases * MUSICA_COMPAS_RESPALDO;
       musica.play().catch(() => {}); // puede bloquearla si aún no hubo interacción
     } else musicaPendiente = true; // todavía cargando: arranca al terminar
   }
@@ -2925,9 +3090,14 @@
   }
 
   // --- Presentación -----------------------------------------------------------
-  // Al abrir la página, antes del menú, en tres pantallas:
-  // 1. Logo: el dibujo de "logo agus.png" en el medio de la pantalla negra, que
-  //    aparece y se va.
+  // Al abrir la página, antes del menú, en cuatro pantallas:
+  // 1. Logo: el dibujo de "logo agus sin texto.png" con "creado por agustin
+  //    tardella" abajo (en Spaceport) en el medio de la pantalla negra, que
+  //    se prende como el foquito del planeta del escenario 2, con su ruidito
+  //    (si el navegador ya deja sonar), y se funde (logoFoquito en
+  //    styles.css). Una tecla lo saltea y pasa a la carátula.
+  // 1b. Carátula (ver "La carátula" más abajo): una de seis, al azar; espera
+  //    una tecla, un click o el botón A, y con eso se funde a negro.
   // 2. Entrada: el negro se aclara (no del todo: el fondo queda como con
   //    PRESENTA_FONDO) y en el medio se abre un agujero de gusano. Llega la nave
   //    desde la izquierda, a color, lo mira y se mete volando derecho: igual
@@ -2941,7 +3111,8 @@
   //    y frena antes de llegar, gira y lo mira un momento, y después gira otra
   //    vez, acelera y se va por la derecha. No vuelve a verse hasta que se
   //    elige un modo.
-  // Cualquier tecla, un click o el botón A la saltean. Una sola vez por página.
+  // Pasada la carátula, cualquier tecla, un click o el botón A saltean el
+  // resto. Una sola vez por página.
   //
   // Los navegadores no dejan sonar nada hasta que la persona toca la página (una
   // tecla o un click). Con PRESENTA_PIDE_TOQUE en true, si todavía no se tocó, al
@@ -2953,9 +3124,8 @@
   //
   // Todo lo de la presentación se dibuja en coordenadas de pantalla.
   const PRESENTA_PIDE_TOQUE = false; // true: "presiona cualquier tecla" antes de la intro y antes de entrar a un modo desde la pausa
-  const PRESENTA_LOGO_ENTRA = 0.8; // s que tarda en aparecer el logo
-  const PRESENTA_LOGO_QUEDA = 1.8; // s que se queda a la vista
-  const PRESENTA_LOGO_SALE = 0.8; // s que tarda en irse
+  const PRESENTA_LOGO_DURA = 4; // s del logo, lo que dura logoFoquito (styles.css)
+  const PRESENTA_LOGO_SUENA = 0.5; // s en que suena el foquito: cuando empieza a parpadear
   const PRESENTA_ACLARA = 2.4; // lo que tarda en aclarar la pantalla de entrada
   const PRESENTA_FONDO = 2 / CUMULOS_PARA_COLOR; // el fondo como con 2 agujeros
   // (Los agujeros miden lo mismo que en el juego: 1 por el zoom de la cámara,
@@ -2979,8 +3149,10 @@
   const PRESENTA_ARRANQUE = 0.8; // s que tarda en llegar a esa velocidad
   const PRESENTA_CAIDA_SALTEO = 0.35; // fundido a negro al saltearla
   const PRESENTA_ESPERA_MAX = 3; // s de negro esperando el logo, como mucho
-  const presentaLogo = document.getElementById("game-presenta-logo");
+  const presentaLogo = document.getElementById("game-presenta-logo"); // el dibujo y la firma
+  const presentaLogoImg = presentaLogo && presentaLogo.querySelector("img");
   const presentaToque = document.getElementById("game-presenta-toque");
+  const caratulaTexto = document.getElementById("game-caratula-texto");
   // Un WAV mudo de 8 muestras: para probar si el navegador deja sonar.
   const SILENCIO =
     "data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YRAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -3017,11 +3189,11 @@
     // Sin opción apuntada hasta que se vaya la nave (o se la saltee): ahí se
     // apunta la primera, con su "selector" (ver terminarPresentacion).
     apagarMenu();
-    // fase: "logo", "espera" (el toque para poder sonar), "entrada" o
-    // "salida"; f: segundos desde que empezó la fase. toque: null mientras se
-    // averigua si puede sonar, false esperando que toquen algo, true si ya
-    // puede sonar. cae: cuándo termina el fundido a negro de salteo (null si
-    // no se salteó).
+    // fase: "logo", "caratula", "espera" (el toque para poder sonar),
+    // "entrada" o "salida"; f: segundos desde que empezó la fase. toque: null
+    // mientras se averigua si puede sonar, false esperando que toquen algo,
+    // true si ya puede sonar. cae: cuándo termina el fundido a negro de
+    // salteo (null si no se salteó). car: lo de la carátula.
     presenta = {
       fase: "logo",
       f: 0,
@@ -3031,6 +3203,7 @@
       cae: null,
       agujeros: [],
       pos: null,
+      car: null,
     };
     const gp = primerJoystick();
     presenta.padA = !!gp && botonPad(gp, PAD_A);
@@ -3047,9 +3220,10 @@
     const listo = () => {
       if (presenta) presenta.listo = true;
     };
-    if (presentaLogo.decode) presentaLogo.decode().then(listo, listo);
-    else if (presentaLogo.complete) listo();
-    else presentaLogo.addEventListener("load", listo);
+    if (!presentaLogoImg) listo();
+    else if (presentaLogoImg.decode) presentaLogoImg.decode().then(listo, listo);
+    else if (presentaLogoImg.complete) listo();
+    else presentaLogoImg.addEventListener("load", listo);
     presentaLogo.hidden = false;
     puedeSonar().then((puede) => {
       if (!presenta || presenta.toque !== null) return; // ya tocaron
@@ -3062,6 +3236,14 @@
   // podía, la saltea.
   function tocarPresentacion() {
     if (!presenta) return;
+    if (presenta.fase === "logo") {
+      saltarLogo();
+      return;
+    }
+    if (presenta.fase === "caratula") {
+      dejarCaratula();
+      return;
+    }
     if (!PRESENTA_PIDE_TOQUE || presenta.toque === true) {
       saltarPresentacion();
       return;
@@ -3106,27 +3288,28 @@
       if (p.cae <= 0) terminarPresentacion();
       return;
     }
+    if (p.fase === "caratula") {
+      actualizarCaratula(dt);
+      return;
+    }
     if (p.fase === "logo") {
       if (!p.listo) {
         p.espera += dt;
         if (p.espera < PRESENTA_ESPERA_MAX) return;
         p.listo = true;
       }
-      if (p.f === 0) {
-        presentaLogo.style.transition = `opacity ${PRESENTA_LOGO_ENTRA}s ease`;
-        presentaLogo.classList.add("visible");
-      }
+      // El foquito (logoFoquito en styles.css): aparece apagado, parpadea
+      // con el ruidito, se queda prendido, se funde y se va.
+      if (p.f === 0 && p.logoCae === undefined)
+        presentaLogo.classList.add("foquito");
       p.f += dt;
-      const sale = PRESENTA_LOGO_ENTRA + PRESENTA_LOGO_QUEDA;
-      if (!p.logoSale && p.f >= sale) {
-        p.logoSale = true;
-        presentaLogo.style.transition = `opacity ${PRESENTA_LOGO_SALE}s ease`;
-        presentaLogo.classList.remove("visible");
+      if (!p.logoSono && p.logoCae === undefined && p.f >= PRESENTA_LOGO_SUENA) {
+        p.logoSono = true;
+        sonarMenu("foquito");
       }
-      if (p.f >= sale + PRESENTA_LOGO_SALE) {
-        presentaLogo.hidden = true;
-        pasarFase("espera");
-      }
+      if (p.logoCae !== undefined) p.logoCae -= dt;
+      if (p.logoCae !== undefined ? p.logoCae <= 0 : p.f >= PRESENTA_LOGO_DURA)
+        terminarLogo();
       return;
     }
     if (p.fase === "espera") {
@@ -3145,6 +3328,37 @@
     if (p.fase === "entrada") actualizarEntrada();
     else actualizarSalida();
     if (presenta) dibujarPresentacion(); // (si la nave ya se fue, terminó)
+  }
+
+  // Terminó el logo (o se lo salteó): la carátula.
+  function terminarLogo() {
+    presentaLogo.classList.remove("foquito", "visible");
+    presentaLogo.style.transition = "";
+    presentaLogo.style.opacity = "";
+    presentaLogo.hidden = true;
+    empezarCaratula();
+  }
+
+  // Una tecla durante el logo: se apaga rápido desde donde estaba y sigue la
+  // carátula.
+  const PRESENTA_LOGO_SALTEO = 0.3;
+  function saltarLogo() {
+    const p = presenta;
+    if (p.logoCae !== undefined) return;
+    p.logoCae = PRESENTA_LOGO_SALTEO;
+    apagarLogo(PRESENTA_LOGO_SALTEO);
+  }
+
+  // El logo se va en dur segundos desde el brillo que tenía (aunque esté a
+  // mitad del foquito).
+  function apagarLogo(dur) {
+    const opacidad = getComputedStyle(presentaLogo).opacity;
+    presentaLogo.style.transition = "none";
+    presentaLogo.style.opacity = opacidad;
+    presentaLogo.classList.remove("foquito", "visible");
+    void presentaLogo.offsetWidth;
+    presentaLogo.style.transition = `opacity ${dur}s ease`;
+    presentaLogo.style.opacity = "0";
   }
 
   // Pantalla de entrada: el starry apenas prendido, el agujero en el medio.
@@ -3333,6 +3547,19 @@
 
   function dibujarPresentacion() {
     const p = presenta;
+    dibujarCieloPresentacion();
+    for (const h of p.agujeros) {
+      const esc = escalaAgujeroPresentacion(h, p.f);
+      if (esc > 0.01)
+        dibujarAgujero(h.x, h.y, h.ang, esc, PRESENTA_AGUJERO_COLOR);
+    }
+    dibujarChispas(PRESENTA_AGUJERO_COLOR);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // Borra el lienzo y dibuja las estrellas; deja el lienzo en coordenadas de
+  // pantalla.
+  function dibujarCieloPresentacion() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
     // Las estrellas, con la cámara que va a tener el menú (ver dibujar): el
@@ -3350,12 +3577,1029 @@
     );
     dibujarEstrellas();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    for (const h of p.agujeros) {
-      const esc = escalaAgujeroPresentacion(h, p.f);
-      if (esc > 0.01)
-        dibujarAgujero(h.x, h.y, h.ang, esc, PRESENTA_AGUJERO_COLOR);
+  }
+
+  // --- La carátula -------------------------------------------------------------
+  // Después del logo, antes del agujero de gusano: una de seis carátulas
+  // minimalistas (las maquetas están en caratulas/), al azar cada vez que se
+  // entra y nunca la misma dos veces seguidas (con ?caratula=N se elige una).
+  // Todavía sin nombre del juego. Abajo, "cargando" hasta que están las
+  // imágenes y después "presiona cualquier tecla": ese toque es el que deja
+  // sonar al navegador. Cada una se mueve apenas:
+  // 1. Anillo: el agujero blanco, solo, late con el tempo de la música (como los
+  //    agujeros del juego).
+  // 2. Duelo: las dos naves chiquitas frente a frente y un agujero entre ellas;
+  //    las estrellas se corren muy despacio.
+  // 3. Estelas: las dos naves casi cruzándose, cada una con su humo (el de la X
+  //    o la B); el halo de cada una se aviva y se apaga tenue, 3 s cada una,
+  //    medio superpuestas.
+  // 4. Blanco y negro: la nave sola, con la llama a media potencia, pasa de
+  //    blanco y negro a color.
+  // 5. Lluvia: piedras finitas que caen y esquivan a la nave, que nunca recibe
+  //    un golpe.
+  // 6. Llegada: la nave con su humo va hacia un agujero chiquito que nunca
+  //    alcanza; el cielo gira muy despacio.
+  // Se dibujan en 1920x1080 (el mapa del juego) y se escalan a la pantalla (ver
+  // transformarCaratula); las estrellas llenan la pantalla entera.
+  const CARATULAS = 6;
+  const CARATULA_ULTIMA = "esc4-caratula"; // la que salió la vez anterior
+  const CARATULA_APARECE = 1.2; // s que tarda en aclararse desde el negro
+  const CARATULA_SALE = 0.7; // s del fundido a negro con el toque
+  const CARATULA_ESTRELLAS = 70; // en 1920x1080
+  const CARATULA_AZUL = "90, 169, 255";
+  const CARATULA_ROJO = "255, 90, 90";
+  const CARATULA_DERIVA = 5; // 2: px/s que se corren las estrellas
+  const CARATULA_GIRO_CIELO = 0.012; // 6: rad/s que gira el cielo
+  const CARATULA_DESTELLO = 3; // 3: s que dura el destello de cada nave
+  const CARATULA_COLOR = { desde: 1.5, dura: 4.5 }; // 4: cuándo empieza a colorearse la nave y cuánto tarda
+  const CARATULA_PIEDRAS = 46; // 5
+  const CARATULA_ESQUIVA = 60; // 5: px que dejan las piedras entre ellas y la nave
+
+  function elegirCaratula() {
+    const pedida = Number(new URLSearchParams(location.search).get("caratula"));
+    if (pedida >= 1 && pedida <= CARATULAS) return pedida;
+    let ultima = 0;
+    try {
+      ultima = Number(localStorage.getItem(CARATULA_ULTIMA)) || 0;
+    } catch (e) {}
+    let n;
+    do n = 1 + Math.floor(Math.random() * CARATULAS);
+    while (n === ultima);
+    try {
+      localStorage.setItem(CARATULA_ULTIMA, String(n));
+    } catch (e) {}
+    return n;
+  }
+
+  // Escala y corrimiento de 1920x1080 a la pantalla (entra entera, centrada).
+  function medidaCaratula() {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const u = Math.min(W / 1920, H / 1080);
+    return { u, ox: (W - 1920 * u) / 2, oy: (H - 1080 * u) / 2 };
+  }
+  function transformarCaratula() {
+    const { u, ox, oy } = medidaCaratula();
+    ctx.setTransform(dpr * u, 0, 0, dpr * u, dpr * ox, dpr * oy);
+  }
+
+  // Estrellas en un cuadrado que cubre la pantalla aunque gire (lado = la
+  // diagonal), con la misma densidad que las maquetas.
+  function crearEstrellasCaratula() {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const lado = Math.hypot(W, H);
+    const { u } = medidaCaratula();
+    const n = Math.round(
+      (CARATULA_ESTRELLAS * lado * lado) / (1920 * 1080 * u * u),
+    );
+    const estrellas = [];
+    for (let i = 0; i < n; i++)
+      estrellas.push({
+        x: (Math.random() - 0.5) * lado,
+        y: (Math.random() - 0.5) * lado,
+        r: (0.6 + Math.random() * 1.1) * Math.max(u, 0.5),
+        a: 0.15 + Math.random() * 0.4,
+      });
+    return estrellas;
+  }
+
+  // corrida: px que se corrieron a la izquierda; giro: radianes alrededor del
+  // centro de la pantalla.
+  function dibujarEstrellasCaratula(estrellas, corrida, giro) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const lado = Math.hypot(W, H);
+    const cos = Math.cos(giro);
+    const sin = Math.sin(giro);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#fff";
+    for (const s of estrellas) {
+      let x = s.x - corrida;
+      x = ((((x + lado / 2) % lado) + lado) % lado) - lado / 2;
+      const px = W / 2 + x * cos - s.y * sin;
+      const py = H / 2 + x * sin + s.y * cos;
+      if (px < -3 || px > W + 3 || py < -3 || py > H + 3) continue;
+      ctx.globalAlpha = s.a;
+      ctx.beginPath();
+      ctx.arc(px, py, s.r, 0, Math.PI * 2);
+      ctx.fill();
     }
-    dibujarChispas(PRESENTA_AGUJERO_COLOR);
+    ctx.globalAlpha = 1;
+  }
+
+  // Un dibujo quieto (el humo) hecho una sola vez en un lienzo del tamaño de
+  // la carátula en pantalla; dibujar(c) dibuja en 1920x1080.
+  function lienzoCaratula(dibujar) {
+    const { u } = medidaCaratula();
+    const lienzo = document.createElement("canvas");
+    lienzo.width = Math.max(1, Math.round(1920 * u * dpr));
+    lienzo.height = Math.max(1, Math.round(1080 * u * dpr));
+    const c = lienzo.getContext("2d");
+    c.scale(u * dpr, u * dpr);
+    dibujar(c);
+    return lienzo;
+  }
+
+  // El humo de la estela del juego (X o B del joystick), con sus mismos
+  // números (ver sembrarEstela y dibujarEstela): bocanadas del color de la
+  // nave cada ~0,04 altos de nave, que nacen en la punta del fuego y crecen y
+  // se apagan con la edad, 3 s de humo (lo que dura el tanque). camino: puntos
+  // desde la punta del fuego hacia atrás; vel: altos de nave por segundo.
+  function humoCaratula(c, camino, rgb, alto, vel = 2.6) {
+    const spr = spriteEstela(
+      "#" +
+        rgb
+          .split(",")
+          .map((v) => Number(v).toString(16).padStart(2, "0"))
+          .join(""),
+    );
+    const paso = alto * 0.042;
+    const largoMax = vel * alto * ESTELA_TANQUE;
+    const puntos = [];
+    let hecho = 0;
+    for (let i = 1; i < camino.length && hecho < largoMax; i++) {
+      const [ax, ay] = camino[i - 1];
+      const [bx, by] = camino[i];
+      const d = Math.hypot(bx - ax, by - ay);
+      for (let s = 0; s < d && hecho < largoMax; s += paso, hecho += paso)
+        puntos.push([ax + ((bx - ax) * s) / d, ay + ((by - ay) * s) / d, hecho]);
+    }
+    // Las más viejas primero (quedan abajo).
+    for (let i = puntos.length - 1; i >= 0; i--) {
+      const [x, y, dist] = puntos[i];
+      const edad = dist / (vel * alto);
+      const t = edad / (7 + Math.random() * 5);
+      const r0 = (alto * (4 + Math.random() * 2)) / 130;
+      const r1 = (alto * (24 + Math.random() * 20)) / 130;
+      const r = r0 + (r1 - r0) * Math.pow(t, 0.55);
+      const deriva = edad * alto * 0.02;
+      c.globalAlpha =
+        (0.07 + Math.random() * 0.04) *
+        Math.pow(1 - t, 1.6) *
+        Math.min(1, edad / 0.3);
+      c.drawImage(
+        spr,
+        x + (Math.random() - 0.5) * deriva - r,
+        y + (Math.random() - 0.5) * deriva - r,
+        r * 2,
+        r * 2,
+      );
+    }
+    c.globalAlpha = 1;
+  }
+
+  // Una curva (cuadrática) como lista de puntos.
+  function curvaCaratula(a, b, c, n = 80) {
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const v = 1 - t;
+      pts.push([
+        v * v * a[0] + 2 * v * t * b[0] + t * t * c[0],
+        v * v * a[1] + 2 * v * t * b[1] + t * t * c[1],
+      ]);
+    }
+    return pts;
+  }
+  // La punta del fuego de una nave en (x, y) girada rot grados.
+  function motorCaratula(x, y, alto, rot) {
+    const a = (rot * Math.PI) / 180;
+    return [x - Math.sin(a) * alto * 0.36, y + Math.cos(a) * alto * 0.36];
+  }
+
+  // Piedra finita de la lluvia (5): nace arriba (o en cualquier lugar, para
+  // arrancar con la lluvia ya cayendo).
+  function crearPiedraCaratula(arriba) {
+    const r = 6 + Math.random() * 16;
+    const n = 4 + Math.floor(Math.random() * 3);
+    const verts = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
+      const k = 0.6 + Math.random() * 0.6;
+      verts.push({ x: Math.cos(a) * k, y: Math.sin(a) * k });
+    }
+    return {
+      x: Math.random() * 1920,
+      y: arriba ? -r * 2 - Math.random() * 300 : Math.random() * 1080,
+      r,
+      vx: 0,
+      vy: 40 + Math.random() * 70,
+      ang: Math.random() * Math.PI * 2,
+      giro: (Math.random() - 0.5) * 1.2,
+      alfa: 0.25 + Math.random() * 0.35,
+      verts,
+    };
+  }
+
+  // Las naves de las carátulas: dónde están (en 1920x1080), su alto y hacia
+  // dónde miran. Las del humo (3 y 6) salen de su curva.
+  const CARATULA_CURVA_AZUL = [[870, 590], [634, 820], [96, 900]];
+  const CARATULA_CURVA_ROJA = [[1050, 410], [1286, 180], [1824, 100]];
+  const CARATULA_LLEGADA = { x: 768, y: 522, alto: 66, desde: [0, 640] };
+
+  function crearCaratula() {
+    const n = elegirCaratula();
+    const c = { n, lista: false, sale: null, estrellas: crearEstrellasCaratula() };
+    const rumboA = (a, b) => rumbo(b[0] - a[0], b[1] - a[1]);
+    if (n === 3) {
+      const azul = curvaCaratula(...CARATULA_CURVA_AZUL);
+      const roja = curvaCaratula(...CARATULA_CURVA_ROJA);
+      c.naves = [
+        { x: azul[0][0], y: azul[0][1], rot: rumboA(azul[3], azul[0]), rgb: CARATULA_AZUL, fase: 0 },
+        { x: roja[0][0], y: roja[0][1], rot: rumboA(roja[3], roja[0]), rgb: CARATULA_ROJO, fase: CARATULA_DESTELLO / 2 },
+      ];
+      c.humo = lienzoCaratula((ctx2) => {
+        for (const [nave, curva] of [
+          [c.naves[0], CARATULA_CURVA_AZUL],
+          [c.naves[1], CARATULA_CURVA_ROJA],
+        ]) {
+          const m = motorCaratula(nave.x, nave.y, 84, nave.rot);
+          humoCaratula(ctx2, curvaCaratula(m, curva[1], curva[2]), nave.rgb, 84);
+        }
+      });
+    } else if (n === 5) {
+      c.piedras = [];
+      for (let i = 0; i < CARATULA_PIEDRAS; i++)
+        c.piedras.push(crearPiedraCaratula(false));
+    } else if (n === 6) {
+      const L = CARATULA_LLEGADA;
+      c.rot = rumbo(L.x - L.desde[0], L.y - L.desde[1]);
+      c.humo = lienzoCaratula((ctx2) => {
+        const m = motorCaratula(L.x, L.y, L.alto, c.rot);
+        const atras = [m[0] - (L.x - L.desde[0]) * 1.2, m[1] - (L.y - L.desde[1]) * 1.2];
+        humoCaratula(ctx2, [m, atras], CARATULA_AZUL, L.alto);
+      });
+    }
+    return c;
+  }
+
+  // Después del logo: se aclara la carátula.
+  function empezarCaratula() {
+    const p = presenta;
+    pasarFase("caratula");
+    p.car = crearCaratula();
+    particulas = [];
+    fondoDeGolpe(() => scene.style.setProperty("--fondo-color", "0"));
+    tapa.style.transition = `opacity ${CARATULA_APARECE}s ease`;
+    tapa.classList.remove("cae");
+    if (caratulaTexto) {
+      caratulaTexto.textContent = "cargando";
+      caratulaTexto.classList.add("cargando");
+      caratulaTexto.style.opacity = "";
+      caratulaTexto.hidden = false;
+    }
+  }
+
+  // ¿Ya se puede dibujar todo? (Las naves y los anillos de los agujeros.)
+  function caratulaLista() {
+    const cargada = (img) => img.complete && img.naturalWidth > 0;
+    return (
+      !!gusanoSprites &&
+      cargada(imgRivalTop) &&
+      cargada(imgRivalFondo) &&
+      cargada(imgFuego)
+    );
+  }
+
+  // El toque en la carátula: se funde a negro y sigue con el agujero de
+  // gusano. Desde acá ya se puede sonar.
+  function dejarCaratula() {
+    const c = presenta.car;
+    if (!c || c.sale !== null) return;
+    c.sale = 0;
+    presenta.toque = true;
+    if (menuCtx) menuCtx.resume().catch(() => {});
+    if (audioCtx) audioCtx.resume().catch(() => {});
+    tapa.style.transition = `opacity ${CARATULA_SALE}s ease`;
+    tapa.classList.add("cae");
+    if (caratulaTexto) caratulaTexto.style.opacity = "0";
+  }
+
+  function actualizarCaratula(dt) {
+    const p = presenta;
+    const c = p.car;
+    p.f += dt;
+    if (!c.lista && caratulaLista()) {
+      c.lista = true;
+      if (caratulaTexto) {
+        caratulaTexto.textContent = "presiona cualquier tecla";
+        caratulaTexto.classList.remove("cargando");
+      }
+    }
+    if (c.sale !== null) {
+      c.sale += dt;
+      if (c.sale >= CARATULA_SALE + 0.25) {
+        // Ya en negro: el agujero de gusano (ver "espera").
+        if (caratulaTexto) caratulaTexto.hidden = true;
+        pasarFase("espera");
+        return;
+      }
+    }
+    if (c.n === 5) moverPiedrasCaratula(c.piedras, dt);
+    // El fuego de las naves: a media potencia en la 4, a pleno en las demás.
+    actualizarFuegoRival(dt, c.n === 4 ? 40 : 65);
+    dibujarCaratula(c, p.f);
+  }
+
+  // Caen derecho, pero al acercarse a la nave se corren de costado y la
+  // rodean: nunca la tocan.
+  function moverPiedrasCaratula(piedras, dt) {
+    const nx = 960;
+    const ny = 800;
+    const radioNave = 45;
+    for (const s of piedras) {
+      const dx = s.x - nx;
+      const dy = s.y - ny;
+      const lejos = radioNave + s.r + CARATULA_ESQUIVA;
+      const lado = dx >= 0 ? 1 : -1;
+      // Se va apartando desde un poco antes de llegar.
+      if (Math.abs(dx) < lejos && dy > -lejos * 3 && dy < lejos)
+        s.vx += lado * 260 * dt * (1 - Math.abs(dx) / lejos);
+      else s.vx *= 1 - Math.min(1, dt * 1.5);
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.ang += s.giro * dt;
+      // Y por las dudas, nunca adentro del círculo de la nave.
+      const d = Math.hypot(s.x - nx, s.y - ny);
+      if (d < lejos) {
+        const k = lejos / (d || 1);
+        s.x = nx + (s.x - nx) * k;
+        s.y = ny + (s.y - ny) * k;
+      }
+      if (s.y - s.r * 2 > 1080) Object.assign(s, crearPiedraCaratula(true));
+    }
+  }
+
+  // La nave en (x, y) de 1920x1080: las tres capas juntas (atrás, fuego,
+  // adelante) como la del rival (ver dibujarRival), con el filtro que se pida.
+  function naveCaratula(x, y, alto, rot, filtro) {
+    const lw = lienzoRival.width;
+    const lh = lienzoRival.height;
+    const ancho = (alto * lw) / lh;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.filter = filtro;
+    ctx.drawImage(lienzoRival, -ancho / 2, -alto / 2, ancho, alto);
+    ctx.restore();
+  }
+  // Halo de color de la nave; fuerza de 0 a 1 (1 = el de las maquetas).
+  function haloCaratula(rgb, fuerza = 1) {
+    const k = medidaCaratula().u * dpr;
+    if (calidadBaja())
+      return `drop-shadow(0 0 ${4 * k}px rgba(${rgb}, ${0.95 * fuerza}))`;
+    return (
+      `drop-shadow(0 0 ${4 * k}px rgba(${rgb}, ${0.95 * fuerza})) ` +
+      `drop-shadow(0 0 ${12 * k}px rgba(${rgb}, ${0.45 * fuerza}))`
+    );
+  }
+
+  function dibujarCaratula(c, t) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    const { u } = medidaCaratula();
+    dibujarEstrellasCaratula(
+      c.estrellas,
+      c.n === 2 ? t * CARATULA_DERIVA * u : 0,
+      c.n === 6 ? t * CARATULA_GIRO_CIELO : 0,
+    );
+    if (!c.lista) return;
+    transformarCaratula();
+    // Las naves del lienzo del rival, con el fuego de este cuadro.
+    const lc = lienzoRival.getContext("2d");
+    lc.clearRect(0, 0, lienzoRival.width, lienzoRival.height);
+    lc.drawImage(imgRivalFondo, 0, 0, lienzoRival.width, lienzoRival.height);
+    lc.drawImage(lienzoFuegoRival, 0, 0);
+    lc.drawImage(imgRivalTop, 0, 0, lienzoRival.width, lienzoRival.height);
+    const compas = MUSICA_COMPAS_RESPALDO;
+    const late =
+      1 +
+      CUMULO_PULSO_AMPLITUD *
+        pulsoCumulo(t % compas, compas / MUSICA_TIEMPOS_COMPAS);
+    const giroAgujero = t * CUMULO_GIRO * 0.3;
+
+    if (c.n === 1) {
+      dibujarAgujero(960, 470, giroAgujero * 0.5, 6.5 * late, 0);
+    } else if (c.n === 2) {
+      dibujarAgujero(960, 500, giroAgujero, 1.5, 1);
+      naveCaratula(700, 500, 96, 90, haloCaratula(CARATULA_AZUL));
+      naveCaratula(1220, 500, 96, -90, haloCaratula(CARATULA_ROJO));
+    } else if (c.n === 3) {
+      ctx.drawImage(c.humo, 0, 0, 1920, 1080);
+      for (const n of c.naves) {
+        // Destello tenue: sube y baja en CARATULA_DESTELLO s, y cada nave
+        // arranca a la mitad del de la otra.
+        const f = (((t - n.fase) % (CARATULA_DESTELLO * 2)) + CARATULA_DESTELLO * 2) % (CARATULA_DESTELLO * 2);
+        const destello = f < CARATULA_DESTELLO ? Math.sin((f / CARATULA_DESTELLO) * Math.PI) : 0;
+        naveCaratula(n.x, n.y, 84, n.rot, haloCaratula(n.rgb, 0.6 + 0.4 * destello));
+      }
+    } else if (c.n === 4) {
+      const luz = ctx.createRadialGradient(960, 470, 0, 960, 470, 360);
+      luz.addColorStop(0, "rgba(255, 244, 214, 0.10)");
+      luz.addColorStop(1, "rgba(255, 244, 214, 0)");
+      ctx.fillStyle = luz;
+      ctx.fillRect(0, 0, 1920, 1080);
+      const k = Math.max(
+        0,
+        Math.min(1, (t - CARATULA_COLOR.desde) / CARATULA_COLOR.dura),
+      );
+      const gris = 1 - k * k * (3 - 2 * k);
+      naveCaratula(
+        960,
+        470,
+        210,
+        0,
+        `grayscale(${gris.toFixed(3)}) brightness(${(1 + 0.1 * gris).toFixed(3)})`,
+      );
+    } else if (c.n === 5) {
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 1.2;
+      ctx.fillStyle = "#000";
+      for (const s of c.piedras) {
+        const cos = Math.cos(s.ang);
+        const sin = Math.sin(s.ang);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${s.alfa})`;
+        ctx.beginPath();
+        s.verts.forEach((v, i) => {
+          const px = s.x + (v.x * cos - v.y * sin) * s.r;
+          const py = s.y + (v.x * sin + v.y * cos) * s.r;
+          if (i) ctx.lineTo(px, py);
+          else ctx.moveTo(px, py);
+        });
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      naveCaratula(960, 800, 84, 0, haloCaratula(CARATULA_AZUL));
+    } else if (c.n === 6) {
+      const L = CARATULA_LLEGADA;
+      dibujarAgujero(1306, 470, giroAgujero, 1.25, 1);
+      ctx.drawImage(c.humo, 0, 0, 1920, 1080);
+      naveCaratula(L.x, L.y, L.alto, c.rot, haloCaratula(CARATULA_AZUL, 0.8));
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // --- El selector de naves --------------------------------------------------------
+  // Contra la PC, con dos jugadores y online, después de elegir el modo y antes
+  // de las instrucciones: "tu nave" (las maquetas están en naves/). Una fila
+  // con las naves en carrusel (la elegida grande, en el medio, con su halo y su
+  // fuego) y otra con los fuegos. Con un jugador: W/S o las flechas de arriba y
+  // abajo pasan de una fila a la otra, A/D o las de los costados cambian, E,
+  // enter o espacio juegan y Escape vuelve al menú (con el joystick: la
+  // cruceta o el stick, A y B). Con dos jugadores la pantalla se parte: el 1 a
+  // la izquierda con WASD y E, el 2 a la derecha con las flechas y enter (el
+  // joystick, del que lo tenga en el juego: ver actualizarControles); cada uno
+  // dice "listo" y, cuando están los dos, arranca. Se dibuja en el canvas, en
+  // 1920x1080 como las carátulas (ver transformarCaratula). Todas las naves
+  // vuelan igual: lo dice abajo.
+  let selector = null; // abierto: { modo, lados: [...], estrellas, t, ... }
+  let navesElegidas = null; // modo para el que ya se eligió (ver elegirModo)
+  const SEL_AZUL = "90, 169, 255";
+  const SEL_ROJO = "255, 90, 90";
+  const SEL_ANIMA = 10; // qué tan rápido se acomoda el carrusel (1/s)
+  const SEL_ARRANCA = 0.5; // s entre que están los dos listos y arranca
+
+  function abrirSelector(m) {
+    const guardada = naveGuardada();
+    const lado = (j, rgb) => ({
+      nave: NAVES_JUEGO.findIndex((n) => n.id === guardada[j].nave),
+      fuego: FUEGOS.findIndex((f) => f.id === guardada[j].fuego),
+      posNave: 0,
+      posFuego: 0,
+      fila: 0, // 0 = naves, 1 = fuegos
+      listo: false,
+      rgb,
+      llama: { nivel: 0, fase: Math.random() * 10 },
+      lienzoLlama: Object.assign(document.createElement("canvas"), { width: 203, height: 300 }),
+      lienzoNave: Object.assign(document.createElement("canvas"), { width: 203, height: 300 }),
+      vuelo: { modo: null, nave: 0 }, // la nave volando con el mouse encima (ver actualizarVueloSel)
+    });
+    const lados = m === "dos" ? [lado("j1", SEL_AZUL), lado("j2", SEL_ROJO)] : [lado("j1", SEL_AZUL)];
+    for (const l of lados) {
+      l.posNave = l.nave;
+      l.posFuego = l.fuego;
+    }
+    const gp = primerJoystick();
+    selector = {
+      modo: m,
+      lados,
+      estrellas: crearEstrellasCaratula(),
+      t: 0,
+      arranca: null,
+      pad: gp ? leerPadSelector(gp) : null,
+    };
+    if (modoEl) modoEl.hidden = true;
+  }
+
+  function cerrarSelector(jugar) {
+    const s = selector;
+    selector = null;
+    if (!jugar) {
+      // Vuelve al menú, como estaba.
+      if (modoEl) modoEl.hidden = false;
+      sincronizarPadMenu();
+      return;
+    }
+    const eleccion = naveGuardada();
+    eleccion.j1 = { nave: NAVES_JUEGO[s.lados[0].nave].id, fuego: FUEGOS[s.lados[0].fuego].id };
+    if (s.lados[1])
+      eleccion.j2 = { nave: NAVES_JUEGO[s.lados[1].nave].id, fuego: FUEGOS[s.lados[1].fuego].id };
+    guardarNaves(eleccion);
+    aplicarNaveJugador(eleccion.j1);
+    if (s.modo === "dos") aplicarNaveRival(eleccion.j2);
+    navesElegidas = s.modo;
+    sonarMenu("seleccion");
+    sincronizarPadMenu();
+    elegirModo(s.modo);
+  }
+
+  // Una acción de un jugador (i: 0 el 1, 1 el 2): "arriba", "abajo",
+  // "izquierda", "derecha", "ok" o "volver".
+  function accionSelector(i, accion) {
+    const s = selector;
+    const l = s && s.lados[i];
+    if (!l) return;
+    if (accion === "volver") {
+      cerrarSelector(false);
+      return;
+    }
+    if (accion === "ok") {
+      if (s.lados.length === 1) cerrarSelector(true);
+      else {
+        l.listo = !l.listo;
+        sonarMenu(l.listo ? "seleccion" : "selector");
+      }
+      return;
+    }
+    if (l.listo) return; // listo: no cambia hasta que se saque el listo
+    if (accion === "arriba" || accion === "abajo") {
+      const fila = accion === "abajo" ? 1 : 0;
+      if (fila !== l.fila) {
+        l.fila = fila;
+        sonarMenu("selector");
+      }
+      return;
+    }
+    const paso = accion === "derecha" ? 1 : -1;
+    if (l.fila === 0) {
+      l.nave = (l.nave + paso + NAVES_JUEGO.length) % NAVES_JUEGO.length;
+    } else {
+      l.fuego = (l.fuego + paso + FUEGOS.length) % FUEGOS.length;
+    }
+    sonarMenu("selector");
+  }
+
+  // Las teclas del selector (ver el keydown): true si la usó.
+  const SEL_TECLAS_UNO = {
+    KeyW: "arriba", ArrowUp: "arriba", KeyS: "abajo", ArrowDown: "abajo",
+    KeyA: "izquierda", ArrowLeft: "izquierda", KeyD: "derecha", ArrowRight: "derecha",
+    KeyE: "ok", Enter: "ok", NumpadEnter: "ok", Space: "ok",
+  };
+  const SEL_TECLAS_J1 = { KeyW: "arriba", KeyS: "abajo", KeyA: "izquierda", KeyD: "derecha", KeyE: "ok" };
+  const SEL_TECLAS_J2 = {
+    ArrowUp: "arriba", ArrowDown: "abajo", ArrowLeft: "izquierda", ArrowRight: "derecha",
+    Enter: "ok", NumpadEnter: "ok",
+  };
+  function teclaSelector(ev) {
+    if (ev.code === "Escape" || ev.code === "Backspace") {
+      accionSelector(0, "volver");
+      return;
+    }
+    if (ev.repeat && /Enter|KeyE|Space/.test(ev.code)) return;
+    if (selector.lados.length === 1) {
+      if (SEL_TECLAS_UNO[ev.code]) accionSelector(0, SEL_TECLAS_UNO[ev.code]);
+    } else {
+      // Con los lados dados vuelta en el menú (y sin joystick) las flechas son
+      // del 1 y WASD del 2, como en el juego (tecladoAlReves).
+      const alReves = controlesCambiados && !primerJoystick();
+      if (SEL_TECLAS_J1[ev.code]) accionSelector(alReves ? 1 : 0, SEL_TECLAS_J1[ev.code]);
+      else if (SEL_TECLAS_J2[ev.code]) accionSelector(alReves ? 0 : 1, SEL_TECLAS_J2[ev.code]);
+    }
+    ev.preventDefault();
+  }
+
+  // El joystick: la cruceta o el stick, A y B, contando solo lo recién
+  // apretado. Con dos jugadores es del 2, salvo que se hayan cambiado los
+  // lados en el menú (como en el juego).
+  function leerPadSelector(gp) {
+    const joy = leerJoystick();
+    return {
+      arriba: joy.teclas.has("up"),
+      abajo: joy.teclas.has("down"),
+      izquierda: joy.teclas.has("left"),
+      derecha: joy.teclas.has("right"),
+      ok: botonPad(gp, PAD_A),
+      volver: botonPad(gp, PAD_B),
+    };
+  }
+  function padSelector() {
+    const s = selector;
+    const gp = primerJoystick();
+    if (!gp) {
+      s.pad = null;
+      return;
+    }
+    const ahora = leerPadSelector(gp);
+    const antes = s.pad || ahora;
+    s.pad = ahora;
+    const i = s.lados.length === 2 && !controlesCambiados ? 1 : 0;
+    for (const accion of ["arriba", "abajo", "izquierda", "derecha", "ok", "volver"])
+      if (ahora[accion] && !antes[accion]) {
+        accionSelector(i, accion);
+        if (!selector) return; // se cerró
+      }
+  }
+
+  function actualizarSelector(dt) {
+    const s = selector;
+    s.t += dt;
+    padSelector();
+    if (!selector) return;
+    for (const l of s.lados) {
+      // El carrusel se acomoda suave hacia lo elegido.
+      const k = 1 - Math.exp(-dt * SEL_ANIMA);
+      const metaNave = l.posNave + difCircular(l.nave - l.posNave, NAVES_JUEGO.length);
+      l.posNave += (metaNave - l.posNave) * k;
+      const metaFuego = l.posFuego + difCircular(l.fuego - l.posFuego, FUEGOS.length);
+      l.posFuego += (metaFuego - l.posFuego) * k;
+    }
+    s.lados.forEach((l, i) => {
+      const m = s.lados.length === 1 ? SEL_UNO : SEL_DOS;
+      actualizarVueloSel(l, s.lados.length === 1 ? 960 : m.cx[i], m, dt);
+      // El fuego: a pleno en el carrusel; volando, según lo rápido que va.
+      const v = l.vuelo;
+      const vel = v.modo ? 15 + Math.hypot(v.vx, v.vy) * 0.12 : 65;
+      animarFuego(l.llama, l.lienzoLlama, fuegoTenido(FUEGOS[l.fuego].id), dt, vel);
+    });
+    if (s.lados.length === 2) {
+      if (s.lados.every((l) => l.listo)) {
+        s.arranca = (s.arranca || 0) + dt;
+        if (s.arranca >= SEL_ARRANCA) {
+          cerrarSelector(true);
+          return;
+        }
+      } else s.arranca = null;
+    }
+    dibujarSelector();
+  }
+
+  // La diferencia d llevada al camino más corto en una ronda de n.
+  function difCircular(d, n) {
+    return ((((d + n / 2) % n) + n) % n) - n / 2;
+  }
+
+  // Interpola en una tabla por |d| (0, 1, 2, 3...).
+  function tablaSel(tabla, d) {
+    const a = Math.min(Math.abs(d), tabla.length - 1);
+    const i = Math.min(Math.floor(a), tabla.length - 2);
+    return tabla[i] + (tabla[i + 1] - tabla[i]) * (a - i);
+  }
+
+  function textoSel(t, x, y, tam, color, alinear = "center", espacio = 0.12) {
+    ctx.font = `${tam}px Spaceport, ui-monospace, Consolas, monospace`;
+    ctx.fillStyle = color;
+    ctx.textAlign = alinear;
+    ctx.textBaseline = "middle";
+    if ("letterSpacing" in ctx) ctx.letterSpacing = `${tam * espacio}px`;
+    ctx.fillText(t, x, y);
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+  }
+  function flechaSel(x, y, dir, tam = 18, alfa = 0.8) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${alfa})`;
+    ctx.beginPath();
+    ctx.moveTo(x + dir * tam * 0.6, y);
+    ctx.lineTo(x - dir * tam * 0.4, y - tam * 0.6);
+    ctx.lineTo(x - dir * tam * 0.4, y + tam * 0.6);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Una nave del carrusel: la del medio entera (su fuego y su halo), las de los
+  // costados solas y más apagadas.
+  function naveSel(l, n, x, y, alto, alfa, centro) {
+    const img = NAVES_JUEGO[n].img;
+    if (!img.complete || !img.naturalWidth) return;
+    const ancho = (alto * 203) / 300;
+    ctx.save();
+    ctx.globalAlpha = alfa;
+    if (centro) {
+      const c = l.lienzoNave.getContext("2d");
+      c.clearRect(0, 0, 203, 300);
+      c.drawImage(l.lienzoLlama, 0, 0);
+      c.drawImage(img, 0, 0, 203, 300);
+      const k = medidaCaratula().u * dpr;
+      ctx.filter = calidadBaja()
+        ? `drop-shadow(0 0 ${4 * k}px rgba(${l.rgb}, 0.95))`
+        : `drop-shadow(0 0 ${4 * k}px rgba(${l.rgb}, 0.95)) drop-shadow(0 0 ${12 * k}px rgba(${l.rgb}, 0.5))`;
+      ctx.drawImage(l.lienzoNave, x - ancho / 2, y - alto / 2, ancho, alto);
+    } else {
+      ctx.drawImage(img, x - ancho / 2, y - alto / 2, ancho, alto);
+    }
+    ctx.restore();
+  }
+
+  // El ícono de un fuego: su llama, recortada del dibujo.
+  function fuegoSel(f, x, y, alto, alfa) {
+    const fuente = fuegoTenido(FUEGOS[f].id);
+    if (!fuente) return;
+    const ancho = (alto * FUEGO_W) / (FUEGO_BOTTOM - FUEGO_TOP);
+    ctx.globalAlpha = alfa;
+    ctx.drawImage(fuente, FUEGO_X, FUEGO_TOP, FUEGO_W, FUEGO_BOTTOM - FUEGO_TOP, x - ancho / 2, y - alto / 2, ancho, alto);
+    ctx.globalAlpha = 1;
+  }
+
+  // Un lado del selector centrado en cx. m: medidas (un jugador o dos).
+  function ladoSel(l, cx, m) {
+    const activaNaves = l.fila === 0 && !l.listo;
+    const activaFuegos = l.fila === 1 && !l.listo;
+    // Las naves: primero las de los costados (las más lejanas abajo).
+    const orden = NAVES_JUEGO.map((_, j) => j)
+      .map((j) => ({ j, d: difCircular(j - l.posNave, NAVES_JUEGO.length) }))
+      .filter((o) => Math.abs(o.d) < m.distNave.length - 1)
+      .sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+    for (const { j, d } of orden) {
+      const x = cx + Math.sign(d) * tablaSel(m.distNave, d);
+      const flota = Math.sin(selector.t * 1.6 + j) * 4;
+      const centro = j === l.nave && Math.abs(d) < 0.5;
+      if (centro && l.vuelo.modo) continue; // está volando (ver dibujarVueloSel)
+      naveSel(l, j, x, m.yNave + flota, tablaSel(m.altoNave, d), tablaSel(m.alfaNave, d), centro);
+    }
+    if (activaNaves) {
+      flechaSel(cx - m.flechaNave, m.yNave, -1, 12);
+      flechaSel(cx + m.flechaNave, m.yNave, 1, 12);
+    }
+    textoSel(NAVES_JUEGO[l.nave].nombre, cx, m.yNombre, m.tamNombre, "#fff");
+    // Los fuegos.
+    const blanco = (a) => `rgba(255, 255, 255, ${a})`;
+    textoSel("fuego", cx - m.etiquetaFuego, m.yFuego, m.tamFuego, blanco(activaFuegos ? 1 : 0.55));
+    textoSel(FUEGOS[l.fuego].nombre, cx + m.etiquetaFuego, m.yFuego, m.tamFuego, blanco(activaFuegos ? 1 : 0.55));
+    for (let j = 0; j < FUEGOS.length; j++) {
+      const d = difCircular(j - l.posFuego, FUEGOS.length);
+      if (Math.abs(d) >= m.distFuego.length - 1) continue;
+      fuegoSel(j, cx + Math.sign(d) * tablaSel(m.distFuego, d), m.yFuego, tablaSel(m.altoFuego, d), tablaSel(m.alfaFuego, d) * (activaFuegos ? 1 : 0.7));
+    }
+    if (activaFuegos) {
+      flechaSel(cx - m.flechaFuego, m.yFuego, -1, 8);
+      flechaSel(cx + m.flechaFuego, m.yFuego, 1, 8);
+    }
+  }
+
+  // Las teclas de abajo: cajitas con la tecla y lo que hace.
+  function ayudaSel(items, y) {
+    const tam = 15;
+    ctx.font = `${tam}px Spaceport, ui-monospace, Consolas, monospace`;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "3px";
+    const caja = (t) => Math.max(26, ctx.measureText(t).width + 12);
+    const medidas = items.map(({ teclas, texto }) => {
+      const cajas = teclas.map(caja);
+      return { cajas, ancho: cajas.reduce((a, b) => a + b + 5, 0) + 6 + ctx.measureText(texto).width };
+    });
+    const sep = 34;
+    let x = 960 - (medidas.reduce((a, m) => a + m.ancho, 0) + sep * (items.length - 1)) / 2;
+    items.forEach(({ teclas, texto }, i) => {
+      teclas.forEach((t, k) => {
+        const w = medidas[i].cajas[k];
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(x, y - 13, w, 26, 4);
+        ctx.stroke();
+        textoSel(t, x + w / 2, y + 1, 14, "rgba(255, 255, 255, 0.7)", "center", 0.05);
+        x += w + 5;
+      });
+      textoSel(texto, x + 3, y + 1, tam, "rgba(255, 255, 255, 0.6)", "left", 0.12);
+      ctx.font = `${tam}px Spaceport, ui-monospace, Consolas, monospace`;
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "3px";
+      x += 6 + ctx.measureText(texto).width + sep;
+    });
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+  }
+
+  // Con el mouse sobre la nave elegida (su lugar en el medio del carrusel),
+  // esa nave, con su fuego, sale a volar: va a puntos al azar de la pantalla y
+  // en cada uno frena, gira y mira a la flechita del mouse. Si se cambia de
+  // nave mientras vuela, se va rápido por el borde más cercano y entra la
+  // nueva desde otro borde. Al sacar el mouse de ese lugar vuelve a su lugar.
+  // Todo en 1920x1080, como el resto del selector.
+  const SEL_VUELO = {
+    vel: 900, // px/s como mucho, volando
+    agil: 3, // qué tan rápido corrige hacia donde quiere ir (1/s)
+    frena: 260, // px antes del punto desde los que va frenando
+    mira: [0.7, 1.5], // s que se queda mirando al mouse en cada punto
+    sale: 2600, // px/s al irse
+    entra: 1400, // px/s al entrar
+    borde: { x0: 140, x1: 1780, y0: 140, y1: 940 }, // adónde puede ir
+  };
+  let selMouse = null; // { x, y } en pantalla, o null si no está sobre la página
+  document.addEventListener("mousemove", (ev) => {
+    selMouse = { x: ev.clientX, y: ev.clientY };
+  });
+  document.addEventListener("mouseleave", () => {
+    selMouse = null;
+  });
+
+  // El mouse en 1920x1080, o null.
+  function mouseSel() {
+    if (!selMouse) return null;
+    const { u, ox, oy } = medidaCaratula();
+    return { x: (selMouse.x - ox) / u, y: (selMouse.y - oy) / u };
+  }
+
+  function puntoAlAzarSel() {
+    const b = SEL_VUELO.borde;
+    return {
+      x: b.x0 + Math.random() * (b.x1 - b.x0),
+      y: b.y0 + Math.random() * (b.y1 - b.y0),
+    };
+  }
+
+  // Gira rot (grados) hacia meta, un poco por cuadro, por el camino corto.
+  function girarSel(rot, meta, dt, rapidez = 6) {
+    let d = meta - rot;
+    d = ((((d + 180) % 360) + 360) % 360) - 180;
+    return rot + d * (1 - Math.exp(-dt * rapidez));
+  }
+
+  // v: el vuelo de un lado; cx, m: dónde está su lugar en el carrusel.
+  function actualizarVueloSel(l, cx, m, dt) {
+    const v = l.vuelo;
+    const mouse = mouseSel();
+    const alto = m.altoNave[0];
+    const hover =
+      !!mouse &&
+      !l.listo &&
+      Math.abs(mouse.x - cx) < alto * 0.35 &&
+      Math.abs(mouse.y - m.yNave) < alto * 0.5;
+    const lugar = { x: cx, y: m.yNave };
+    if (!v.modo) {
+      v.nave = l.nave;
+      if (!hover) return;
+      Object.assign(v, { modo: "vuela", x: cx, y: m.yNave, vx: 0, vy: 0, rot: 0, meta: puntoAlAzarSel(), mira: 0 });
+    }
+    // Cambió la nave: la que vuela se va (y después entra la otra).
+    if (v.nave !== l.nave && v.modo !== "sale") v.modo = "sale";
+    if (v.modo === "sale") {
+      let dx = v.x - 960;
+      let dy = v.y - 540;
+      const d = Math.hypot(dx, dy) || 1;
+      dx /= d;
+      dy /= d;
+      v.vx += (dx * SEL_VUELO.sale - v.vx) * (1 - Math.exp(-dt * 8));
+      v.vy += (dy * SEL_VUELO.sale - v.vy) * (1 - Math.exp(-dt * 8));
+      v.x += v.vx * dt;
+      v.y += v.vy * dt;
+      v.rot = girarSel(v.rot, rumbo(v.vx, v.vy), dt, 12);
+      if (v.x < -250 || v.x > 2170 || v.y < -250 || v.y > 1330) {
+        // Afuera: entra la nueva desde un borde al azar, derecho hacia adentro.
+        v.nave = l.nave;
+        const lado = Math.floor(Math.random() * 4);
+        const p = puntoAlAzarSel();
+        v.x = lado === 0 ? -200 : lado === 1 ? 2120 : p.x;
+        v.y = lado === 2 ? -200 : lado === 3 ? 1280 : p.y;
+        v.meta = hover ? puntoAlAzarSel() : lugar;
+        const ex = v.meta.x - v.x;
+        const ey = v.meta.y - v.y;
+        const e = Math.hypot(ex, ey) || 1;
+        v.vx = (ex / e) * SEL_VUELO.entra;
+        v.vy = (ey / e) * SEL_VUELO.entra;
+        v.rot = rumbo(v.vx, v.vy);
+        v.mira = 0;
+        v.modo = hover ? "vuela" : "vuelve";
+      }
+      return;
+    }
+    if (hover && v.modo === "vuelve") {
+      v.modo = "vuela";
+      v.meta = puntoAlAzarSel();
+    } else if (!hover && v.modo === "vuela") {
+      v.modo = "vuelve";
+    }
+    const meta = v.modo === "vuelve" ? lugar : v.meta;
+    const dx = meta.x - v.x;
+    const dy = meta.y - v.y;
+    const d = Math.hypot(dx, dy);
+    // Va hacia el punto y frena al llegar.
+    const quiere = Math.min(SEL_VUELO.vel, (SEL_VUELO.vel * d) / SEL_VUELO.frena);
+    const qx = d > 0.5 ? (dx / d) * quiere : 0;
+    const qy = d > 0.5 ? (dy / d) * quiere : 0;
+    const k = 1 - Math.exp(-dt * SEL_VUELO.agil);
+    v.vx += (qx - v.vx) * k;
+    v.vy += (qy - v.vy) * k;
+    v.x += v.vx * dt;
+    v.y += v.vy * dt;
+    const rapidez = Math.hypot(v.vx, v.vy);
+    if (v.modo === "vuelve") {
+      // De vuelta en su lugar, mirando para arriba: vuelve al carrusel.
+      v.rot = girarSel(v.rot, rapidez > 80 ? rumbo(v.vx, v.vy) : 0, dt);
+      const derecha = ((((v.rot % 360) + 540) % 360) - 180);
+      if (d < 4 && rapidez < 30 && Math.abs(derecha) < 3) v.modo = null;
+      return;
+    }
+    if (d < 24 && rapidez < 120) {
+      // Llegó: mira a la flechita un rato y elige otro punto.
+      if (!v.mira)
+        v.mira = SEL_VUELO.mira[0] + Math.random() * (SEL_VUELO.mira[1] - SEL_VUELO.mira[0]);
+      v.mira -= dt;
+      if (mouse) v.rot = girarSel(v.rot, rumbo(mouse.x - v.x, mouse.y - v.y), dt);
+      if (v.mira <= 0) {
+        v.mira = 0;
+        v.meta = puntoAlAzarSel();
+      }
+    } else {
+      v.rot = girarSel(v.rot, rumbo(v.vx, v.vy), dt);
+    }
+  }
+
+  // La nave que vuela, encima de todo, con su fuego y su halo.
+  function dibujarVueloSel(l, m) {
+    const v = l.vuelo;
+    if (!v.modo) return;
+    const img = NAVES_JUEGO[v.nave].img;
+    if (!img.complete || !img.naturalWidth) return;
+    const alto = m.altoNave[0];
+    const ancho = (alto * 203) / 300;
+    const c = l.lienzoNave.getContext("2d");
+    c.clearRect(0, 0, 203, 300);
+    c.drawImage(l.lienzoLlama, 0, 0);
+    c.drawImage(img, 0, 0, 203, 300);
+    const k = medidaCaratula().u * dpr;
+    ctx.save();
+    ctx.translate(v.x, v.y);
+    ctx.rotate((v.rot * Math.PI) / 180);
+    ctx.filter = calidadBaja()
+      ? `drop-shadow(0 0 ${4 * k}px rgba(${l.rgb}, 0.95))`
+      : `drop-shadow(0 0 ${4 * k}px rgba(${l.rgb}, 0.95)) drop-shadow(0 0 ${12 * k}px rgba(${l.rgb}, 0.5))`;
+    ctx.drawImage(l.lienzoNave, -ancho / 2, -alto / 2, ancho, alto);
+    ctx.restore();
+  }
+
+  // Medidas (en 1920x1080) al tamaño del menú principal: letras de 16 a 22
+  // px y todo en un bloque centrado.
+  const SEL_UNO = {
+    yTitulo: 250, ySub: 286,
+    distNave: [0, 170, 300, 400], altoNave: [190, 110, 80, 50], alfaNave: [1, 0.8, 0.45, 0],
+    yNave: 445, flechaNave: 115, yNombre: 595, tamNombre: 22,
+    yFuego: 655, etiquetaFuego: 150, tamFuego: 17, flechaFuego: 28,
+    distFuego: [0, 52, 88, 118], altoFuego: [34, 22, 18, 14], alfaFuego: [1, 0.8, 0.45, 0],
+    yNota: 735, yAyuda: 795,
+  };
+  const SEL_DOS = {
+    yTitulo: 215, cx: [640, 1280], yJ: 300, yLinea: [275, 740],
+    distNave: [0, 130, 215, 270], altoNave: [170, 95, 65, 40], alfaNave: [1, 0.8, 0.4, 0],
+    yNave: 430, flechaNave: 95, yNombre: 560, tamNombre: 20,
+    yFuego: 618, etiquetaFuego: 130, tamFuego: 16, flechaFuego: 25,
+    distFuego: [0, 46, 78, 104], altoFuego: [30, 20, 16, 12], alfaFuego: [1, 0.8, 0.45, 0],
+    yEstado: 685, yNota: 790, yAyuda: 845,
+  };
+
+  function dibujarSelector() {
+    const s = selector;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    dibujarEstrellasCaratula(s.estrellas, s.t * 3 * medidaCaratula().u, 0);
+    transformarCaratula();
+    const gris = "rgba(255, 255, 255, 0.45)";
+    if (s.lados.length === 1) {
+      const m = SEL_UNO;
+      textoSel("tu nave", 960, m.yTitulo, 30, "#fff", "center", 0.14);
+      textoSel(s.modo === "online" ? "online" : "contra la PC", 960, m.ySub, 16, "rgba(255, 255, 255, 0.55)");
+      ladoSel(s.lados[0], 960, m);
+      textoSel("todas con la misma velocidad y el mismo impacto", 960, m.yNota, 15, gris);
+      ayudaSel([
+        { teclas: ["W", "S"], texto: "nave o fuego" },
+        { teclas: ["A", "D"], texto: "cambiar" },
+        { teclas: ["E"], texto: "jugar" },
+        { teclas: ["esc"], texto: "volver" },
+      ], m.yAyuda);
+      dibujarVueloSel(s.lados[0], m);
+    } else {
+      const m = SEL_DOS;
+      textoSel("tu nave", 960, m.yTitulo, 30, "#fff", "center", 0.14);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(960, m.yLinea[0]);
+      ctx.lineTo(960, m.yLinea[1]);
+      ctx.stroke();
+      s.lados.forEach((l, i) => {
+        const cx = m.cx[i];
+        textoSel(i ? "J2" : "J1", cx, m.yJ, 22, `rgb(${l.rgb})`);
+        ladoSel(l, cx, m);
+        textoSel(l.listo ? "listo" : "eligiendo", cx, m.yEstado, 18, l.listo ? `rgb(${l.rgb})` : gris);
+      });
+      textoSel("todas con la misma velocidad y el mismo impacto", 960, m.yNota, 15, gris);
+      const alReves = controlesCambiados && !primerJoystick();
+      ayudaSel([
+        { teclas: ["W", "A", "S", "D"], texto: alReves ? "J2" : "J1" },
+        { teclas: ["▲", "◀", "▼", "▶"], texto: alReves ? "J1" : "J2" },
+        { teclas: ["E"], texto: alReves ? "J2 listo" : "J1 listo" },
+        { teclas: ["enter"], texto: alReves ? "J1 listo" : "J2 listo" },
+        { teclas: ["esc"], texto: "volver" },
+      ], m.yAyuda);
+      for (const l of s.lados) dibujarVueloSel(l, m);
+    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
@@ -3364,10 +4608,7 @@
     presenta.cae = dur;
     tapa.style.transition = `opacity ${dur}s ease`;
     tapa.classList.add("cae");
-    if (presentaLogo) {
-      presentaLogo.style.transition = `opacity ${dur}s ease`;
-      presentaLogo.classList.remove("visible");
-    }
+    if (presentaLogo && !presentaLogo.hidden) apagarLogo(dur);
   }
 
   function saltarPresentacion() {
@@ -3456,9 +4697,11 @@
     particulas = [];
     if (presentaLogo) {
       presentaLogo.hidden = true;
-      presentaLogo.classList.remove("visible");
+      presentaLogo.classList.remove("visible", "foquito");
+      presentaLogo.style.opacity = "";
     }
     if (presentaToque) presentaToque.hidden = true;
+    if (caratulaTexto) caratulaTexto.hidden = true;
     ship.classList.remove("game-color");
     ship.classList.add("game-sin-nave");
     colorEscalon = -1; // fuerza a aplicar el color (0) a la nave y al fondo
@@ -4497,29 +5740,20 @@
   // Mueve una lluvia: se desvían hacia su nave mientras estén más arriba que
   // COMPROMISO; más cerca ya no corrigen (siguen con el rumbo que traen, se
   // puede esquivar) y las que ya pasaron siguen derecho.
-  // Contra la PC y con dos jugadores el mapa es un cilindro: las naves dan la
-  // vuelta por los costados (ver script.js y moverRival), así que las piedras
+  // En todos los modos el mapa es un cilindro: las naves dan la vuelta por
+  // los costados (ver script.js y moverRival), así que las piedras
   // también: te buscan por el camino más corto de costado (aunque sea cruzando
   // el borde) y, si lo cruzan, reaparecen del otro lado. Si no, salirse por un
   // costado alcanzaba para que nunca te llegaran. El largo de la vuelta es el
   // mismo que el de la nave (el ancho más el margen de cada lado).
   const MUNDO_VUELTA_MARGEN = 100;
   // Cuánto se pueden salir del mapa antes de dar la vuelta: con dos jugadores se
-  // ve el mapa entero y pueden pasar el borde; contra la PC la cámara hace zoom
-  // y lo que se sale queda fuera de la vista, donde solo la IA sabe qué pasa
-  // (ventaja para ella), así que ahí dan la vuelta justo en el borde.
+  // ve el mapa entero y pueden pasar el borde; en el resto (contra la PC, el
+  // tutorial y online) la cámara hace zoom y lo que se sale queda fuera de la
+  // vista (contra la PC, donde solo la IA sabe qué pasa: ventaja para ella),
+  // así que ahí dan la vuelta justo en el borde.
   function margenVuelta() {
-    return modo === "pc" || modo === "online" ? 0 : MUNDO_VUELTA_MARGEN;
-  }
-
-  // Arriba y abajo, por lo mismo: contra la PC ninguna de las dos se sale de la
-  // pantalla (el centro de la nave frena a PC_MARGEN_Y px adentro del borde;
-  // la PC sabría dónde está la otra, pero el jugador no la vería a ella). Da
-  // cuánto se puede salir el centro (negativo: se queda adentro), o null si
-  // rigen los límites de siempre (naveFisica.fueraArriba y fueraAbajo).
-  const PC_MARGEN_Y = 40;
-  function margenVertical() {
-    return modo === "pc" ? -PC_MARGEN_Y : null;
+    return modo === "dos" ? MUNDO_VUELTA_MARGEN : 0;
   }
 
   // La diferencia horizontal dx llevada al camino más corto de los dos (entre
@@ -4530,7 +5764,7 @@
   }
 
   function moverPoligonos(lista, centro, busqueda, dt) {
-    const vuelta = modo === "dos" || modo === "pc" || modo === "online";
+    const vuelta = !!window.vueltaCostados;
     const W = window.innerWidth;
     const margen = margenVuelta();
     const largo = W + margen * 2;
@@ -4669,6 +5903,7 @@
   // --- La PC -----------------------------------------------------------------
 
   function crearRival() {
+    if (modo === "pc") naveRivalAlAzar();
     // En su esquina de abajo, la contraria a la del jugador (ver
     // xEsquinaRival): online la pisa enseguida la posición real que llega del
     // rival, pero hasta que llega el primer estado que se vea en su lugar.
@@ -4726,6 +5961,13 @@
   // suave (opcional): desde cuántos px del destino va frenando.
   function rumboRival(dt) {
     const dif = DIFICULTADES[dificultad] || DIFICULTADES.regular;
+    const H = window.innerHeight;
+    // A ciegas (ver CIEGA_*): cuánto hace que tiene el centro fuera de la pantalla.
+    const ciega = rival.y > H;
+    rival.ciegaT = ciega ? (rival.ciegaT || 0) + dt : 0;
+    const reflejos = ciega
+      ? Math.max(dif.reflejos, CIEGA_REFLEJOS)
+      : dif.reflejos;
     let dx = 0;
     let dy = 0;
     const huir = (p) => {
@@ -4734,13 +5976,15 @@
       // Las que ya pasaron por debajo no asustan.
       if (ddy < -p.radio) return;
       const dist = Math.hypot(ddx, ddy) || 1;
-      if (dist >= dif.peligro + p.radio) {
+      // A ciegas, las que están fuera de la pantalla no las ve.
+      const fuera = p.y - p.radio > H || p.y + p.radio < 0;
+      if (dist >= dif.peligro + p.radio || (ciega && fuera)) {
         p.vistaPC = 0;
         return;
       }
-      // Reflejos: se da cuenta recién cuando lleva dif.reflejos s cerca.
+      // Reflejos: se da cuenta recién cuando lleva esos s cerca.
       p.vistaPC = (p.vistaPC || 0) + dt;
-      if (p.vistaPC < dif.reflejos) return;
+      if (p.vistaPC < reflejos) return;
       const peso = (dif.peligro + p.radio - dist) / dif.peligro;
       // Sobre todo para el costado: esquivar para arriba contra una piedra
       // que cae no sirve de mucho.
@@ -4750,6 +5994,11 @@
     for (const p of poligonos) huir(p);
     for (const p of poligonosRival) huir(p);
     if (Math.hypot(dx, dy) > 0.25) return { x: dx, y: dy, boost: false };
+
+    // Se dio cuenta de que está fuera de la pantalla: primero vuelve (derecho
+    // para arriba, esquivando de costado lo que vea).
+    if (rival.ciegaT >= CIEGA_DARSE_CUENTA)
+      return { x: dx, y: -1, boost: false };
 
     // Dudas: de vez en cuando (más cuanto más fácil) se queda un momento sin
     // decidir adónde ir (a las piedras las sigue esquivando).
@@ -4794,7 +6043,6 @@
     // muy arriba, de donde vienen las piedras) y al llegar, o a los
     // PASEO_SEG, elige otro.
     const W = window.innerWidth;
-    const H = window.innerHeight;
     const p = rival.paseo;
     if (
       !p ||
@@ -4848,13 +6096,19 @@
   const FUEGO_CX = 102;
   const FUEGO_FRANJA = 2;
   function actualizarFuegoRival(dt, velocidad) {
-    const f = fuegoRival;
+    animarFuego(fuegoRival, lienzoFuegoRival, fuegoTenido(naveRival.fuego), dt, velocidad);
+  }
+
+  // Un fuego (f: { nivel, fase }) dibujado en lienzo (203x300) desde fuente
+  // (el dibujo de cohete_fuego, tal cual o teñido: ver fuegoTenido).
+  function animarFuego(f, lienzo, fuente, dt, velocidad) {
     const meta = Math.max(0, Math.min(1, (velocidad - 15) / (75 - 15)));
     const tau = meta > f.nivel ? 0.08 : 0.6;
     f.nivel += (meta - f.nivel) * (1 - Math.exp(-dt / tau));
     if (f.nivel < 0.004 && meta === 0) f.nivel = 0;
     f.fase += dt * (0.35 + 0.65 * f.nivel);
-    if (!imgFuego.complete || !imgFuego.naturalWidth) return;
+    if (!fuente || (fuente === imgFuego && (!imgFuego.complete || !imgFuego.naturalWidth)))
+      return;
     const s = f.fase;
     const amp = 0.15 + 0.85 * f.nivel;
     const largo =
@@ -4865,8 +6119,8 @@
             0.06 * Math.sin(s * 37 + 1) +
             0.04 * Math.sin(s * 11 + 2)));
     const ancho = 1 + amp * 0.06 * Math.sin(s * 29 + 0.5);
-    const c = lienzoFuegoRival.getContext("2d");
-    c.clearRect(0, 0, lienzoFuegoRival.width, lienzoFuegoRival.height);
+    const c = lienzo.getContext("2d");
+    c.clearRect(0, 0, lienzo.width, lienzo.height);
     for (let sy = FUEGO_TOP; sy < FUEGO_BOTTOM; sy += FUEGO_FRANJA) {
       const p = (sy - FUEGO_TOP) / (FUEGO_BOTTOM - FUEGO_TOP); // 0 motores .. 1 punta
       const sh = Math.min(FUEGO_FRANJA, FUEGO_BOTTOM - sy);
@@ -4880,7 +6134,7 @@
         (Math.sin(s * 14 - p * 7) * 0.7 + Math.sin(s * 23 - p * 11 + 1) * 0.3);
       const dx = FUEGO_CX + (FUEGO_X - FUEGO_CX) * ancho + vaiven;
       c.drawImage(
-        imgFuego,
+        fuente,
         FUEGO_X,
         sy,
         FUEGO_W,
@@ -5011,22 +6265,18 @@
     } else {
       rival.x = Math.max(margen, Math.min(window.innerWidth - margen, rival.x));
     }
-    const margenY = margenVertical();
-    if (margenY !== null) {
-      // Contra la PC ninguna se sale por arriba ni por abajo (ver
-      // margenVertical); la del jugador frena en el mismo lugar (script.js).
-      rival.y = Math.max(
-        -margenY,
-        Math.min(window.innerHeight + margenY, rival.y),
-      );
-    } else {
-      // Con dos jugadores llega tan lejos como la del jugador 1: puede
-      // salirse un poco de la pantalla, y la flecha de su color muestra
-      // dónde quedó (ver dibujarPunteros).
-      rival.y = Math.max(
-        -fisica.fueraArriba,
-        Math.min(window.innerHeight + fisica.fueraAbajo, rival.y),
-      );
+    // Llega tan lejos como la del jugador 1: arriba frena con el centro en el
+    // borde y abajo puede salirse un poco de la pantalla (la flecha de su
+    // color muestra dónde quedó, ver dibujarPunteros). Al frenar pierde la
+    // velocidad hacia ese lado, como la del jugador en script.js.
+    const yMin = -fisica.fueraArriba;
+    const yMax = window.innerHeight + fisica.fueraAbajo;
+    if (rival.y < yMin) {
+      rival.y = yMin;
+      rival.vy = Math.max(0, rival.vy);
+    } else if (rival.y > yMax) {
+      rival.y = yMax;
+      rival.vy = Math.min(0, rival.vy);
     }
 
     // Gira igual que la nave del jugador con las flechas en script.js: hacia
@@ -5527,6 +6777,8 @@
       ship.classList.toggle("multijugador", soyAnfitrion());
       ship.classList.toggle("color-rival", !soyAnfitrion());
       conectarDirecto();
+      // La nave y el fuego que eligió cada uno (ver "El selector de naves").
+      enviarOnline({ tipo: "nave", nave: eleccionJ1.nave, fuego: eleccionJ1.fuego });
       // El mismo cielo en las dos pantallas: la semilla del anfitrión.
       if (soyAnfitrion()) enviarOnline({ tipo: "cielo", semilla: semillaCielo });
       // Antes de jugar, el mapa (ver "El mapa del online").
@@ -5544,6 +6796,8 @@
         red.otraPantalla = { w: m.w, h: m.h };
         if (red.estado === "midiendo") acordarMapa();
       }
+    } else if (m.tipo === "nave") {
+      aplicarNaveRival({ nave: m.nave, fuego: m.fuego });
     } else if (m.tipo === "cielo") {
       if (!soyAnfitrion() && Number.isFinite(m.semilla)) armarCielo(m.semilla);
     } else if (m.tipo === "rtc") {
@@ -6092,16 +7346,18 @@
     if (!rival || ganado) return;
     if (enLinea() && !rival.visto) return; // todavía no llegó dónde está
     if (rival.stun > 0 && rival.t >= DURACION_CHOQUE) return; // fuera de juego: no se ve
-    if (!imgRivalTop.complete || !imgRivalTop.naturalWidth) return;
+    const img = naveRival.img;
+    if (!img.complete || !img.naturalWidth) return;
     const w = lienzoRival.width;
     const h = lienzoRival.height;
     // Las tres capas juntas (atrás, fuego, adelante), como la nave del jugador.
     const c = lienzoRival.getContext("2d");
     c.clearRect(0, 0, w, h);
-    if (imgRivalFondo.complete && imgRivalFondo.naturalWidth)
-      c.drawImage(imgRivalFondo, 0, 0, w, h);
+    const fondo = naveRival.fondo;
+    if (fondo && fondo.complete && fondo.naturalWidth)
+      c.drawImage(fondo, 0, 0, w, h);
     c.drawImage(lienzoFuegoRival, 0, 0);
-    c.drawImage(imgRivalTop, 0, 0, w, h);
+    c.drawImage(img, 0, 0, w, h);
 
     const k = escalaNaveMundo();
     const lado = cajaNave;
@@ -6169,14 +7425,18 @@
   // avanzado; al dar la vuelta al tubo reaparece el mismo cielo. Es solo el
   // fondo: las piedras y los agujeros siguen donde están. Online lo decide el
   // anfitrión y le avisa al invitado ("fondo"), así las dos pantallas giran
-  // juntas.
+  // juntas. En el tutorial se está solo: gira con cada vuelta de la nave.
   const FONDO_JUNTAS = 1.2; // s que puede haber entre las dos vueltas
   const vueltaDe = { jugador: null, rival: null }; // la última de cada nave: { lado, t }
   let fondoCorre = null; // { desde, hasta, t (0 a 1) } mientras se corre
 
   // lado: 1 si salió por la derecha, -1 por la izquierda.
   function anotarVuelta(quien, lado) {
-    if (!lado || esTutorial() || (enLinea() && !soyAnfitrion())) return;
+    if (!lado || (enLinea() && !soyAnfitrion())) return;
+    if (esTutorial()) {
+      correrFondo(lado);
+      return;
+    }
     const otra = vueltaDe[quien === "jugador" ? "rival" : "jugador"];
     if (otra && otra.lado === lado && reloj - otra.t <= FONDO_JUNTAS) {
       vueltaDe.jugador = vueltaDe.rival = null;
@@ -6733,6 +7993,10 @@
       else esperaToque.padA = a;
       return;
     }
+    if (selector) {
+      actualizarSelector(dt);
+      return;
+    }
     const circulos = circulosNave();
     reloj += dt;
     moverFondo(dt);
@@ -6856,6 +8120,15 @@
           if (enLinea()) seguirRivalOnline(dt);
           else actualizarRival(dt, circulos);
         }
+        // Las vueltas de ahora corren el fondo pero no traen piedras ni presión
+        // (ver actualizar): se dan por vistas, si no caían todas juntas al
+        // arrancar.
+        const vueltas = window.shipVueltas || 0;
+        if (vueltas !== vueltasVistas) {
+          anotarVuelta("jugador", window.shipVueltaLado);
+          vueltasVistas = vueltas;
+        }
+        vueltasRivalVistas = vueltasRival;
       } else {
         // La música del juego acelera de a muy poquito.
         if (musicaFuente || (musica && !musica.paused)) {
@@ -7010,7 +8283,6 @@
         window.dosJugadores = false;
         window.vueltaCostados = false;
         window.vueltaMargen = 0;
-        window.naveMargenY = null;
         window.j2Joystick = false;
         window.j2Teclado = false;
         window.tecladoAlReves = false;

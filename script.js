@@ -1990,12 +1990,15 @@ function drawStars() {
     // moverRival), así ninguna tiene ventaja por ser una u otra. Todo por
     // cuadro de 60 Hz. Los "fuera" son cuánto se puede salir de la pantalla el
     // centro de la nave (FLIGHT_MARGIN* miden la esquina de su caja de 130 px).
+    // Arriba, en todos los modos, el centro frena justo en el borde: se siente
+    // como un límite y ninguna nave queda fuera de la vista por arriba. Abajo
+    // se puede salir, como en el resto del sitio.
     window.naveFisica = {
       empuje: GAMEPAD_THRUST_BASE * GAME_SHIP_SPEED,
       empujeBoost: GAMEPAD_THRUST_BOOST * GAME_SHIP_SPEED,
       freno: GAMEPAD_DAMPING,
       stick: stickShip,
-      fueraArriba: FLIGHT_MARGIN_TOP - 65,
+      fueraArriba: 0,
       fueraAbajo: FLIGHT_MARGIN + 65,
     };
 
@@ -2227,23 +2230,16 @@ function drawStars() {
           minY = -edgeMargin(scene, "top", FLIGHT_MARGIN_TOP),
           maxY =
             window.innerHeight + edgeMargin(scene, "bottom", FLIGHT_MARGIN);
-        // Con dos jugadores y contra la PC, en el escenario 4 los costados no
-        // frenan, dan la vuelta (window.vueltaCostados, lo pone esc4-game.js):
+        // En el escenario 4, ya elegido el modo, los costados no frenan, dan
+        // la vuelta (window.vueltaCostados, lo pone esc4-game.js):
         // el que se sale por uno reaparece por el otro con la misma
         // velocidad, así ninguno queda arrinconado contra el borde. Arriba y
         // abajo siguen frenando como siempre.
         const daVuelta = window.vueltaCostados && currentSceneId === "game";
-        // Arriba y abajo, en el escenario 4 esc4-game.js puede pedir otro
-        // límite (window.naveMargenY: cuánto se puede salir de la pantalla el
-        // centro de la nave, negativo si se queda adentro), el mismo con el
-        // que frena la otra nave: contra la PC ninguna se sale.
-        const margenY =
-          currentSceneId === "game" && typeof window.naveMargenY === "number"
-            ? window.naveMargenY
-            : null;
-        const yMin = margenY === null ? minY : -margenY - 65;
-        const yMax =
-          margenY === null ? maxY : window.innerHeight + margenY - 65;
+        // Arriba, en el escenario 4 el límite es el de window.naveFisica (el
+        // centro frena en el borde), el mismo con el que frena la otra nave.
+        const yMin =
+          currentSceneId === "game" ? -window.naveFisica.fueraArriba - 65 : minY;
         // Límites de la vuelta: cuando el centro de la nave pasa
         // window.vueltaMargen más allá del borde (e es la esquina de su caja
         // de 130 px, el centro está 65 px más allá). Es el mismo margen con el
@@ -2286,8 +2282,8 @@ function drawStars() {
           a = yMin;
           r = 0;
           touchedEdge = "top";
-        } else if (a > yMax) {
-          a = yMax;
+        } else if (a > maxY) {
+          a = maxY;
           r = 0;
           touchedEdge = "bottom";
         }
@@ -2538,7 +2534,10 @@ function drawStars() {
           dt *
           (IDLE_SPEED + (1 - IDLE_SPEED) * level) *
           (1 + (BOOST_SPEED - 1) * boostF);
-        if (!img.complete || !img.naturalWidth) return;
+        // El fuego elegido en el escenario 4 (window.fuegoJ1, un lienzo que
+        // arma esc4-game.js) o el de siempre.
+        const fuente = window.fuegoJ1 || img;
+        if (fuente === img && (!img.complete || !img.naturalWidth)) return;
         if (level < 0.02 && now - lastDraw < IDLE_FRAME_MS) return;
         lastDraw = now;
         const s = fase;
@@ -2574,7 +2573,7 @@ function drawStars() {
               Math.sin(s * 23 - p * 11 + 1) * 0.3);
           const dx = FIRE_CX + (FIRE_X - FIRE_CX) * ancho + sway;
           ctx.drawImage(
-            img,
+            fuente,
             FIRE_X,
             sy,
             FIRE_W,
@@ -2624,10 +2623,12 @@ function drawStars() {
         t.classList.toggle("luz-on", lightOn); // el escenario 4 ajusta la sombra de la nave según la luz
         d.style.transform = lightOn ? "translate(1px, 0px)" : "translate(0, 0)";
         applyLightFilter();
+        // La nave elegida en el escenario 4 (window.naveJ1, la pone
+        // esc4-game.js) o el cohete de siempre.
         if (cohetteTop)
           cohetteTop.src = lightOn
-            ? "parallax/cohete_on.webp"
-            : "parallax/cohete.webp";
+            ? (window.naveJ1 && window.naveJ1.on) || "parallax/cohete_on.webp"
+            : (window.naveJ1 && window.naveJ1.off) || "parallax/cohete.webp";
         if (silent) return;
         const light = scenes[currentSceneId].light;
         sfxPlay(lightOn ? "luzOn" : "luzOff", light ? light.volume : 1);

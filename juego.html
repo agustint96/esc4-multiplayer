@@ -694,15 +694,19 @@
       <p class="game-presenta-toque" id="game-presenta-toque" hidden>
         presiona cualquier tecla
       </p>
-      <!-- Presentación, primera pantalla: el logo en el medio de la pantalla
-           negra (ver empezarPresentacion en esc4-game.js). -->
-      <img
-        src="logo agus.png"
-        class="game-presenta-logo"
-        id="game-presenta-logo"
-        alt=""
-        hidden
-      />
+      <!-- Presentación, la carátula: abajo, "cargando" mientras se preparan
+           las imágenes y después "presiona cualquier tecla" (lo escribe
+           esc4-game.js, ver CARATULA_*). El dibujo va en el canvas. -->
+      <p class="game-presenta-toque game-caratula-texto" id="game-caratula-texto" hidden></p>
+      <!-- Presentación, después de la carátula: el logo en el medio de la
+           pantalla negra, que se prende como un foquito (ver
+           empezarPresentacion en esc4-game.js). -->
+      <div class="game-presenta-logo" id="game-presenta-logo" hidden>
+        <img src="logo agus sin texto.png" alt="" />
+        <p class="game-presenta-firma">
+          creado por<span>agustin tardella</span>
+        </p>
+      </div>
       <!-- Online, con Escape o el boton de menu del joystick: el juego no se
            puede frenar (el rival sigue), asi que solo pregunta si salir. Se
            elige con LB y RB, la cruceta o el stick, las flechas del teclado o

@@ -1,4 +1,7 @@
 :root {
+  /* La flecha del mouse: negra con borde blanco (la del sistema, si el
+     navegador no carga esta). La manito de los botones queda la de siempre. */
+  --cursor-flecha: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='28' viewBox='0 0 20 28'%3E%3Cpath d='M1.5 1.5V22l5-4.8 3.7 8.3 3.4-1.5-3.6-8.1H17z' fill='%23000' stroke='%23fff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E") 1 1, default;
   --navy: #0d1b2e;
   --navy-mid: #1a2d4a;
   --blue: #2f4467;
@@ -62,7 +65,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  cursor: default;
+  cursor: var(--cursor-flecha);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -676,21 +679,82 @@ html.entra-juego .game-cuadrado {
 .game-scene.fondo-instantaneo::before {
   transition: none;
 }
-/* Presentación al abrir la página, primera pantalla (esc4-game.js, ver
-   empezarPresentacion): el logo en el medio de la pantalla negra. Aparece y se
-   va con .visible (el fundido lo pone esc4-game.js). */
+/* Presentación al abrir la página, después de la carátula (esc4-game.js, ver
+   empezarPresentacion): el logo en el medio de la pantalla negra. Se prende y
+   se funde con .foquito (logoFoquito, abajo); si se saltea a la mitad,
+   esc4-game.js lo apaga con un fundido desde donde estaba. */
 .game-presenta-logo {
   position: absolute;
   top: 50%;
   left: 50%;
-  height: min(60vh, 110vw);
-  width: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   transform: translate(-50%, -50%);
   opacity: 0;
   pointer-events: none;
 }
+.game-presenta-logo img {
+  height: min(46vh, 85vw);
+  width: auto;
+}
+/* "creado por agustin tardella", con las letras del resto del juego (Spaceport,
+   sin tildes). */
+.game-presenta-firma {
+  margin: 3.5vh 0 0;
+  font-family: Spaceport, ui-monospace, Consolas, monospace;
+  font-size: clamp(0.6rem, 1.5vmin, 0.95rem);
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+.game-presenta-firma span {
+  display: block;
+  margin-top: 1.2vh;
+  font-size: clamp(0.9rem, 2.6vmin, 1.6rem);
+  letter-spacing: 0.2em;
+  color: #fff;
+}
 .game-presenta-logo.visible {
   opacity: 1;
+}
+/* Como el planeta del escenario 2 (planetBulbBlow): aparece apagado, parpadea
+   dos veces como si le costara arrancar, se queda prendido ~2 s con el brillo
+   cálido, vuelve a parpadear como si se fuera a fundir y se apaga. Los 3 s del
+   planeta van de 0,5 s a 3,5 s de estos 4 (el primer medio segundo aparece
+   apagado desde el negro, el último se va). El ruidito suena a los 0,5 s,
+   cuando arranca el parpadeo (ver PRESENTA_LOGO_SUENA en esc4-game.js). */
+.game-presenta-logo.foquito {
+  animation: logoFoquito 4s ease-in-out forwards;
+}
+@keyframes logoFoquito {
+  0% {
+    opacity: 0;
+    filter: brightness(0.5);
+  }
+  12.5%,
+  20%,
+  75.5%,
+  84.5%,
+  87.5% {
+    opacity: 0.35;
+    filter: drop-shadow(0 0 8px rgba(255, 244, 214, 0)) brightness(0.5);
+  }
+  16.25%,
+  23.75%,
+  80% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(255, 244, 214, 0.25));
+  }
+  25.25%,
+  74.75% {
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(255, 244, 214, 0.15));
+  }
+  100% {
+    opacity: 0;
+    filter: brightness(0.5);
+  }
 }
 .game-presenta-logo[hidden] {
   display: none;
@@ -719,6 +783,21 @@ html.entra-juego .game-cuadrado {
 }
 .game-presenta-toque[hidden] {
   display: none;
+}
+/* En la carátula, abajo, como en las maquetas (caratulas/). */
+.game-caratula-texto {
+  top: auto;
+  bottom: 13.5%;
+  transform: none;
+  font-size: clamp(0.6rem, 1.5vmin, 1rem);
+  letter-spacing: 0.45em;
+  color: rgba(255, 255, 255, 0.5);
+  transition: opacity 0.6s ease;
+}
+/* "cargando": quieto y más apagado (sin titilar). */
+.game-caratula-texto.cargando {
+  animation: none;
+  color: rgba(255, 255, 255, 0.4);
 }
 @keyframes presentaTitila {
   0%,
@@ -1898,7 +1977,7 @@ html[data-calidad="baja"] .starry-cohete-pair {
 @media (min-width: 601px) {
   .starry-p9-wrap {
     pointer-events: auto;
-    cursor: default;
+    cursor: var(--cursor-flecha);
   }
 }
 .parallax-footer {
@@ -1956,7 +2035,7 @@ html.cargando .layer {
   height: 320px;
 }
 #p3 img {
-  cursor: default;
+  cursor: var(--cursor-flecha);
 }
 #p4 {
   z-index: 3;
@@ -2026,12 +2105,12 @@ html.cargando .layer {
   height: 100%;
   width: auto;
   display: block;
-  cursor: default;
+  cursor: var(--cursor-flecha);
   pointer-events: none;
 }
 #group-256 .gl img[src="parallax/parallax 2.webp"] {
   pointer-events: auto;
-  cursor: default;
+  cursor: var(--cursor-flecha);
 }
 #p7 {
   z-index: 5;
@@ -2228,6 +2307,6 @@ html.cargando .layer {
 @media (min-width: 601px) {
   .starry-p9 {
     pointer-events: auto;
-    cursor: default;
+    cursor: var(--cursor-flecha);
   }
 }

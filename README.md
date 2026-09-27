@@ -8,17 +8,26 @@ persona en el mismo teclado o en otra PC por internet.
 
 ## Modos
 
-Al abrir la página hay una presentación: primero el logo en el medio de la
-pantalla negra; después se aclara y aparece un agujero de gusano, llega la
-nave (a color), lo mira y se mete. En otra pantalla, la del menú, sale por
-otro agujero y se va hacia la derecha; la cámara la sigue hasta que el menú
-queda en el medio, y ahí la nave sigue de largo (vuelve al elegir un modo).
-Como los navegadores no dejan sonar nada hasta que se toca la página, si
-todavía no se la tocó, al irse el logo la pantalla negra dice "presiona
-cualquier tecla" y la presentación sigue con ese toque. Ya en marcha,
-cualquier tecla, un click o el botón A la saltean. Mientras la nave mira el
+Al abrir la página hay una presentación. Primero el logo en el medio de la
+pantalla negra, que se prende como el foquito del planeta del escenario 2 (con
+su ruidito, `audio/Esc2/everyone.m4a`, si el navegador ya deja sonar) y se
+funde. Después, una carátula al azar entre seis (maquetas en `caratulas/`,
+nunca la misma dos veces seguidas; `?caratula=N` elige una), todavía sin
+nombre del juego, cada una con una animación mínima; abajo dice "cargando" y
+después "presiona cualquier tecla". Ese toque es el que deja sonar al
+navegador. Luego se aclara y aparece un agujero de gusano, llega la nave (a
+color), lo mira y se mete. En otra pantalla, la del menú, sale por otro
+agujero y se va hacia la derecha, y ahí la nave sigue de largo (vuelve al
+elegir un modo). Una tecla durante el logo lo saltea; pasada la carátula,
+cualquier tecla, un click o el botón A saltean el resto. Mientras la nave mira el
 menú no hay ninguna opción marcada: recién cuando se va se marca la primera.
-Después se elige el modo con el teclado. Al pasar de una opción a otra suena
+Después se elige el modo con el teclado. Contra la PC, con dos jugadores y online, antes de
+jugar aparece "tu nave": se elige entre siete naves (el cohete y las de
+`naves/nuevas/`) y cinco fuegos (clásico, fuego, hielo, plasma y veneno, el
+mismo dibujo recoloreado). Todas vuelan igual y chocan igual. Con dos
+jugadores la pantalla se parte y cada uno dice "listo"; la PC sortea una nave
+y un fuego en cada partida, y online cada uno ve la nave que eligió el otro.
+La última elección queda guardada. Al pasar de una opción a otra suena
 `selector.mp3` y al elegir una, `seleccion.mp3` (en `audio/Esc4/game sound/`),
 también en la pausa y en el cartel de salir del online. Durante el juego, el botón **MENU**
 (arriba a la izquierda) o **Escape** vuelven a esta elección.
