@@ -1784,6 +1784,7 @@
     { id: "falcon", nombre: "Falcon 9" },
     { id: "alax", nombre: "X-Wing" },
     { id: "platillo", nombre: "Invasor" },
+    { id: "iss", nombre: "ISS" },
   ].map((n) => {
     const dir = n.id === "cohete" ? "parallax/" : `naves/nuevas/${n.id}/`;
     const off = `${dir}${n.id}.webp`;
