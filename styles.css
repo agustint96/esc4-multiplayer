@@ -1017,6 +1017,16 @@ html.entra-juego .game-cuadrado {
   text-align: center;
   color: #fff;
 }
+/* Los puntitos de "buscando rival" (ver animarPuntosOnline en esc4-game.js):
+   afuera del texto, así el texto no se corre del centro mientras cambian. */
+.game-buscando {
+  position: relative;
+}
+.game-puntos {
+  position: absolute;
+  left: 100%;
+  top: 0;
+}
 .game-modo-estado small {
   font-size: 0.8em;
   color: rgba(255, 255, 255, 0.55);

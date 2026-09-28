@@ -604,6 +604,19 @@
   // Tope de color de la partida: el que en el juego original se tiene al pasar
   // el agujero 7 de 10.
   const COLOR_MAXIMO = 0.7;
+  // Las dos naves van aparte del resto de la escena: no arrancan del todo en
+  // blanco y negro sino con la mitad de su color, y con los goles llegan a
+  // todo su color (en el tutorial a los 10 goles; con rival, cuando el que va
+  // ganando llega a 10, aunque la escena se quede en COLOR_MAXIMO). La
+  // presentación sigue como siempre: esto es desde que se elige un modo.
+  const NAVES_COLOR_INICIO = 0.5;
+  const NAVES_COLOR_SUAVIZADO = 3; // 1/s: lo que tardan en acompañar al color de la escena
+  // Online, buscando rival: la nave (que se puede mover) parpadea de todo su
+  // color al blanco y negro y vuelve, una vuelta cada BUSCANDO_PARPADEO
+  // segundos, y a "buscando rival" se le escriben y se le borran los puntitos.
+  const BUSCANDO_PARPADEO = 1.2;
+  const BUSCANDO_PUNTOS = ["", ".", "..", "...", "..", "."];
+  const BUSCANDO_PUNTO_DURA = 0.3; // s de cada paso de los puntitos
   // La nave de la PC se ve semitransparente, para no confundirla con la tuya.
   const RIVAL_OPACIDAD = 0.55;
   // Las dos naves se ven igual que en el tutorial (mismo blanco y negro, sin
@@ -832,7 +845,9 @@
   let cumulosTomados = 0; // choques de esta partida
   let colorNave = 0; // 0 = blanco y negro ... 1 = todos sus colores (lo que se ve)
   let colorObjetivo = 0; // hacia dónde va colorNave
-  let colorEscalon = 0; // último escalón aplicado al filtro (ver aplicarColorNave)
+  let colorEscalon = 0; // último escalón aplicado al fondo (ver aplicarColorNave)
+  let tinteNaves = 0; // el color de las dos naves, 0..1 (ver NAVES_COLOR_INICIO)
+  let tinteEscalon = 0; // último escalón aplicado al filtro de la nave (ver aplicarTinteNaves)
   // Levantado de brillo del filtro de la nave con la luz prendida (styles.css,
   // .luz-on): cada canal pasa a slope * x + intercept. A color completo tiene
   // que quedar sin tocar (slope 1, intercept 0) para que se vea como el sprite
@@ -947,7 +962,7 @@
       // Escribiendo la clave, con el campo sin foco (se hizo click afuera):
       // lo que se escribe en él no llega acá (ver claveCampo más abajo).
       if (ev.code === "Enter" || ev.code === "NumpadEnter") buscarConClave();
-      else if (ev.code === "Escape") cerrarClave();
+      else if (ev.code === "Escape") cancelarClave();
       else claveCampo.focus();
       return;
     }
@@ -1505,6 +1520,9 @@
         claveCampo.value = limpiarClave(localStorage.getItem(CLAVE_GUARDADA));
       } catch (e) {}
     }
+    // Viene del selector de naves, que escondió el menú (y la clave está
+    // adentro de él).
+    modoEl.hidden = false;
     modoEl.classList.add("con-clave");
     claveEl.hidden = false;
     // El foco recién después de esta tecla: si no, la que abrió la clave (el
@@ -1523,6 +1541,13 @@
     claveEl.hidden = true;
     modoEl.classList.remove("con-clave");
     claveCampo.blur();
+  }
+
+  // Escape o B en la clave: de vuelta al menú, y si se vuelve a elegir online
+  // se pasa de nuevo por el selector (por si se quiere otra nave).
+  function cancelarClave() {
+    navesElegidas = null;
+    cerrarClave();
   }
 
   function buscarConClave() {
@@ -1548,7 +1573,7 @@
         buscarConClave();
       } else if (ev.code === "Escape") {
         sonarMenu("selector");
-        cerrarClave();
+        cancelarClave();
       }
     });
   }
@@ -1564,7 +1589,7 @@
       buscarConClave();
     } else if (b && !padMenuB) {
       sonarMenu("selector");
-      cerrarClave();
+      cancelarClave();
     }
     padMenuA = a;
     padMenuB = b;
@@ -1628,8 +1653,11 @@
       return;
     }
     modo = m;
-    // La nave se había ido al terminar la presentación: vuelve con el modo.
+    // La nave se había ido al terminar la presentación: vuelve con el modo, ya
+    // con la mitad de su color.
     ship.classList.remove("game-sin-nave");
+    tinteNaves = tinteMeta();
+    aplicarTinteNaves();
     // Si el botón de salir ya venía apretado (se volvió al menú con él y se
     // eligió sin soltarlo), que no cuente como una apretada nueva y se salga
     // de nuevo apenas arranca.
@@ -2363,6 +2391,9 @@
     limpiarFinal();
     colorEscalon = -1; // fuerza a aplicar el 0
     aplicarColorNave();
+    tinteNaves = tinteMeta(); // las naves vuelven a la mitad de su color
+    tinteEscalon = -1;
+    aplicarTinteNaves();
     enCentro = !!recolocar;
     if (enCentro) {
       centrarNave();
@@ -4711,6 +4742,9 @@
     ship.classList.add("game-sin-nave");
     colorEscalon = -1; // fuerza a aplicar el color (0) a la nave y al fondo
     fondoDeGolpe(aplicarColorNave);
+    tinteNaves = tinteMeta();
+    tinteEscalon = -1;
+    aplicarTinteNaves();
     centrarNave();
     if (modoEl) {
       modoEl.style.transform = "";
@@ -5130,13 +5164,13 @@
   // filtro de la nave obliga al navegador a repintarla entera, y hacerlo en
   // cada cuadro mientras se tiñe (varios segundos por pasaje) tiraba los cuadros
   // por segundo: por eso solo se toca cuando el valor cambia de escalón
-  // (COLOR_PASOS escalones en total, imperceptibles uno a uno).
-  function aplicarColorNave() {
-    const escalon = Math.round(colorNave * COLOR_PASOS);
-    if (escalon === colorEscalon) return;
-    colorEscalon = escalon;
-    const valor = (escalon / COLOR_PASOS).toFixed(3);
-    ship.style.setProperty("--nave-sat", valor);
+  // (COLOR_PASOS escalones en total, imperceptibles uno a uno). La nave va con
+  // tinteNaves; el resto de la escena, con colorNave (ver aplicarColorNave).
+  function aplicarTinteNaves() {
+    const escalon = Math.round(tinteNaves * COLOR_PASOS);
+    if (escalon === tinteEscalon) return;
+    tinteEscalon = escalon;
+    ship.style.setProperty("--nave-sat", (escalon / COLOR_PASOS).toFixed(3));
     // slope * x + intercept con los filtros de CSS: contrast(c) es
     // c * x + (1 - c) / 2 y brightness(b) multiplica por b, así que con
     // b = slope + 2 * intercept y c = slope / b queda justo esa cuenta (y
@@ -5148,10 +5182,37 @@
     ship.style.setProperty("--nave-luz-c", (slope / brillo).toFixed(4));
     // El sprite de atrás (el resplandor) también: su gris lo lee de esta variable
     // (ver scenes.game.light en script.js).
-    ship.style.setProperty(
-      "--nave-gris",
-      (1 - escalon / COLOR_PASOS).toFixed(3),
-    );
+    ship.style.setProperty("--nave-gris", gris.toFixed(3));
+  }
+
+  // Hacia dónde va tinteNaves: fuera de un modo (la presentación y el menú),
+  // como la escena; en un modo, de NAVES_COLOR_INICIO a todo su color a medida
+  // que la escena llega a su tope.
+  function tinteMeta() {
+    if (!modo) return colorNave;
+    const tope = esTutorial() ? 1 : COLOR_MAXIMO;
+    const avance = Math.max(0, Math.min(1, colorNave / tope));
+    return NAVES_COLOR_INICIO + (1 - NAVES_COLOR_INICIO) * avance;
+  }
+
+  // Cada cuadro: online, buscando rival, parpadea (arranca a todo color); si
+  // no, acompaña al color de la escena.
+  function actualizarTinte(dt) {
+    if (esperandoRival()) {
+      const fase = (reloj / BUSCANDO_PARPADEO) * Math.PI * 2;
+      tinteNaves = 0.5 + 0.5 * Math.cos(fase);
+    } else {
+      tinteNaves +=
+        (tinteMeta() - tinteNaves) * Math.min(1, dt * NAVES_COLOR_SUAVIZADO);
+    }
+    aplicarTinteNaves();
+  }
+
+  function aplicarColorNave() {
+    const escalon = Math.round(colorNave * COLOR_PASOS);
+    if (escalon === colorEscalon) return;
+    colorEscalon = escalon;
+    const valor = (escalon / COLOR_PASOS).toFixed(3);
     // La luz también: empieza blanca y va pasando al salmón (los halos y el
     // degradado de la nave, ver --luz-rgb en styles.css; el del canvas lo mezcla
     // dibujar).
@@ -6761,14 +6822,27 @@
       conectando: "conectando",
       midiendo: "rival encontrado",
       esperando: clave
-        ? "buscando rival<br /><small>con la clave " +
+        ? BUSCANDO_HTML + "<br /><small>con la clave " +
           clave +
           "<br />esc para cancelar</small>"
-        : "buscando rival<br /><small>esc para cancelar</small>",
+        : BUSCANDO_HTML + "<br /><small>esc para cancelar</small>",
       "sin-conexion":
         "sin conexion con el servidor<br /><small>esc para volver</small>",
     };
     el.innerHTML = textos[red.estado] || "";
+  }
+
+  // "buscando rival" con los puntitos que se escriben y se borran (ver
+  // BUSCANDO_PUNTOS): van aparte, pegados a la derecha, así el texto no se
+  // corre del centro mientras cambian.
+  const BUSCANDO_HTML =
+    '<span class="game-buscando">buscando rival<span class="game-puntos"></span></span>';
+  function animarPuntosOnline() {
+    const el = modoEl && modoEl.querySelector(".game-puntos");
+    if (!el) return;
+    const paso = Math.floor(reloj / BUSCANDO_PUNTO_DURA) % BUSCANDO_PUNTOS.length;
+    if (el.textContent !== BUSCANDO_PUNTOS[paso])
+      el.textContent = BUSCANDO_PUNTOS[paso];
   }
 
   function recibirOnline(m) {
@@ -7384,7 +7458,7 @@
     // IA (luzRival, ver actualizarRival); online la nave del rival queda
     // siempre "iluminada". Se va tiñendo con sus goles y, encima, su halo: rojo o
     // azul según le haya tocado (ver esAzul).
-    const gris = 1 - Math.min(1, colorNave);
+    const gris = 1 - Math.min(1, tinteNaves);
     const iluminada = modo === "dos" || modo === "pc" ? luzRival : true;
     ctx.filter =
       "grayscale(" +
@@ -8015,10 +8089,12 @@
       return;
     }
     if (esperandoRival()) {
-      // Online, buscando rival: igual que eligiendo, hasta que el emparejador
+      // Online, buscando rival: sin piedras ni agujeros, pero con la nave
+      // suelta (parpadeando, ver actualizarTinte), hasta que el emparejador
       // junta a los dos y se acuerda el mapa (ver revisarMapa).
       revisarMapa();
-      if (window.shipMove) window.shipMove(0, 0);
+      actualizarTinte(dt);
+      animarPuntosOnline();
       dibujar(circulos[1]);
       return;
     }
@@ -8030,6 +8106,7 @@
       colorNave += (colorObjetivo - colorNave) * Math.min(1, dt * suavizado);
       aplicarColorNave();
     }
+    actualizarTinte(dt);
     if (final) {
       final.t += dt;
       // Se deja quieta a la nave del jugador donde está (sin control, como en la
