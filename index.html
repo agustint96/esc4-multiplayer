@@ -10,7 +10,10 @@
          tamaño (ver "El mapa del online" en js/esc4-game.js) y lo piden acá
          ("esc4-mapa"): el juego se pone de ese tamaño y se lo agranda o achica
          para que entre entero, así los dos juegan con las mismas distancias y
-         la misma velocidad. Lo que sobra son franjas de estrellas, sin juego. -->
+         la misma velocidad. Lo que sobra son franjas de estrellas, sin juego.
+         En el celular, lo mismo siempre: el juego se pone del tamaño de una
+         pantalla de compu (de al menos 1920x1080, con la forma del celular) y
+         se lo achica para que la llene, así se juega como en la PC. -->
     <style>
       html,
       body {
@@ -18,6 +21,10 @@
         margin: 0;
         overflow: hidden;
         background: #000;
+        /* En el celular, ni zoom ni deslizar para recargar: el juego usa los
+           toques (ver html.tactil en styles.css). */
+        touch-action: none;
+        overscroll-behavior: none;
         /* La flecha del mouse del juego (ver --cursor-flecha en styles.css),
            también sobre las franjas. */
         cursor:
@@ -31,6 +38,15 @@
         width: 100%;
         height: 100%;
         display: block;
+      }
+      /* La caja del marco: la pantalla justa. Recorta lo que sobra del marco
+         (en el celular es más grande que la pantalla y se lo achica con
+         transform, que no cambia lo que ocupa): si no, el navegador del
+         celular ve la página más ancha y la aleja entera. */
+      #marco-caja {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
       }
       #juego {
         position: absolute;
@@ -52,11 +68,13 @@
   </head>
   <body>
     <canvas id="estrellas" aria-hidden="true"></canvas>
-    <iframe
-      id="juego"
-      title="Escenario 4"
-      allow="autoplay; gamepad; fullscreen"
-    ></iframe>
+    <div id="marco-caja">
+      <iframe
+        id="juego"
+        title="Escenario 4"
+        allow="autoplay; gamepad; fullscreen"
+      ></iframe>
+    </div>
     <script>
       (() => {
         const marco = document.getElementById("juego");
@@ -96,23 +114,38 @@
           }
         }
 
-        // mapa: { w, h } online (lo pide el juego), o null: toda la ventana.
+        // mapa: { w, h } online (lo pide el juego), o null: toda la ventana
+        // (en el celular, la de compu de mapaCelular).
         let mapa = null;
+        const tactil = window.matchMedia(
+          "(hover: none) and (pointer: coarse)",
+        ).matches;
+        // La ventana del celular llevada a una de compu: la escala que hace
+        // entrar 1920x1080 y, con esa escala, lo que ocupa la ventana entera
+        // (en un celular acostado, 1080 de alto y más de 1920 de ancho).
+        function mapaCelular() {
+          const k = Math.min(
+            window.innerWidth / 1920,
+            window.innerHeight / 1080,
+          );
+          return {
+            w: Math.round(window.innerWidth / k),
+            h: Math.round(window.innerHeight / k),
+          };
+        }
         function acomodar() {
-          marco.classList.toggle("mapa-fijo", !!mapa);
-          if (!mapa) {
+          const m = mapa || (tactil ? mapaCelular() : null);
+          marco.classList.toggle("mapa-fijo", !!m);
+          if (!m) {
             marco.style.removeProperty("width");
             marco.style.removeProperty("height");
             marco.style.removeProperty("transform");
             return;
           }
           // El juego entero adentro de la ventana, centrado y sin deformarse.
-          const k = Math.min(
-            window.innerWidth / mapa.w,
-            window.innerHeight / mapa.h,
-          );
-          marco.style.width = mapa.w + "px";
-          marco.style.height = mapa.h + "px";
+          const k = Math.min(window.innerWidth / m.w, window.innerHeight / m.h);
+          marco.style.width = m.w + "px";
+          marco.style.height = m.h + "px";
           marco.style.transform = `translate(-50%, -50%) scale(${k})`;
         }
         dibujarEstrellas();

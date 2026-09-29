@@ -1569,7 +1569,8 @@
     // al menú, que con los números elige un modo, ni a la nave).
     claveCampo.addEventListener("keydown", (ev) => {
       ev.stopPropagation();
-      if (ev.code === "Enter" || ev.code === "NumpadEnter") {
+      // (El enter del teclado del celular a veces llega sin code: por la key.)
+      if (ev.code === "Enter" || ev.code === "NumpadEnter" || ev.key === "Enter") {
         sonarMenu("seleccion");
         buscarConClave();
       } else if (ev.code === "Escape") {
@@ -1578,6 +1579,20 @@
       }
     });
   }
+
+  // Los botones de la clave del celular (ver .game-clave-botones).
+  document.querySelectorAll("[data-clave]").forEach((b) =>
+    b.addEventListener("click", () => {
+      if (!claveAbierta()) return;
+      if (b.dataset.clave === "buscar") {
+        sonarMenu("seleccion");
+        buscarConClave();
+      } else {
+        sonarMenu("selector");
+        cancelarClave();
+      }
+    }),
+  );
 
   // Joystick escribiendo la clave: con él no se puede escribir, pero A busca
   // con lo que haya (vacía, con cualquiera) y B vuelve al menú. Por flanco.
@@ -2116,9 +2131,13 @@
     const b = !!gp && botonPad(gp, PAD_B);
     const padJ2 = !!window.j2Joystick; // con dos jugadores, el joystick lo tiene el 2
     // Con un solo jugador (tutorial, contra la PC, online) X y M son lo mismo.
+    // En el celular, el botón de estela de la pantalla.
     if (jugador === 1)
       return (
-        estelaTecla.j1 || (modo !== "dos" && estelaTecla.j2) || (b && !padJ2)
+        estelaTecla.j1 ||
+        (modo !== "dos" && estelaTecla.j2) ||
+        (b && !padJ2) ||
+        (!!window.toque && window.toque.estela)
       );
     return modo === "dos" && (estelaTecla.j2 || (b && padJ2));
   }
@@ -3005,6 +3024,7 @@
   // andando por si se vuelve a habilitar.
   const esCelular = () =>
     window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+  const tactil = esCelular(); // se juega con el dedo (ver "Controles táctiles")
   const apretada = (tecla) =>
     [...sostenidas].some((codigo) => AYUDA_TECLAS[codigo] === tecla);
 
@@ -3792,6 +3812,13 @@
   function medidaCaratula() {
     const W = window.innerWidth;
     const H = window.innerHeight;
+    if (selector && tactil) {
+      // En el celular el selector se acerca: entra lo que tiene algo (de
+      // SEL_RECORTE_T), no los 1920x1080 enteros, así se lo puede tocar.
+      const R = SEL_RECORTE_T;
+      const u = Math.min(W / R.ancho, H / (R.y1 - R.y0));
+      return { u, ox: (W - 1920 * u) / 2, oy: H / 2 - ((R.y0 + R.y1) / 2) * u };
+    }
     const u = Math.min(W / 1920, H / 1080);
     return { u, ox: (W - 1920 * u) / 2, oy: (H - 1080 * u) / 2 };
   }
@@ -4089,6 +4116,7 @@
     if (!c || c.sale !== null) return;
     c.sale = 0;
     presenta.toque = true;
+    pedirPantallaCompleta();
     if (menuCtx) menuCtx.resume().catch(() => {});
     if (audioCtx) audioCtx.resume().catch(() => {});
     tapa.style.transition = `opacity ${CARATULA_SALE}s ease`;
@@ -4103,7 +4131,7 @@
     if (!c.lista && caratulaLista(c)) {
       c.lista = true;
       if (caratulaTexto) {
-        caratulaTexto.textContent = "presiona cualquier tecla";
+        caratulaTexto.textContent = tactil ? "toca la pantalla" : "presiona cualquier tecla";
         caratulaTexto.classList.remove("cargando");
       }
     }
@@ -4498,18 +4526,70 @@
       const paso = accion === "abajo" ? 1 : -1;
       l.fuego = (l.fuego + paso + selFuegos()) % selFuegos();
     } else {
-      // La que estaba vuelve a su retrato desde donde iba; la nueva sale del
-      // suyo.
       const paso = accion === "derecha" ? 1 : -1;
-      const v = l.vuelo;
-      if (v.modo) {
-        // Estaba volando: vuelve desde donde iba.
-        l.sale = { nave: l.nave, t: 0, x: v.x, y: v.y, alto: medidasSel().altoNave[0], rot: v.rot };
-        v.modo = null;
-      } else if (l.pose) l.sale = { nave: l.nave, t: 0, ...l.pose };
-      l.nave = (l.nave + paso + selNaves()) % selNaves();
-      l.llega = 0;
+      cambiarNaveSel(l, (l.nave + paso + selNaves()) % selNaves());
     }
+    sonarMenu("selector");
+  }
+
+  // Cambia la nave de un lado: la que estaba vuelve a su retrato desde donde
+  // iba (volando o en su lugar) y la nueva sale del suyo.
+  function cambiarNaveSel(l, nueva) {
+    const v = l.vuelo;
+    if (v.modo) {
+      l.sale = { nave: l.nave, t: 0, x: v.x, y: v.y, alto: medidasSel().altoNave[0], rot: v.rot };
+      v.modo = null;
+    } else if (l.pose) l.sale = { nave: l.nave, t: 0, ...l.pose };
+    l.nave = nueva;
+    l.llega = 0;
+  }
+
+  // Con el dedo (o el mouse): tocar un retrato o un fuego lo elige, deslizar
+  // de costado corre la cinta de ese lado y los botones de abajo (en el
+  // celular) siguen o vuelven. Lo que se puede tocar lo anota cada cuadro el
+  // dibujo (zonaSel), en 1920x1080.
+  let selToque = null; // { id, x, y }: el dedo que se apoyó
+  function zonaSel(x, y, w, h, hacer) {
+    selector.zonas.push({ x, y, w, h, hacer });
+  }
+  document.addEventListener("pointerdown", (ev) => {
+    if (selector) selToque = { id: ev.pointerId, x: ev.clientX, y: ev.clientY };
+  });
+  document.addEventListener("pointerup", (ev) => {
+    const s = selector;
+    const t = selToque;
+    selToque = null;
+    if (!s || !t || t.id !== ev.pointerId || !s.zonas) return;
+    const { u, ox, oy } = medidaCaratula();
+    const x = (ev.clientX - ox) / u;
+    const y = (ev.clientY - oy) / u;
+    const dx = ev.clientX - t.x;
+    const dy = ev.clientY - t.y;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      // Deslizó: la cinta corre para ese lado (hacia la izquierda, la de la
+      // derecha pasa al medio).
+      const i = s.lados.length === 1 || s.pc ? s.lados.length - 1 : x < 960 ? 0 : 1;
+      accionSelector(i, dx < 0 ? "derecha" : "izquierda");
+      return;
+    }
+    for (let k = s.zonas.length - 1; k >= 0; k--) {
+      const z = s.zonas[k];
+      if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) {
+        z.hacer();
+        return;
+      }
+    }
+  });
+  function tocarRetratoSel(i, j) {
+    const l = selector.lados[i];
+    if (l.listo || j === l.nave) return;
+    cambiarNaveSel(l, j);
+    sonarMenu("selector");
+  }
+  function tocarFuegoSel(i, j) {
+    const l = selector.lados[i];
+    if (l.listo || j === l.fuego) return;
+    l.fuego = j;
     sonarMenu("selector");
   }
 
@@ -4590,7 +4670,8 @@
       l.enLugar = l.llega >= 1 ? l.enLugar + dt : 0;
       if (l.sale && (l.sale.t += dt) >= SEL_VUELVE) l.sale = null;
       // Vuela por toda la pantalla; con dos lados, cada uno por su mitad.
-      const b = SEL_VUELO.borde;
+      // (En el celular, dentro de lo que se ve: ver SEL_RECORTE_T.)
+      const b = tactil ? { ...SEL_VUELO.borde, y0: 170, y1: 720 } : SEL_VUELO.borde;
       l.borde = s.lados.length === 1 ? b : i ? { ...b, x0: 1020 } : { ...b, x1: 900 };
       // La cinta corre hasta la elegida, por el camino corto.
       l.pos += difCircular(l.nave - l.pos, selNaves()) * (1 - Math.exp(-dt * SEL_CORRE));
@@ -4757,7 +4838,7 @@
 
   // La cinta de un lado: los retratos alrededor de la elegida, que se apagan
   // hacia los bordes, con una flechita a cada lado.
-  function cintaSel(l, cx, m) {
+  function cintaSel(l, cx, m, i) {
     const R = SEL_RETRATO;
     const medio = m.medioCinta; // retratos que se ven a cada lado
     for (let j = 0; j < selNaves(); j++) {
@@ -4766,6 +4847,7 @@
       if (lejos > medio + 0.5) continue;
       const alfa = Math.max(0, Math.min(1, medio + 0.5 - lejos));
       const elegida = j === l.nave;
+      if (alfa > 0.3) zonaSel(c.x, c.y, R.ancho, R.alto, () => tocarRetratoSel(i, j));
       ctx.globalAlpha = alfa;
       ctx.beginPath();
       ctx.roundRect(c.x, c.y, R.ancho, R.alto, 8);
@@ -4809,6 +4891,7 @@
     for (const dir of [-1, 1]) {
       const x = cx + dir * a;
       const y = m.yFila + R.alto / 2;
+      zonaSel(x - 30, y - 40, 60, 80, () => accionSelector(i, dir > 0 ? "derecha" : "izquierda"));
       ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
       ctx.beginPath();
       ctx.moveTo(x + dir * 7, y);
@@ -4927,7 +5010,7 @@
 
   // La fila de fuegos de un lado: "fuego", todos (el elegido más grande, "al
   // azar" al final) y su nombre.
-  function fuegosSel(l, cx, y, tam) {
+  function fuegosSel(l, cx, y, tam, i) {
     const n = selFuegos();
     const paso = tam * 2.5;
     const x0 = cx - ((n - 1) * paso) / 2;
@@ -4937,7 +5020,35 @@
     for (let j = 0; j < n; j++) {
       const elegido = j === l.fuego;
       fuegoSel(j, x0 + j * paso, y, elegido ? tam * 2 : tam * 1.1, elegido ? 1 : 0.5);
+      zonaSel(x0 + j * paso - paso / 2, y - tam * 1.4, paso, tam * 2.8, () => tocarFuegoSel(i, j));
     }
+  }
+
+  // En el celular, en vez de las teclas: botones para tocar (items: { texto,
+  // hacer, rgb? }), en fila y centrados en y.
+  function botonesSel(items, y) {
+    const tam = 22;
+    const alto = 64;
+    const sep = 36;
+    ctx.font = `${tam}px Spaceport, ui-monospace, Consolas, monospace`;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = `${tam * 0.14}px`;
+    const anchos = items.map((b) => ctx.measureText(b.texto).width + 56);
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+    let x = 960 - (anchos.reduce((a, b) => a + b, 0) + sep * (items.length - 1)) / 2;
+    items.forEach((b, k) => {
+      const w = anchos[k];
+      const rgb = b.rgb || "255, 255, 255";
+      ctx.beginPath();
+      ctx.roundRect(x, y - alto / 2, w, alto, 8);
+      ctx.fillStyle = `rgba(${rgb}, 0.08)`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(${rgb}, 0.7)`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      textoSel(b.texto, x + w / 2, y + 1, tam, `rgb(${rgb})`, "center", 0.14);
+      zonaSel(x, y - alto / 2, w, alto, b.hacer);
+      x += w + sep;
+    });
   }
 
   const nombreSel = (l) => (azarNave(l.nave) ? "al azar" : NAVES_JUEGO[l.nave].nombre);
@@ -5135,16 +5246,31 @@
   // Medidas (en 1920x1080) al tamaño del menú principal: letras de 16 a 22
   // px y todo en un bloque centrado. yFila: arriba de la cinta; medioCinta:
   // retratos que se ven a cada lado de la elegida.
-  const SEL_UNO = {
-    yTitulo: 200, ySub: 236,
-    yNave: 405, altoNave: [260], yNombre: 580, tamNombre: 22,
-    yFuego: 635, tamFuego: 17, yFila: 700, medioCinta: 4.5, yNota: 850, yAyuda: 905,
-  };
-  const SEL_DOS = {
-    yTitulo: 165, cx: [560, 1360], yJ: 240,
-    yNave: 375, altoNave: [220], yNombre: 525, tamNombre: 20,
-    yFuego: 580, tamFuego: 16, yEstado: 638, yFila: 715, medioCinta: 2.8, yNota: 862, yAyuda: 915,
-  };
+  // En el celular, más juntas (y el selector se acerca a lo que ocupan:
+  // SEL_RECORTE_T, ver medidaCaratula), con los botones de abajo.
+  const SEL_UNO = tactil
+    ? {
+        yTitulo: 150, ySub: 186,
+        yNave: 330, altoNave: [200], yNombre: 460, tamNombre: 24,
+        yFuego: 510, tamFuego: 18, yFila: 552, medioCinta: 4.5, yNota: 686, yAyuda: 748,
+      }
+    : {
+        yTitulo: 200, ySub: 236,
+        yNave: 405, altoNave: [260], yNombre: 580, tamNombre: 22,
+        yFuego: 635, tamFuego: 17, yFila: 700, medioCinta: 4.5, yNota: 850, yAyuda: 905,
+      };
+  const SEL_DOS = tactil
+    ? {
+        yTitulo: 130, cx: [560, 1360], yJ: 185,
+        yNave: 300, altoNave: [180], yNombre: 420, tamNombre: 22,
+        yFuego: 468, tamFuego: 17, yEstado: 512, yFila: 548, medioCinta: 2.8, yNota: 684, yAyuda: 748,
+      }
+    : {
+        yTitulo: 165, cx: [560, 1360], yJ: 240,
+        yNave: 375, altoNave: [220], yNombre: 525, tamNombre: 20,
+        yFuego: 580, tamFuego: 16, yEstado: 638, yFila: 715, medioCinta: 2.8, yNota: 862, yAyuda: 915,
+      };
+  const SEL_RECORTE_T = { ancho: 1520, y0: 100, y1: 792 };
 
   function dibujarSelector() {
     const s = selector;
@@ -5152,6 +5278,7 @@
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
     dibujarEstrellasCaratula(s.estrellas, s.t * 3 * medidaCaratula().u, 0);
     transformarCaratula();
+    s.zonas = [];
     const gris = "rgba(255, 255, 255, 0.45)";
     const nota = () => textoSel("todas con la misma velocidad y el mismo impacto", 960, medidasSel().yNota, 15, gris);
     if (s.lados.length === 1) {
@@ -5160,15 +5287,21 @@
       tituloSel("Elegi tu nave", m.yTitulo, 30);
       textoSel(s.modo === "online" ? "online" : "contra la PC", 960, m.ySub, 16, "rgba(255, 255, 255, 0.55)");
       textoSel(nombreSel(l), 960, m.yNombre, m.tamNombre, "#fff");
-      fuegosSel(l, 960, m.yFuego, m.tamFuego);
-      cintaSel(l, 960, m);
+      fuegosSel(l, 960, m.yFuego, m.tamFuego, 0);
+      cintaSel(l, 960, m, 0);
       nota();
-      ayudaSel([
-        { teclas: ["A", "D"], texto: "nave" },
-        { teclas: ["W", "S"], texto: "fuego" },
-        { teclas: ["E"], texto: s.modo === "pc" ? "seguir" : "jugar" },
-        { teclas: ["esc"], texto: "volver" },
-      ], m.yAyuda);
+      if (tactil)
+        botonesSel([
+          { texto: "volver", hacer: () => accionSelector(0, "volver") },
+          { texto: s.modo === "pc" ? "seguir" : "jugar", rgb: l.rgb, hacer: () => accionSelector(0, "ok") },
+        ], m.yAyuda);
+      else
+        ayudaSel([
+          { teclas: ["A", "D"], texto: "nave" },
+          { teclas: ["W", "S"], texto: "fuego" },
+          { teclas: ["E"], texto: s.modo === "pc" ? "seguir" : "jugar" },
+          { teclas: ["esc"], texto: "volver" },
+        ], m.yAyuda);
       grandeSel(l, 0, 960, m);
       dibujarVueloSel(l, m);
     } else {
@@ -5179,18 +5312,29 @@
         const cx = m.cx[i];
         textoSel(i ? (s.pc ? "PC" : "J2") : "J1", cx, m.yJ, 22, `rgb(${l.rgb})`);
         textoSel(nombreSel(l), cx, m.yNombre, m.tamNombre, "#fff");
-        fuegosSel(l, cx, m.yFuego, m.tamFuego);
+        fuegosSel(l, cx, m.yFuego, m.tamFuego, i);
         if (s.pc) {
           // Contra la PC la tuya ya está: sin cinta, con "lista".
           if (!i) textoSel("lista", cx, m.yEstado, 18, `rgb(${l.rgb})`);
-          else cintaSel(l, cx, m);
+          else cintaSel(l, cx, m, i);
         } else {
           textoSel(l.listo ? "listo" : "eligiendo", cx, m.yEstado, 18, l.listo ? `rgb(${l.rgb})` : gris);
-          cintaSel(l, cx, m);
+          cintaSel(l, cx, m, i);
         }
       });
       nota();
-      if (s.pc) {
+      if (tactil && s.pc) {
+        botonesSel([
+          { texto: "volver", hacer: () => accionSelector(1, "volver") },
+          { texto: "jugar", rgb: s.lados[1].rgb, hacer: () => accionSelector(1, "ok") },
+        ], m.yAyuda);
+      } else if (tactil) {
+        botonesSel([
+          { texto: "J1 listo", rgb: s.lados[0].rgb, hacer: () => accionSelector(0, "ok") },
+          { texto: "volver", hacer: () => accionSelector(0, "volver") },
+          { texto: "J2 listo", rgb: s.lados[1].rgb, hacer: () => accionSelector(1, "ok") },
+        ], m.yAyuda);
+      } else if (s.pc) {
         ayudaSel([
           { teclas: ["A", "D"], texto: "nave" },
           { teclas: ["W", "S"], texto: "fuego" },
@@ -8539,27 +8683,15 @@
     const yo = p && p.listo ? { x: p.x + cajaNave / 2, y: p.y + cajaNave / 2 } : null;
     if (yo && !ship.classList.contains("fuera-de-juego"))
       puntero(yo.x, yo.y, colorPropio());
-    // Los agujeros aparecen en cualquier lugar del mapa (ver crearCumulo): si
-    // no se ve ninguno, una flecha al más cercano a la nave, que se ve como un
-    // agujero: negra por dentro y con el borde y el brillo del color de su
-    // anillo (blanco al principio y cada vez más salmón, como ellos).
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-    const agujeros = cumulos.filter(prendido).map((c) => ({
-      x: aPantalla(c.x, cam.ox),
-      y: aPantalla(c.y, cam.oy),
-    }));
-    const seVe = (a) => a.x >= 0 && a.x <= W && a.y >= 0 && a.y <= H;
-    if (!agujeros.length || agujeros.some(seVe)) return;
-    const desde = yo || { x: W / 2, y: H / 2 };
-    const cerca = (a) => Math.hypot(a.x - desde.x, a.y - desde.y);
-    const masCerca = agujeros.reduce((m, a) => (cerca(a) < cerca(m) ? a : m));
-    puntero(
-      masCerca.x,
-      masCerca.y,
-      mezclaAgujeros(Math.max(0, Math.min(1, colorNave))),
-      "#000",
-    );
+    // Los agujeros aparecen en cualquier lugar del mapa (ver crearCumulo):
+    // cada uno que quede fuera de la pantalla lleva su flecha en el borde,
+    // que se ve como un agujero: negra por dentro y con el borde y el brillo
+    // del color de su anillo (blanco al principio y cada vez más salmón, como
+    // ellos). Así siempre se sabe dónde están los dos.
+    const colorAgujero = mezclaAgujeros(Math.max(0, Math.min(1, colorNave)));
+    for (const c of cumulos)
+      if (prendido(c))
+        puntero(aPantalla(c.x, cam.ox), aPantalla(c.y, cam.oy), colorAgujero, "#000");
   }
 
   // Del mundo a la pantalla: la inversa de lo que hace circulosNave, y lo mismo
@@ -8896,6 +9028,164 @@
     window.calidad.alCambiar(() => {
       if (activo) ajustarCanvas();
     });
+
+  // --- Controles táctiles ------------------------------------------------------
+  // En el celular (tactil) se juega con el dedo: en la mitad izquierda de la
+  // pantalla, un stick que aparece donde se apoya el pulgar (y se queda
+  // quieto, tenue, abajo a la izquierda mientras no se lo toca), y a la
+  // derecha los botones de impulso y estela (mientras se los tiene
+  // apretados) y el de la luz (prende y apaga). Se ven solo jugando. Todo va
+  // a window.toque, que script.js lee como un joystick más (el stick y el
+  // impulso) y quiereEstela como la X; la luz, como la Q (alternarLuzJ1).
+  // Arriba a la derecha, el zoom: abierto (window.toque.zoomAbierto: la
+  // cámara se aleja mientras la nave se mueve y se acerca cuando se queda
+  // quieta, ver script.js) o cerrado (siempre cerca, como en la PC sin
+  // Espacio). Se recuerda para la próxima vez.
+  // Las pantallas del juego (menú, selector, clave, pausa) se tocan
+  // directamente. La pantalla completa se pide con el toque de la carátula.
+  // Si el marco achica el juego (index.html lo pone del tamaño de una
+  // pantalla de compu), los controles se agrandan lo mismo (--tactil-escala):
+  // quedan del tamaño de siempre para el dedo.
+  const TOQUE_RADIO = 55; // px de la pantalla de verdad: hasta dónde se corre la perilla
+  const ZOOM_GUARDADO = "esc4-zoom-celular";
+  let zoomAbierto = true;
+  try {
+    zoomAbierto = localStorage.getItem(ZOOM_GUARDADO) !== "cerrado";
+  } catch (e) {}
+  window.toque = { x: 0, y: 0, activo: false, impulso: false, estela: false, zoomAbierto };
+  const tactilEl = document.getElementById("game-tactil");
+  if (tactil && tactilEl) {
+    document.documentElement.classList.add("tactil");
+    window.toqueControles = true;
+    if (presentaToque) presentaToque.textContent = "toca la pantalla";
+    const zona = document.getElementById("game-tactil-zona");
+    const stick = document.getElementById("game-tactil-stick");
+    const perilla = document.getElementById("game-tactil-perilla");
+    const botones = [...tactilEl.querySelectorAll("[data-toque]")];
+    const botonZoom = document.getElementById("game-tactil-zoom");
+    const mostrarZoom = () => {
+      botonZoom.textContent = window.toque.zoomAbierto ? "zoom abierto" : "zoom cerrado";
+    };
+    mostrarZoom();
+    botonZoom.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      window.toque.zoomAbierto = !window.toque.zoomAbierto;
+      try {
+        localStorage.setItem(ZOOM_GUARDADO, window.toque.zoomAbierto ? "abierto" : "cerrado");
+      } catch (e) {}
+      mostrarZoom();
+      botonZoom.classList.add("apretado");
+    });
+    for (const tipo of ["pointerup", "pointercancel", "pointerleave"])
+      botonZoom.addEventListener(tipo, () => botonZoom.classList.remove("apretado"));
+    let dedo = null; // { id, x, y }: el pulgar del stick
+    let escala = 1; // cuánto se agrandan los controles (ver --tactil-escala)
+    const medirEscala = () => {
+      const k = window.calidad ? window.calidad.escalaMarco() : 1;
+      escala = 1 / k;
+      document.documentElement.style.setProperty("--tactil-escala", escala.toFixed(4));
+    };
+    const reposo = () => {
+      stick.style.left = 110 * escala + "px";
+      stick.style.top = window.innerHeight - 110 * escala + "px";
+    };
+    const soltarStick = () => {
+      dedo = null;
+      window.toque.activo = false;
+      window.toque.x = window.toque.y = 0;
+      perilla.style.transform = "";
+      stick.classList.remove("activo");
+      reposo();
+    };
+    const moverStick = (ev) => {
+      let dx = ev.clientX - dedo.x;
+      let dy = ev.clientY - dedo.y;
+      const d = Math.hypot(dx, dy);
+      const radio = TOQUE_RADIO * escala;
+      if (d > radio) {
+        dx *= radio / d;
+        dy *= radio / d;
+      }
+      perilla.style.transform = `translate(${dx}px, ${dy}px)`;
+      window.toque.x = dx / radio;
+      window.toque.y = dy / radio;
+      window.toque.activo = true;
+    };
+    zona.addEventListener("pointerdown", (ev) => {
+      if (dedo) return;
+      ev.preventDefault();
+      dedo = { id: ev.pointerId, x: ev.clientX, y: ev.clientY };
+      zona.setPointerCapture(ev.pointerId);
+      stick.style.left = ev.clientX + "px";
+      stick.style.top = ev.clientY + "px";
+      stick.classList.add("activo");
+      moverStick(ev);
+    });
+    zona.addEventListener("pointermove", (ev) => {
+      if (dedo && ev.pointerId === dedo.id) moverStick(ev);
+    });
+    for (const tipo of ["pointerup", "pointercancel", "lostpointercapture"])
+      zona.addEventListener(tipo, (ev) => {
+        if (dedo && ev.pointerId === dedo.id) soltarStick();
+      });
+    const soltarBoton = (b) => {
+      b.classList.remove("apretado");
+      if (b.dataset.toque !== "luz") window.toque[b.dataset.toque] = false;
+    };
+    for (const b of botones) {
+      b.addEventListener("pointerdown", (ev) => {
+        ev.preventDefault();
+        b.setPointerCapture(ev.pointerId);
+        b.classList.add("apretado");
+        if (b.dataset.toque === "luz") {
+          if (window.alternarLuzJ1) window.alternarLuzJ1();
+        } else window.toque[b.dataset.toque] = true;
+      });
+      for (const tipo of ["pointerup", "pointercancel", "lostpointercapture"])
+        b.addEventListener(tipo, () => soltarBoton(b));
+    }
+    medirEscala();
+    reposo();
+    window.addEventListener("resize", () => {
+      medirEscala();
+      if (!dedo) reposo();
+    });
+    // Se ven solo jugando (ni en el menú, ni en el selector, ni en la pausa,
+    // ni con el final): al esconderse se suelta todo.
+    (function mirarTactil() {
+      const ver = !!modo && !pausa && !final && !ganado && !selector && !presenta && !claveAbierta();
+      if (tactilEl.hidden === ver) {
+        tactilEl.hidden = !ver;
+        if (!ver) {
+          soltarStick();
+          botones.forEach(soltarBoton);
+        }
+      }
+      requestAnimationFrame(mirarTactil);
+    })();
+  }
+
+  // En el celular, al tocar la carátula: pantalla completa y acostada (donde
+  // se pueda; si no, se sigue igual). Adentro del marco (index.html) la pide
+  // la página de afuera: si la pidiera este documento, el marco quedaría en
+  // pantalla completa del tamaño del celular y se perdería la pantalla de
+  // compu achicada (ver mapaCelular en index.html).
+  function pedirPantallaCompleta() {
+    if (!tactil) return;
+    let ventana = window;
+    try {
+      if (window.parent !== window && window.parent.document) ventana = window.parent;
+    } catch (e) {} // (otro origen: se queda con esta)
+    const doc = ventana.document;
+    const el = doc.documentElement;
+    if (doc.fullscreenElement || !el.requestFullscreen) return;
+    el.requestFullscreen({ navigationUI: "hide" })
+      .then(() => {
+        const o = ventana.screen.orientation;
+        if (o && o.lock) return o.lock("landscape");
+      })
+      .catch(() => {});
+  }
 
   window.esc4Game = {
     // script.js: zoom de la cámara y punto de la pantalla que queda fijo.

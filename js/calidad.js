@@ -114,11 +114,26 @@
     }
   }
 
+  // Cuánto achica el marco al juego (1 si no lo achica o no hay marco).
+  function escalaMarco() {
+    try {
+      const f = window.frameElement;
+      if (!f) return 1;
+      const k = f.getBoundingClientRect().width / window.innerWidth;
+      return k > 0 && k < 1 ? k : 1;
+    } catch (e) {
+      return 1;
+    }
+  }
+
   const calidad = {
     nivel,
-    // Resolución del canvas del juego para este nivel.
+    escalaMarco,
+    // Resolución del canvas del juego para este nivel. Si el marco achica
+    // el juego (en el celular, ver index.html), la de la pantalla de verdad:
+    // no tiene sentido dibujar más píxeles que los que se ven.
     dpr() {
-      const d = window.devicePixelRatio || 1;
+      const d = (window.devicePixelRatio || 1) * escalaMarco();
       return Math.min(d, nivel === "baja" ? 1 : nivel === "alta" ? 2 : 1.5);
     },
     alCambiar(fn) {

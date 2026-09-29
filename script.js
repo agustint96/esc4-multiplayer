@@ -1211,6 +1211,16 @@ function drawStars() {
     // ruedita se comporta como siempre.
     let wheelMapViewT = 0;
     let wheelExpireAt = 0;
+    // En el celular del escenario 4 (window.toqueControles) no hay Espacio ni
+    // rueda: con el zoom abierto (el botón de zoom de la pantalla,
+    // window.toque.zoomAbierto) la cámara se aleja sola mientras la nave se
+    // mueve (se ve toda la cancha) y se acerca, con el zoom de siempre, cuando
+    // la nave se queda quieta un momento; con el zoom cerrado queda siempre
+    // cerca. Es otro origen de mapViewT, como la rueda.
+    let tactilMapViewT = 0;
+    let tactilQuieta = 0; // s que lleva la nave quieta
+    const TACTIL_QUIETA_VEL = 0.4; // px por cuadro de 60 Hz (~25 px/s): por debajo, quieta
+    const TACTIL_QUIETA_SEG = 0.5; // s quieta para que la cámara se acerque
     const WHEEL_ZOOM_RANGE = 600; // px de rueda para ir de zoom normal a mapa completo
     const WHEEL_ZOOM_HOLD_MS = 3000; // el zoom out dura esto tras el último movimiento de la rueda
     document.addEventListener(
@@ -2048,6 +2058,10 @@ function drawStars() {
         mouseBoost = false;
       }),
       requestAnimationFrame(function tick() {
+        // En el celular del escenario 4 la nave va con el stick de la pantalla
+        // (window.toque, ver "Controles táctiles" en esc4-game.js): los
+        // toques no la llevan hacia el dedo.
+        if (window.toqueControles) l = false;
         // Con dos jugadores y un joystick conectado, el joystick es del jugador 2
         // (lo lee esc4-game.js): esta nave queda con todo el teclado.
         const gp = window.j2Joystick ? null : getFirstGamepad();
@@ -2095,6 +2109,16 @@ function drawStars() {
         if ((wasd && keyUp) || (flechas && arrowUp)) gy = -1;
         else if ((wasd && keyDown) || (flechas && arrowDown)) gy = 1;
         if ((wasd && keyBoost) || (flechas && keyBoostDer)) boosting = true;
+        // El stick y el impulso de la pantalla del celular: como el del joystick.
+        const toque = window.toque;
+        if (toque && toque.activo) {
+          const [tx, ty] = stickShip(toque.x, toque.y);
+          if (tx !== 0 || ty !== 0) {
+            gx = tx;
+            gy = ty;
+          }
+        }
+        if (toque && toque.impulso) boosting = true;
         // Terminó la partida del escenario 4 (window.shipSinControl): ni
         // teclado, ni joystick, ni mouse; la nave sigue de largo con lo que
         // traía.
@@ -2293,12 +2317,18 @@ function drawStars() {
         // escenarios), cruza a ese escenario; si no, el clamp de arriba ya
         // alcanza -es un borde sin escenario del otro lado, como hoy son
         // left/right en la principal y en la de espacio-.
+        // Un cruce pedido (shipLeave, o el del arranque de juego.html hacia
+        // el escenario 4) se hace siempre: requiresDesktop es para que en el
+        // celular no se llegue volando, pero juego.html tiene que entrar
+        // aunque cargue con el celular parado (angosto).
+        let forzado = false;
         if (forcedEdge) {
           touchedEdge = forcedEdge;
           forcedEdge = null;
+          forzado = true;
         }
         const edge = touchedEdge && scene.edges[touchedEdge];
-        if (edge && !(edge.requiresDesktop && isMobileTouch())) {
+        if (edge && (forzado || !(edge.requiresDesktop && isMobileTouch()))) {
           const prevScene = scene;
           currentSceneId = edge.to;
           scene = scenes[currentSceneId];
@@ -2377,9 +2407,20 @@ function drawStars() {
         if (zoomBloqueado) wheelMapViewT = 0;
         if (wheelMapViewT > 0 && performance.now() > wheelExpireAt)
           wheelMapViewT = 0;
+        if (window.toqueControles && currentSceneId === "game") {
+          if (Math.hypot(n, r) > TACTIL_QUIETA_VEL) tactilQuieta = 0;
+          else tactilQuieta += cuadros / 60;
+          const abierto = !!window.toque && window.toque.zoomAbierto;
+          tactilMapViewT = abierto && tactilQuieta < TACTIL_QUIETA_SEG ? 1 : 0;
+        } else tactilMapViewT = 0;
         const mapViewT = zoomBloqueado
           ? 0
-          : Math.max(keyMapView ? 1 : 0, gamepadMapViewT, wheelMapViewT);
+          : Math.max(
+              keyMapView ? 1 : 0,
+              gamepadMapViewT,
+              wheelMapViewT,
+              tactilMapViewT,
+            );
         const targetCameraZoom = scene.camera
           ? scene.camera.zoom + (1 - scene.camera.zoom) * mapViewT
           : 1;
@@ -2962,6 +3003,11 @@ function drawStars() {
       } else if (window.esc4Game) window.esc4Game.toggleLuzRival();
     }
   });
+  // El botón de luz de la pantalla del celular (ver "Controles táctiles" en
+  // esc4-game.js): como la Q.
+  window.alternarLuzJ1 = () => {
+    if (toggleShipLight && !window.juegoEnPausa) toggleShipLight();
+  };
 })();
 
 // CV: elegir idioma — el ícono del nav ya no descarga directo, abre un
