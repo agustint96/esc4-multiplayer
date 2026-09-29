@@ -2108,8 +2108,9 @@
     return modo === "dos" && (estelaTecla.j2 || (b && padJ2));
   }
   // Suelta bocanadas entre donde estaba el motor y donde está ahora, y gasta
-  // del tanque el tiempo que salió estela (dt).
-  function sembrarEstela(prev, x, y, destino, esc, dt) {
+  // del tanque el tiempo que salió estela (dt). lista: dónde van (la de la
+  // órbita de la carátula tiene la suya).
+  function sembrarEstela(prev, x, y, destino, esc, dt, lista = estela) {
     if (prev.ok) {
       const dx = x - prev.x;
       const dy = y - prev.y;
@@ -2130,7 +2131,7 @@
         const n = Math.max(1, Math.round(d / (ESTELA_PASO * (baja ? 2 : 1))));
         for (let i = 1; i <= n; i++) {
           const a0 = 0.07 + Math.random() * 0.04;
-          estela.push({
+          lista.push({
             x: prev.x + (dx * i) / n,
             y: prev.y + (dy * i) / n,
             vx: (Math.random() - 0.5) * 0.1,
@@ -2143,8 +2144,8 @@
             spr,
           });
         }
-        if (estela.length > ESTELA_MAX)
-          estela.splice(0, estela.length - ESTELA_MAX);
+        if (lista.length > ESTELA_MAX)
+          lista.splice(0, lista.length - ESTELA_MAX);
       }
     }
     prev.x = x;
@@ -2219,9 +2220,15 @@
     // Se dibuja en el mundo, con el zoom de la cámara que ya tiene ctx (ver
     // dibujar): la estela queda en el espacio y la cámara la sigue como a todo.
     ctx.save();
+    avanzarBocanadas(estela, dt, true);
+    ctx.restore();
+  }
+  // Las bocanadas crecen, se corren y se apagan dt segundos (y las que se
+  // terminaron se sacan de la lista); si dibujar, se dibujan con ctx como esté.
+  function avanzarBocanadas(lista, dt, dibujar) {
     let j = 0;
-    for (let i = 0; i < estela.length; i++) {
-      const b = estela[i];
+    for (let i = 0; i < lista.length; i++) {
+      const b = lista[i];
       b.age += dt;
       if (b.age >= b.life) continue;
       const t = b.age / b.life;
@@ -2231,14 +2238,16 @@
       b.vy *= 0.995;
       b.x += b.vx * dt * 30;
       b.y += b.vy * dt * 30;
-      const r = b.r0 + (b.r1 - b.r0) * Math.pow(t, 0.55);
-      // Aparece de a poco (0,3 s): recién nacida no se ve una mancha pegada al fuego.
-      ctx.globalAlpha = b.a0 * Math.pow(1 - t, 1.6) * Math.min(1, b.age / 0.3);
-      ctx.drawImage(b.spr, b.x - r, b.y - r, r * 2, r * 2);
-      estela[j++] = b;
+      if (dibujar) {
+        const r = b.r0 + (b.r1 - b.r0) * Math.pow(t, 0.55);
+        // Aparece de a poco (0,3 s): recién nacida no se ve una mancha pegada al fuego.
+        ctx.globalAlpha = b.a0 * Math.pow(1 - t, 1.6) * Math.min(1, b.age / 0.3);
+        ctx.drawImage(b.spr, b.x - r, b.y - r, r * 2, r * 2);
+      }
+      lista[j++] = b;
     }
-    estela.length = j;
-    ctx.restore();
+    lista.length = j;
+    ctx.globalAlpha = 1;
   }
   let luz = false; // luz de la nave prendida (la maneja script.js)
   let luzNivel = 0; // 0..1, sigue a luz suavizado
@@ -3700,7 +3709,7 @@
   }
 
   // --- La carátula -------------------------------------------------------------
-  // Después del logo, antes del agujero de gusano: una de seis carátulas
+  // Después del logo, antes del agujero de gusano: una de nueve carátulas
   // minimalistas (las maquetas están en caratulas/), al azar cada vez que se
   // entra y nunca la misma dos veces seguidas (con ?caratula=N se elige una).
   // Todavía sin nombre del juego. Abajo, "cargando" hasta que están las
@@ -3719,9 +3728,15 @@
   //    un golpe.
   // 6. Llegada: la nave con su humo va hacia un agujero chiquito que nunca
   //    alcanza; el cielo gira muy despacio.
+  // 9. Órbita: la nave da vueltas alrededor de un agujero dejando la estela
+  //    de verdad (la de la X, ver sembrarEstela): la órbita es su humo.
+  // 11. Linterna: la nave con la luz prendida avanza muy despacio entre
+  //    piedras que solo se ven cuando les llega la luz.
+  // 13. Estrella: el caza TIE frente a la Estrella de la Muerte, grande y
+  //    apenas visible; las estrellas se corren muy despacio.
   // Se dibujan en 1920x1080 (el mapa del juego) y se escalan a la pantalla (ver
   // transformarCaratula); las estrellas llenan la pantalla entera.
-  const CARATULAS = 6;
+  const CARATULAS = [1, 2, 3, 4, 5, 6, 9, 11, 13];
   const CARATULA_ULTIMA = "esc4-caratula"; // la que salió la vez anterior
   const CARATULA_APARECE = 1.2; // s que tarda en aclararse desde el negro
   const CARATULA_SALE = 0.7; // s del fundido a negro con el toque
@@ -3734,16 +3749,23 @@
   const CARATULA_COLOR = { desde: 1.5, dura: 4.5 }; // 4: cuándo empieza a colorearse la nave y cuánto tarda
   const CARATULA_PIEDRAS = 46; // 5
   const CARATULA_ESQUIVA = 60; // 5: px que dejan las piedras entre ellas y la nave
+  const CARATULA_ORBITA = { x: 960, y: 500, radio: 250, alto: 60, vuelta: 7 }; // 9: vuelta en s (sentido del reloj)
+  const CARATULA_ORBITA_PREVIA = 9; // 9: s de órbita que ya pasaron al aparecer (el humo ya está)
+  const CARATULA_LINTERNA = { x: 960, y: 555, alto: 76, rot: -20, radio: 380, vel: 16 }; // 11: vel en px/s de las piedras
+  const CARATULA_LUZ = "255, 244, 214"; // 11: el color de la luz
+  const CARATULA_ROCAS = 16; // 11
+  const CARATULA_ESTRELLA = { x: 1510, y: 580, radio: 420, alfa: 0.06 }; // 13: la Estrella de la Muerte (alfa: qué tanto se ve)
+  const CARATULA_TIE = { x: 705, y: 615, alto: 90 }; // 13
 
   function elegirCaratula() {
     const pedida = Number(new URLSearchParams(location.search).get("caratula"));
-    if (pedida >= 1 && pedida <= CARATULAS) return pedida;
+    if (CARATULAS.includes(pedida)) return pedida;
     let ultima = 0;
     try {
       ultima = Number(localStorage.getItem(CARATULA_ULTIMA)) || 0;
     } catch (e) {}
     let n;
-    do n = 1 + Math.floor(Math.random() * CARATULAS);
+    do n = CARATULAS[Math.floor(Math.random() * CARATULAS.length)];
     while (n === ultima);
     try {
       localStorage.setItem(CARATULA_ULTIMA, String(n));
@@ -3912,6 +3934,48 @@
     };
   }
 
+  // Piedra de la linterna (11): más grande, flotando despacio hacia atrás de
+  // la nave. Nace en cualquier lugar alrededor o (adelante) del lado hacia
+  // donde va la nave, afuera de lo que se ve.
+  function crearRocaCaratula(adelante) {
+    const L = CARATULA_LINTERNA;
+    const roca = crearPiedraCaratula(false);
+    const a = (L.rot * Math.PI) / 180;
+    const fx = Math.sin(a);
+    const fy = -Math.cos(a); // hacia donde va la nave
+    const lejos = 560;
+    if (adelante) {
+      const lado = (Math.random() - 0.5) * 2 * lejos;
+      roca.x = L.x + fx * lejos - fy * lado;
+      roca.y = L.y + fy * lejos + fx * lado;
+    } else {
+      const ang = Math.random() * Math.PI * 2;
+      const d = 90 + Math.sqrt(Math.random()) * (lejos - 90);
+      roca.x = L.x + Math.cos(ang) * d;
+      roca.y = L.y + Math.sin(ang) * d;
+    }
+    roca.r = 14 + Math.random() * 16;
+    const vel = L.vel * (0.7 + Math.random() * 0.6);
+    roca.vx = -fx * vel + (Math.random() - 0.5) * 6;
+    roca.vy = -fy * vel + (Math.random() - 0.5) * 6;
+    roca.giro = (Math.random() - 0.5) * 0.5;
+    return roca;
+  }
+
+  // La nave de la órbita (9) da vueltas y va soltando su estela.
+  function moverOrbitaCaratula(c, dt) {
+    const O = CARATULA_ORBITA;
+    c.ang += ((Math.PI * 2) / O.vuelta) * dt;
+    const cos = Math.cos(c.ang);
+    const sin = Math.sin(c.ang);
+    c.x = O.x + O.radio * cos;
+    c.y = O.y + O.radio * sin;
+    c.rot = rumbo(-sin, cos);
+    const [mx, my] = motorCaratula(c.x, c.y, O.alto, c.rot);
+    sembrarEstela(c.motor, mx, my, c.color, O.alto / 130, dt, c.humo);
+    c.motor.tanque = ESTELA_TANQUE; // acá el tanque no se acaba
+  }
+
   // Las naves de las carátulas: dónde están (en 1920x1080), su alto y hacia
   // dónde miran. Las del humo (3 y 6) salen de su curva.
   const CARATULA_CURVA_AZUL = [[870, 590], [634, 820], [96, 900]];
@@ -3950,6 +4014,25 @@
         const atras = [m[0] - (L.x - L.desde[0]) * 1.2, m[1] - (L.y - L.desde[1]) * 1.2];
         humoCaratula(ctx2, [m, atras], CARATULA_AZUL, L.alto);
       });
+    } else if (n === 9) {
+      // Arranca con unas vueltas ya dadas: el humo ya dibuja la órbita.
+      c.ang = -Math.PI * 0.75;
+      c.humo = [];
+      c.motor = { x: 0, y: 0, ok: false, tanque: ESTELA_TANQUE, recargando: false };
+      c.color =
+        "#" + CARATULA_AZUL.split(",").map((v) => Number(v).toString(16).padStart(2, "0")).join("");
+      const paso = 1 / 60;
+      for (let f = 0; f < CARATULA_ORBITA_PREVIA; f += paso) {
+        moverOrbitaCaratula(c, paso);
+        avanzarBocanadas(c.humo, paso, false);
+      }
+    } else if (n === 11) {
+      c.rocas = [];
+      for (let i = 0; i < CARATULA_ROCAS; i++) c.rocas.push(crearRocaCaratula(false));
+    } else if (n === 13) {
+      c.tie = naveDe("tie").img;
+      c.estrella = cargarImagen("naves/nuevas/estrella/estrella@2x.png");
+      c.lienzoTie = Object.assign(document.createElement("canvas"), { width: 203, height: 300 });
     }
     return c;
   }
@@ -3971,9 +4054,11 @@
     }
   }
 
-  // ¿Ya se puede dibujar todo? (Las naves y los anillos de los agujeros.)
-  function caratulaLista() {
+  // ¿Ya se puede dibujar todo? (Las naves, los anillos de los agujeros y lo
+  // propio de cada carátula: el TIE y la Estrella.)
+  function caratulaLista(c) {
     const cargada = (img) => img.complete && img.naturalWidth > 0;
+    if (c.n === 13 && !(cargada(c.tie) && cargada(c.estrella))) return false;
     return (
       !!gusanoSprites &&
       cargada(imgRivalTop) &&
@@ -4000,7 +4085,7 @@
     const p = presenta;
     const c = p.car;
     p.f += dt;
-    if (!c.lista && caratulaLista()) {
+    if (!c.lista && caratulaLista(c)) {
       c.lista = true;
       if (caratulaTexto) {
         caratulaTexto.textContent = "presiona cualquier tecla";
@@ -4017,9 +4102,32 @@
       }
     }
     if (c.n === 5) moverPiedrasCaratula(c.piedras, dt);
-    // El fuego de las naves: a media potencia en la 4, a pleno en las demás.
-    actualizarFuegoRival(dt, c.n === 4 ? 40 : 65);
-    dibujarCaratula(c, p.f);
+    else if (c.n === 9) moverOrbitaCaratula(c, dt);
+    else if (c.n === 11) moverRocasCaratula(c.rocas, dt);
+    // El fuego de las naves: a media potencia en la 4 y en la 11 (la nave va
+    // despacio), a pleno en las demás.
+    actualizarFuegoRival(dt, c.n === 4 || c.n === 11 ? 40 : 65);
+    dibujarCaratula(c, p.f, dt);
+  }
+
+  // Las piedras de la linterna flotan derecho y giran; nunca tocan la nave y
+  // la que se va lejos vuelve a entrar por adelante.
+  function moverRocasCaratula(rocas, dt) {
+    const L = CARATULA_LINTERNA;
+    rocas.forEach((s, i) => {
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.ang += s.giro * dt;
+      const dx = s.x - L.x;
+      const dy = s.y - L.y;
+      const d = Math.hypot(dx, dy);
+      const lejos = L.alto * 0.6 + s.r + CARATULA_ESQUIVA;
+      if (d < lejos) {
+        s.x = L.x + (dx * lejos) / (d || 1);
+        s.y = L.y + (dy * lejos) / (d || 1);
+      }
+      if (d > 620) rocas[i] = crearRocaCaratula(true);
+    });
   }
 
   // Caen derecho, pero al acercarse a la nave se corren de costado y la
@@ -4053,15 +4161,15 @@
 
   // La nave en (x, y) de 1920x1080: las tres capas juntas (atrás, fuego,
   // adelante) como la del rival (ver dibujarRival), con el filtro que se pida.
-  function naveCaratula(x, y, alto, rot, filtro) {
-    const lw = lienzoRival.width;
-    const lh = lienzoRival.height;
+  function naveCaratula(x, y, alto, rot, filtro, lienzo = lienzoRival) {
+    const lw = lienzo.width;
+    const lh = lienzo.height;
     const ancho = (alto * lw) / lh;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate((rot * Math.PI) / 180);
     ctx.filter = filtro;
-    ctx.drawImage(lienzoRival, -ancho / 2, -alto / 2, ancho, alto);
+    ctx.drawImage(lienzo, -ancho / 2, -alto / 2, ancho, alto);
     ctx.restore();
   }
   // Halo de color de la nave; fuerza de 0 a 1 (1 = el de las maquetas).
@@ -4075,13 +4183,13 @@
     );
   }
 
-  function dibujarCaratula(c, t) {
+  function dibujarCaratula(c, t, dt) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
     const { u } = medidaCaratula();
     dibujarEstrellasCaratula(
       c.estrellas,
-      c.n === 2 ? t * CARATULA_DERIVA * u : 0,
+      c.n === 2 || c.n === 13 ? t * CARATULA_DERIVA * u : 0,
       c.n === 6 ? t * CARATULA_GIRO_CIELO : 0,
     );
     if (!c.lista) return;
@@ -4157,6 +4265,67 @@
       dibujarAgujero(1306, 470, giroAgujero, 1.25, 1);
       ctx.drawImage(c.humo, 0, 0, 1920, 1080);
       naveCaratula(L.x, L.y, L.alto, c.rot, haloCaratula(CARATULA_AZUL, 0.8));
+    } else if (c.n === 9) {
+      const O = CARATULA_ORBITA;
+      ctx.save();
+      avanzarBocanadas(c.humo, dt, true);
+      ctx.restore();
+      dibujarAgujero(O.x, O.y, giroAgujero, 1.5, 1);
+      naveCaratula(c.x, c.y, O.alto, c.rot, haloCaratula(CARATULA_AZUL, 0.8));
+    } else if (c.n === 11) {
+      const L = CARATULA_LINTERNA;
+      // La luz respira apenas.
+      const respira = 1 + 0.06 * Math.sin(t * 1.3);
+      const luz = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.radio * respira);
+      luz.addColorStop(0, `rgba(${CARATULA_LUZ}, 0.11)`);
+      luz.addColorStop(0.5, `rgba(${CARATULA_LUZ}, 0.05)`);
+      luz.addColorStop(1, `rgba(${CARATULA_LUZ}, 0)`);
+      ctx.fillStyle = luz;
+      ctx.fillRect(0, 0, 1920, 1080);
+      // Piedras negras que tapan la luz; el borde se ve según cuánta luz les
+      // llega.
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 1.6;
+      ctx.fillStyle = "#000";
+      for (const s of c.rocas) {
+        const d = Math.hypot(s.x - L.x, s.y - L.y);
+        const alfa = 0.9 * Math.max(0, Math.min(1, (L.radio * 1.2 * respira - d) / 200));
+        if (alfa <= 0.01) continue;
+        const cos = Math.cos(s.ang);
+        const sin = Math.sin(s.ang);
+        ctx.strokeStyle = `rgba(${CARATULA_LUZ}, ${alfa.toFixed(3)})`;
+        ctx.beginPath();
+        s.verts.forEach((v, i) => {
+          const px = s.x + (v.x * cos - v.y * sin) * s.r;
+          const py = s.y + (v.x * sin + v.y * cos) * s.r;
+          if (i) ctx.lineTo(px, py);
+          else ctx.moveTo(px, py);
+        });
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      naveCaratula(L.x, L.y, L.alto, L.rot, haloCaratula(CARATULA_LUZ, 0.8));
+    } else if (c.n === 13) {
+      // La Estrella de la Muerte (el dibujo de la nave sin los motores de
+      // abajo), grande y apenas visible. En el dibujo (406x600) la esfera
+      // tiene el centro en (203, 239) y mide 306 de ancho.
+      const E = CARATULA_ESTRELLA;
+      const k = (E.radio * 2) / 306;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(E.x, E.y, E.radio + 4, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.globalAlpha = E.alfa;
+      ctx.drawImage(c.estrella, E.x - 203 * k, E.y - 239 * k, 406 * k, 600 * k);
+      ctx.restore();
+      // El TIE: su dibujo con el fuego de este cuadro, mirando a la Estrella.
+      const lt = c.lienzoTie.getContext("2d");
+      lt.clearRect(0, 0, 203, 300);
+      lt.drawImage(lienzoFuegoRival, 0, 0);
+      lt.drawImage(c.tie, 0, 0, 203, 300);
+      const T = CARATULA_TIE;
+      naveCaratula(T.x, T.y, T.alto, rumbo(E.x - T.x, E.y - T.y), haloCaratula(CARATULA_ROJO), c.lienzoTie);
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
