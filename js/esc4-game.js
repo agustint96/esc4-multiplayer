@@ -394,44 +394,56 @@
   // predominante del parallax 7) a medida que se colorea la nave.
   const CUMULO_COLOR_INICIO = "#ffffff";
   const CUMULO_COLOR_FIN = "#cb681a";
-  const CUMULO_BRILLO = 6; // px del mundo: resplandor de cada estrella (se arma una sola vez en el sprite)
-  // Cuántas veces se repinta cada estrella al armar el sprite: sube el brillo
-  // sin tocar el tamaño (el resplandor llega igual de lejos, solo es más
-  // intenso). Va junto con el "lighter" de dibujarAnilloSprite.
-  const CUMULO_BRILLO_PASADAS = 3;
-  const SPRITE_ESCALA = 4; // px de sprite por px del mundo (nítido con zoom y pantallas densas)
-  const CUMULO_ANILLO = 16; // px del mundo: radio del circulito de estrellas (chico)
-  const CUMULO_RADIO = 26; // px del mundo: zona de entrada (un poco más que el anillo)
-  const CUMULO_ESTRELLAS = 28; // estrellas del anillo de afuera
-  const CUMULO_INTERIOR = 14; // estrellas del anillo de adentro (giran para el otro lado)
-  const CUMULO_ESTRELLA_R = 1.7; // px del mundo: radio de cada estrella. Todas iguales y casi pegadas: 28 x 3,4 px de diámetro ~ el perímetro del círculo (100 px)
-  // El disco negro del medio, más grande que el anillo (antes medía justo
-  // CUMULO_ANILLO y el resplandor del anillo de afuera asomaba la mitad para
-  // afuera, sobre el fondo del juego: ahora el anillo entero queda sobre negro).
-  const CUMULO_DISCO_RADIO = 1.15; // por CUMULO_ANILLO
-  // El anillo de adentro, más lejos del centro que antes (era 0,55): así el
-  // negro sin nada encima -el "fondo negro del medio"- es un círculo más grande
-  // y se nota más, en vez de quedar tapado enseguida por el anillo chico.
-  const CUMULO_INTERIOR_RADIO = 0.72; // por CUMULO_ANILLO
-  const CUMULO_GIRO = 9; // radianes por segundo: giran muy rápido (más de una vuelta por segundo)
+  const CUMULO_ANILLO = 16; // px del mundo: la medida de base del agujero
+  const CUMULO_RADIO = 26; // px del mundo: zona de entrada (un poco más que el agujero)
+  const CUMULO_DISCO_RADIO = 1.15; // por CUMULO_ANILLO (ver GUSANO_RADIO)
+  const CUMULO_GIRO = 9; // radianes por segundo: lo que avanza el ángulo de cada agujero (la esfera gira ESFERA_GIRO de eso)
+  // El agujero es una esfera transparente de estrellas (maqueta en
+  // agujeros/maqueta-globo-cumulo.gif): un globo de estrellas que gira -las de
+  // adelante brillan y las de atrás se ven apagadas a través- y que a veces se
+  // junta en un cúmulo: cada estrella tiene su lugar en la superficie y otro
+  // adentro, en la misma dirección, y va de uno al otro. Nace como cúmulo y se
+  // abre en globo, al cerrarse se vuelve a juntar, cuando se traga una nave
+  // (el de entrada de un gol) se junta de golpe y, con la música, se junta un
+  // poco en cada compás. Las estrellas muestran el resultado: cada gol pinta
+  // una parte del color de quien lo hizo, azul o rojo, y el resto quedan
+  // blancas (ver repartoEquipos). En el tutorial, que no tiene rival, van del
+  // blanco al salmón del sitio a medida que se colorea la nave (ver
+  // GUSANO_COLORES).
+  // px del mundo: la medida de base de los agujeros (lo que se usa para saber
+  // si el rival, online, ya está cerca del de salida: ver dibujarRival).
+  const GUSANO_RADIO = CUMULO_ANILLO * CUMULO_DISCO_RADIO * 1.05;
+  const ESFERA_RADIO = 44; // px del mundo: el globo (más grande que la zona de entrada, CUMULO_RADIO)
+  const ESFERA_ESTRELLAS = 420; // cuántas (en el celular y en calidad baja, menos: ver armarEsfera)
+  const ESFERA_CUMULO = 0.75; // qué tan al medio quedan en el cúmulo (1 parejo; menos, más al medio)
+  const ESFERA_GIRO = 0.144; // fracción de CUMULO_GIRO: lo que gira (~1,3 rad/s)
+  const ESFERA_INCLINA = 0.45; // rad: el eje de giro, inclinado hacia quien mira
+  const ESFERA_LUZ = [-0.45, -0.6, 0.66].map(
+    (v) => v / Math.hypot(-0.45, -0.6, 0.66),
+  ); // de arriba a la izquierda y de adelante
+  const ESFERA_ABRE = 0.9; // s que tarda en abrirse (de cúmulo a globo)
+  const ESFERA_MUSICA = 0.35; // cuánto se junta en el pulso de cada compás (0 nada, 1 cúmulo)
+  const ESFERA_BRILLO = 1.25; // qué tan prendidas están las estrellas (1 como la maqueta)
+  const ESFERA_PINTA = 6; // qué tan rápido se pintan las estrellas con un gol (1/s: con 6, casi en 0,3 s)
+  const ESFERA_DESTELLO = 0.8; // s que brilla una estrella que cambió de color
+  // Los colores de las estrellas blancas (en el tutorial, al principio de la
+  // partida y al final; en el medio, mezclados): apagadas, prendidas y las
+  // más prendidas. Las de los equipos salen de BORDE_JUGADOR (el azul) y
+  // BORDE_RIVAL (el rojo), ver atlasEstrellas.
+  const GUSANO_COLORES = [
+    { tenue: [72, 74, 80], luz: [236, 238, 244], pico: [255, 255, 255] },
+    { tenue: [112, 60, 52], luz: [241, 146, 128], pico: [255, 190, 172] }, // el salmón: --accent en styles.css
+  ];
   const CUMULO_VIDA = 14; // segundos que dura el par de agujeros si no entran
   const CUMULO_DISTANCIA_PAR = 260; // px del mundo: separación mínima entre los dos agujeros del par
   const CUMULO_PRIMERO = 2.5; // segundos hasta el primer par
   const CUMULO_INTERVALO = [3, 6]; // segundos entre un par y el siguiente (al azar)
   const CUMULO_DISTANCIA_MIN = 160; // px del mundo: no aparecen encima de la nave
-  // Pulso: el agujero se estira y vuelve a su tamaño una vez por compás de la
-  // música (los dos del par a la vez). Solo es visual: la zona de entrada no
-  // cambia. Importante: el pico (el disco en lo más alto del pulso) no puede
-  // superar la zona real de entrada (CUMULO_RADIO, 26 px) -si no, se ve el
-  // dibujo entrando en la piedra antes de que en verdad se pueda cruzar-. Por
-  // eso no es un número suelto: CUMULO_PULSO_AMPLITUD sale de CUMULO_PICO_ORIGINAL
-  // (el crecimiento de pulso de toda la vida, 1,4 = +40 %) dividido
-  // CUMULO_DISCO_RADIO, así el pico queda siempre en los mismos 22,4 px de
-  // siempre (16 × 1,4), lo agrande o no el disco.
-  const CUMULO_PICO_ORIGINAL = 1.4;
-  const CUMULO_PULSO_AMPLITUD = CUMULO_PICO_ORIGINAL / CUMULO_DISCO_RADIO - 1;
+  // Pulso: una vez por compás de la música (todos los agujeros a la vez) las
+  // estrellas se juntan un poco y vuelven (ver ESFERA_MUSICA). Solo es
+  // visual: la zona de entrada no cambia.
   const CUMULO_PULSO_TIEMPOS = 1.25; // lo que dura cada pulso (estirar y volver), en tiempos de la música
-  const CUMULO_PULSO_ATAQUE = 0.25; // fracción del pulso que se dedica a estirar (el resto es volver)
+  const CUMULO_PULSO_ATAQUE = 0.25; // fracción del pulso que se dedica a juntarse (el resto es volver)
   // La música del juego (nivel4.ogg) está en 5 tiempos: 145,6 BPM y el bucle son
   // exactamente 60 compases (123,62 s), y el archivo arranca en el primer tiempo
   // (ahí entra el bombo). Se midió sobre el audio; si se cambia la canción hay que
@@ -457,13 +469,13 @@
   const NUMERO_TEMBLOR = 1.7; // px del mundo: cuánto se corre cada estrella (al azar)
   const NUMERO_GIRO = 0.09; // radianes: cuánto puede girar el número entero (a cada lado)
   const NUMERO_CURSIVA = [-0.04, 0.12]; // cuánto se tumba hacia un costado (como letra cursiva)
-  const NUMERO_CAE_A = 2.1; // segundos desde el cruce hasta que empiezan a caer (ya formado desde ~1 s)
+  const NUMERO_CAE_A = 2.1; // segundos desde el cruce hasta que empiezan a caer (ya formado desde ~0,2 s, a tiempo con la voz)
   const NUMERO_CAIDA = 0.9; // segundos que tardan en caer y achicarse del todo
   const NUMERO_GRAVEDAD = 260; // px/s² del mundo
   const MUSICA_TIEMPOS_COMPAS = 5;
   const MUSICA_COMPASES_BUCLE = 60; // compases que dura el bucle entero
   const MUSICA_PULSO_TIEMPO = 0; // en qué tiempo del compás cae el pulso (0 = el primero, 4 = el último): para correrlo si se siente desfasado
-  const MUSICA_COMPAS_RESPALDO = 2.0604; // segundos del compás a velocidad normal: se usa si no se puede saber dónde va la música
+  const MUSICA_COMPAS_RESPALDO = 2.0604; // segundos del compás a velocidad normal: para ubicar la música del <audio> (sin Web Audio) en un compás
   // La batería entra al empezar el compás 7 (12,36 s; medido sobre el audio). En
   // el tutorial, cada partida arranca la música ahí, ya con la batería; al dar
   // la vuelta el bucle sigue desde el principio, como siempre.
@@ -835,7 +847,7 @@
     ];
   }
   armarCielo(semillaCielo);
-  let gusanoSprites = null; // anillos de los agujeros ya dibujados con brillo (ver armarSprites)
+  let gusanoSprites = null; // las estrellas de los agujeros, ya armadas (ver armarEsfera)
   let luzSprites = null; // la luz de la nave ya dibujada (degradado), en blanco y en salmón
   let cumulos = []; // cúmulos de estrellas azules en el mapa
   let particulas = []; // chispas de cuando se choca un cúmulo
@@ -990,8 +1002,7 @@
       if (n && MODOS[n[1]]) {
         sonarMenu("seleccion");
         elegirModo(MODOS[n[1]]);
-      }
-      else if (flecha === "ArrowUp" || flecha === "ArrowDown") {
+      } else if (flecha === "ArrowUp" || flecha === "ArrowDown") {
         apuntarOpcion(opcionApuntada + (flecha === "ArrowDown" ? 1 : -1));
         ev.preventDefault(); // que no scrollee la página detrás
       } else if (flecha === "ArrowLeft" || flecha === "ArrowRight") {
@@ -1389,7 +1400,8 @@
   function cambiarControles(dir) {
     const opcion = opcionesModo[opcionApuntada];
     if (!opcion) return;
-    if (opcion.dataset.elegir === "dos") controlesCambiados = !controlesCambiados;
+    if (opcion.dataset.elegir === "dos")
+      controlesCambiados = !controlesCambiados;
     else if (opcion.dataset.elegir === "pc") cambiarDificultad(dir);
   }
 
@@ -1507,7 +1519,10 @@
   // Minúsculas, solo letras y números (Spaceport no tiene tildes ni eñe),
   // hasta 16: lo mismo que hace el servidor, así se ve la clave tal cual viaja.
   function limpiarClave(s) {
-    return (s || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
+    return (s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 16);
   }
 
   function abrirClave() {
@@ -1570,7 +1585,11 @@
     claveCampo.addEventListener("keydown", (ev) => {
       ev.stopPropagation();
       // (El enter del teclado del celular a veces llega sin code: por la key.)
-      if (ev.code === "Enter" || ev.code === "NumpadEnter" || ev.key === "Enter") {
+      if (
+        ev.code === "Enter" ||
+        ev.code === "NumpadEnter" ||
+        ev.key === "Enter"
+      ) {
         sonarMenu("seleccion");
         buscarConClave();
       } else if (ev.code === "Escape") {
@@ -1840,7 +1859,7 @@
     { id: "estrella", nombre: "Estrella de la Muerte" },
     { id: "van", nombre: "Breaking Bad", costado: true },
     { id: "delorean", nombre: "DeLorean", costado: true },
-    { id: "colectivo", nombre: "Colectivo", costado: true },
+    { id: "colectivo", nombre: "18", costado: true },
   ].map((n) => {
     const dir = n.id === "cohete" ? "parallax/" : `naves/nuevas/${n.id}/`;
     const off = `${dir}${n.id}.webp`;
@@ -1849,7 +1868,13 @@
     // img (las imágenes, recién al elegirla: ver cargarPerfiles).
     const perfil = (lado) => {
       const onLado = `${dir}${n.id}_${lado}_on.webp`;
-      return { off: `${dir}${n.id}_${lado}.webp`, on: onLado, fondo: onLado, img: null, listo: false };
+      return {
+        off: `${dir}${n.id}_${lado}.webp`,
+        on: onLado,
+        fondo: onLado,
+        img: null,
+        listo: false,
+      };
     };
     return {
       ...n,
@@ -1908,13 +1933,36 @@
   // (FUEGO_VACIO): se anima y se dibuja igual, pero no se ve nada.
   const FUEGOS = [
     { id: "clasico", nombre: "clasico" },
-    { id: "fuego", nombre: "fuego", afuera: ["#b8321c", "#ffb35c"], adentro: ["#ff8a1f", "#fff1a8"] },
-    { id: "hielo", nombre: "hielo", afuera: ["#3f7fb8", "#d8f2ff"], adentro: ["#8fd8ff", "#ffffff"] },
-    { id: "plasma", nombre: "plasma", afuera: ["#6a2bb0", "#e7a8ff"], adentro: ["#ff4fc0", "#ffe0f6"] },
-    { id: "veneno", nombre: "veneno", afuera: ["#2f7f2a", "#b8f070"], adentro: ["#9be03c", "#f4ffc0"] },
+    {
+      id: "fuego",
+      nombre: "fuego",
+      afuera: ["#b8321c", "#ffb35c"],
+      adentro: ["#ff8a1f", "#fff1a8"],
+    },
+    {
+      id: "hielo",
+      nombre: "hielo",
+      afuera: ["#3f7fb8", "#d8f2ff"],
+      adentro: ["#8fd8ff", "#ffffff"],
+    },
+    {
+      id: "plasma",
+      nombre: "plasma",
+      afuera: ["#6a2bb0", "#e7a8ff"],
+      adentro: ["#ff4fc0", "#ffe0f6"],
+    },
+    {
+      id: "veneno",
+      nombre: "veneno",
+      afuera: ["#2f7f2a", "#b8f070"],
+      adentro: ["#9be03c", "#f4ffc0"],
+    },
     { id: "ninguno", nombre: "sin fuego" },
   ];
-  const FUEGO_VACIO = Object.assign(document.createElement("canvas"), { width: 203, height: 300 });
+  const FUEGO_VACIO = Object.assign(document.createElement("canvas"), {
+    width: 203,
+    height: 300,
+  });
   const naveDe = (id) => NAVES_JUEGO.find((n) => n.id === id) || NAVES_JUEGO[0];
   const fuegoDe = (id) => FUEGOS.find((f) => f.id === id) || FUEGOS[0];
 
@@ -1934,7 +1982,8 @@
     c.drawImage(imgFuego, 0, 0);
     const datos = c.getImageData(0, 0, lienzo.width, lienzo.height);
     const px = datos.data;
-    const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const rgb = (hex) =>
+      [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
     const afuera = f.afuera.map(rgb);
     const adentro = f.adentro.map(rgb);
     for (let i = 0; i < px.length; i += 4) {
@@ -1946,7 +1995,8 @@
       if (luz < 0.22) continue; // el contorno
       const t = Math.min(1, (luz - 0.22) / 0.78);
       const [o, cl] = (g + b) / 2 > r + 8 ? adentro : afuera;
-      for (let k = 0; k < 3; k++) px[i + k] = Math.round(o[k] + (cl[k] - o[k]) * t);
+      for (let k = 0; k < 3; k++)
+        px[i + k] = Math.round(o[k] + (cl[k] - o[k]) * t);
     }
     c.putImageData(datos, 0, 0);
     fuegosTenidos.set(f.id, lienzo);
@@ -1967,13 +2017,20 @@
   // Lo elegido la última vez (se arranca con eso en el selector).
   const NAVES_GUARDADAS = "esc4-naves";
   function naveGuardada() {
-    const vacia = { j1: { nave: "cohete", fuego: "clasico" }, j2: { nave: "cohete", fuego: "clasico" } };
+    const vacia = {
+      j1: { nave: "cohete", fuego: "clasico" },
+      j2: { nave: "cohete", fuego: "clasico" },
+    };
     try {
       const g = JSON.parse(localStorage.getItem(NAVES_GUARDADAS));
       // "azar" se guarda tal cual: se sortea al jugar (ver sortearEleccion).
       const id = (v, de) => (v === AZAR ? AZAR : de(v).id);
       for (const j of ["j1", "j2"])
-        if (g && g[j]) vacia[j] = { nave: id(g[j].nave, naveDe), fuego: id(g[j].fuego, fuegoDe) };
+        if (g && g[j])
+          vacia[j] = {
+            nave: id(g[j].nave, naveDe),
+            fuego: id(g[j].fuego, fuegoDe),
+          };
     } catch (e) {}
     return vacia;
   }
@@ -1991,7 +2048,10 @@
   let naveJugador = naveDe("cohete"); // la de eleccionJ1 (orientarNaveJugador la mira cada cuadro)
   function aplicarNaveJugador(eleccion) {
     eleccion = sortearEleccion(eleccion);
-    eleccionJ1 = { nave: naveDe(eleccion.nave).id, fuego: fuegoDe(eleccion.fuego).id };
+    eleccionJ1 = {
+      nave: naveDe(eleccion.nave).id,
+      fuego: fuegoDe(eleccion.fuego).id,
+    };
     naveJugador = naveDe(eleccionJ1.nave);
     cargarPerfiles(naveJugador); // mientras tanto están las instrucciones
     ladoJ1.lado = "arriba";
@@ -2000,7 +2060,9 @@
     window.fuegoJ1 = f.id === "clasico" ? null : fuegoTenido(f.id);
     // Si el fuego todavía no se pudo teñir (no había cargado), en cuanto cargue.
     if (f.afuera && !window.fuegoJ1)
-      imgFuego.addEventListener("load", () => aplicarNaveJugador(eleccionJ1), { once: true });
+      imgFuego.addEventListener("load", () => aplicarNaveJugador(eleccionJ1), {
+        once: true,
+      });
   }
 
   // Los sprites de la nave del jugador (y window.naveJ1, que script.js usa al
@@ -2030,7 +2092,13 @@
 
   // La nave del rival (la de la PC, el jugador 2 u online), que dibuja este
   // archivo (ver dibujarRival y actualizarFuegoRival). Arranca como el cohete.
-  const naveRival = { id: "cohete", img: imgRivalTop, fondo: imgRivalFondo, fuego: "clasico", costado: null };
+  const naveRival = {
+    id: "cohete",
+    img: imgRivalTop,
+    fondo: imgRivalFondo,
+    fuego: "clasico",
+    costado: null,
+  };
   function aplicarNaveRival(eleccion) {
     eleccion = sortearEleccion(eleccion);
     const n = naveDe(eleccion && eleccion.nave);
@@ -2074,8 +2142,20 @@
   const estela = [];
   // Dónde estaba el motor el cuadro anterior (x, y, ok), y el tanque: tanque es
   // lo que queda (s) y recargando, si se vació y se está llenando.
-  const estelaJ1 = { x: 0, y: 0, ok: false, tanque: ESTELA_TANQUE, recargando: false };
-  const estelaJ2 = { x: 0, y: 0, ok: false, tanque: ESTELA_TANQUE, recargando: false };
+  const estelaJ1 = {
+    x: 0,
+    y: 0,
+    ok: false,
+    tanque: ESTELA_TANQUE,
+    recargando: false,
+  };
+  const estelaJ2 = {
+    x: 0,
+    y: 0,
+    ok: false,
+    tanque: ESTELA_TANQUE,
+    recargando: false,
+  };
   const estelaTecla = { j1: false, j2: false };
   document.addEventListener("keydown", (ev) => {
     if (ev.code === "KeyX") estelaTecla.j1 = true;
@@ -2235,7 +2315,7 @@
       const rad = (rival.rot * Math.PI) / 180;
       const cos = Math.cos(rad);
       const sin = Math.sin(rad);
-        sembrarEstela(
+      sembrarEstela(
         estelaJ2,
         rival.x + (px * cos - py * sin) * k,
         rival.y + (px * sin + py * cos) * k,
@@ -2275,7 +2355,8 @@
       if (dibujar) {
         const r = b.r0 + (b.r1 - b.r0) * Math.pow(t, 0.55);
         // Aparece de a poco (0,3 s): recién nacida no se ve una mancha pegada al fuego.
-        ctx.globalAlpha = b.a0 * Math.pow(1 - t, 1.6) * Math.min(1, b.age / 0.3);
+        ctx.globalAlpha =
+          b.a0 * Math.pow(1 - t, 1.6) * Math.min(1, b.age / 0.3);
         ctx.drawImage(b.spr, b.x - r, b.y - r, r * 2, r * 2);
       }
       lista[j++] = b;
@@ -2500,6 +2581,7 @@
     }
     // Nueva partida: sin cúmulos y la nave vuelve a blanco y negro.
     cumulos = [];
+    limpiarPasajes();
     particulas = [];
     numeroEstrellas = [];
     acumCumulo = 0;
@@ -2868,8 +2950,7 @@
       musicaFuente.buffer = musicaBuffer;
       musicaFuente.loop = true;
       musicaFuente.connect(musicaGain);
-      const desde =
-        (compases * musicaBuffer.duration) / MUSICA_COMPASES_BUCLE;
+      const desde = (compases * musicaBuffer.duration) / MUSICA_COMPASES_BUCLE;
       musicaFuente.start(0, desde);
       musicaPos = desde;
       musicaRelojPrev = audioCtx.currentTime;
@@ -2901,7 +2982,7 @@
   // Dónde está la música dentro de su compás, en segundos del audio original:
   // { pos: segundos desde el pulso del compás, compas: lo que dura el compás }, o
   // null si no hay música sonando o no se puede saber dónde va (ahí los agujeros
-  // pulsan con su propio reloj, ver dibujarCumulos).
+  // no laten, ver medidaCumulo).
   function compasMusica() {
     let pos, duracion;
     if (musicaFuente && musicaBuffer) {
@@ -3267,7 +3348,7 @@
   //    desde la izquierda, a color, lo mira y se mete volando derecho: igual
   //    que en el juego, del mismo tamaño, sin achicarse ni girar. Al llegar a la
   //    zona de entrada (CUMULO_RADIO) desaparece de golpe por el agujero, con
-  //    las chispas y el sonido de cruzar. Se funde a negro.
+  //    el sonido de cruzar (sin chispas). Se funde a negro.
   // 3. Salida: otra pantalla, ya la del menú (fondo negro con sus estrellas).
   //    El menú ya está centrado, desde que se levanta la pantalla negra (no hay
   //    cámara que se mueva). Se abre otro agujero a la izquierda y la nave
@@ -3293,9 +3374,9 @@
   const PRESENTA_ACLARA = 2.4; // lo que tarda en aclarar la pantalla de entrada
   const PRESENTA_FONDO = 2 / CUMULOS_PARA_COLOR; // el fondo como con 2 agujeros
   // (Los agujeros miden lo mismo que en el juego: 1 por el zoom de la cámara,
-  // cam.z, ver escalaAgujeroPresentacion. La nave, también: shipZoom = 1.)
-  const PRESENTA_AGUJERO_COLOR = 1; // 0 = blancos, 1 = naranjas (como al final del juego)
-  const PRESENTA_ABRE = 0.5; // s que tarda un agujero en abrirse (o en cerrarse)
+  // cam.z, ver dibujarPresentacion. La nave, también: shipZoom = 1.)
+  const PRESENTA_AGUJERO_COLOR = 0; // el color de los agujeros: 0 = como al empezar el juego (blancos), 1 = como al final
+  const PRESENTA_ABRE = 0.9; // s que tarda un agujero en abrirse (o en cerrarse): de cúmulo a globo, como ESFERA_ABRE
   const PRESENTA_AGUJERO_EN = 0.9; // cuándo se abre el agujero de entrada
   const PRESENTA_LLEGA_EN = 1.8; // cuándo empieza a entrar la nave
   const PRESENTA_LLEGADA = 2.6; // lo que tarda en llegar
@@ -3385,7 +3466,8 @@
       if (presenta) presenta.listo = true;
     };
     if (!presentaLogoImg) listo();
-    else if (presentaLogoImg.decode) presentaLogoImg.decode().then(listo, listo);
+    else if (presentaLogoImg.decode)
+      presentaLogoImg.decode().then(listo, listo);
     else if (presentaLogoImg.complete) listo();
     else presentaLogoImg.addEventListener("load", listo);
     presentaLogo.hidden = false;
@@ -3467,7 +3549,11 @@
       if (p.f === 0 && p.logoCae === undefined)
         presentaLogo.classList.add("foquito");
       p.f += dt;
-      if (!p.logoSono && p.logoCae === undefined && p.f >= PRESENTA_LOGO_SUENA) {
+      if (
+        !p.logoSono &&
+        p.logoCae === undefined &&
+        p.f >= PRESENTA_LOGO_SUENA
+      ) {
         p.logoSono = true;
         sonarMenu("foquito");
       }
@@ -3582,7 +3668,7 @@
       // Se mete: derecho hacia el centro del agujero, cada vez más rápido y
       // siempre del mismo tamaño. Al llegar a la zona de entrada (CUMULO_RADIO,
       // por el zoom: la misma que en el juego) desaparece de golpe y el agujero
-      // se cierra con sus chispas.
+      // se cierra.
       const u = Math.min(1, (f - PRESENTA_ENTRA_EN) / PRESENTA_ENTRADA);
       const k = u * u;
       pos = {
@@ -3595,9 +3681,14 @@
         Math.hypot(hueco.x - pos.x, hueco.y - pos.y) < CUMULO_RADIO * cam.z
       ) {
         p.cruzoEn = f;
-        hueco.cierra = f;
-        mostrarNave(false);
-        chispas(hueco.x, hueco.y);
+        // Sigue de largo una copia que se mete en el agujero (ver "La nave
+        // entra al agujero y sale del otro"): el agujero espera a que pase.
+        const copia = copiarNave("jugador", hueco, true);
+        if (copia) pasajes.push(copia);
+        hueco.cierra = f + (copia ? copia.dura : 0);
+        // Se junta en cúmulo mientras se la traga (ver dibujarPresentacion).
+        hueco.traga = { desde: f, dura: Math.max(0.2, copia ? copia.dura : 0) };
+        mostrarNave(false); // (sin chispas: en la presentación no van)
         sonarCruce();
       }
     }
@@ -3657,8 +3748,7 @@
     const s = p.f - PRESENTA_SALE_EN;
     if (s >= 0 && !p.salio) {
       p.salio = true;
-      mostrarNave(true); // aparece de golpe, del tamaño de siempre
-      chispas(hueco.x, hueco.y);
+      mostrarNave(true); // aparece de golpe, entera y encima del agujero (sin chispas)
       sonarCruce();
     }
     const veX = w * PRESENTA_VE_X;
@@ -3692,32 +3782,37 @@
     if (p.x > w + 160) terminarPresentacion(); // ya se fue
   }
 
-  // Tamaño de un agujero de la presentación ahora: se abre y se cierra
-  // achicándose, como en el juego, y en el medio pulsa con su propio reloj.
-  function escalaAgujeroPresentacion(h, f) {
-    const abierto = Math.min(
+  // Qué tan abierto está un agujero de la presentación (0 a 1): se abre y se
+  // cierra en PRESENTA_ABRE.
+  function aberturaPresentacion(h, f) {
+    return Math.min(
       Math.max(0, (f - h.abre) / PRESENTA_ABRE),
       h.cierra === null ? 1 : Math.max(0, 1 - (f - h.cierra) / PRESENTA_ABRE),
-    );
-    const compas = MUSICA_COMPAS_RESPALDO;
-    return (
-      cam.z * // el tamaño del juego: 1 por el zoom de su cámara
-      abierto *
-      (1 +
-        CUMULO_PULSO_AMPLITUD *
-          pulsoCumulo(f % compas, compas / MUSICA_TIEMPOS_COMPAS))
     );
   }
 
   function dibujarPresentacion() {
     const p = presenta;
     dibujarCieloPresentacion();
+    // Los agujeros, como en el juego (del tamaño del juego: 1 por el zoom de
+    // su cámara), pero sin latir: laten solo con la música (ver medidaCumulo)
+    // y acá todavía no suena. El de entrada se junta mientras se traga la nave.
     for (const h of p.agujeros) {
-      const esc = escalaAgujeroPresentacion(h, p.f);
+      const forma = formaAgujero(aberturaPresentacion(h, p.f));
+      const u = h.traga ? Math.min(1, (p.f - h.traga.desde) / h.traga.dura) : 0;
+      const esc = cam.z * forma.esc;
       if (esc > 0.01)
-        dibujarAgujero(h.x, h.y, h.ang, esc, PRESENTA_AGUJERO_COLOR);
+        dibujarAgujero(
+          h.x,
+          h.y,
+          h.ang,
+          esc,
+          Math.max(forma.junta, u * u * (3 - 2 * u)),
+          PRESENTA_AGUJERO_COLOR,
+        );
     }
-    dibujarChispas(PRESENTA_AGUJERO_COLOR);
+    dibujarPasajes();
+    dibujarChispas(mezclaAgujeros(PRESENTA_AGUJERO_COLOR));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
@@ -3750,8 +3845,8 @@
   // Todavía sin nombre del juego. Abajo, "cargando" hasta que están las
   // imágenes y después "presiona cualquier tecla": ese toque es el que deja
   // sonar al navegador. Cada una se mueve apenas:
-  // 1. Anillo: el agujero blanco, solo, late con el tempo de la música (como los
-  //    agujeros del juego).
+  // 1. Anillo: el agujero, solo y grande (no late: los agujeros laten solo con
+  //    la música, y en la carátula todavía no suena).
   // 2. Duelo: las dos naves chiquitas frente a frente y un agujero entre ellas;
   //    las estrellas se corren muy despacio.
   // 3. Estelas: las dos naves casi cruzándose, cada una con su humo (el de la X
@@ -3786,7 +3881,14 @@
   const CARATULA_ESQUIVA = 60; // 5: px que dejan las piedras entre ellas y la nave
   const CARATULA_ORBITA = { x: 960, y: 500, radio: 250, alto: 60, vuelta: 7 }; // 9: vuelta en s (sentido del reloj)
   const CARATULA_ORBITA_PREVIA = 9; // 9: s de órbita que ya pasaron al aparecer (el humo ya está)
-  const CARATULA_LINTERNA = { x: 960, y: 555, alto: 76, rot: -20, radio: 380, vel: 16 }; // 11: vel en px/s de las piedras
+  const CARATULA_LINTERNA = {
+    x: 960,
+    y: 555,
+    alto: 76,
+    rot: -20,
+    radio: 380,
+    vel: 16,
+  }; // 11: vel en px/s de las piedras
   const CARATULA_LUZ = "255, 244, 214"; // 11: el color de la luz
   const CARATULA_ROCAS = 16; // 11
   const CARATULA_ESTRELLA = { x: 1510, y: 580, radio: 420, alfa: 0.06 }; // 13: la Estrella de la Muerte (alfa: qué tanto se ve)
@@ -3907,7 +4009,11 @@
       const [bx, by] = camino[i];
       const d = Math.hypot(bx - ax, by - ay);
       for (let s = 0; s < d && hecho < largoMax; s += paso, hecho += paso)
-        puntos.push([ax + ((bx - ax) * s) / d, ay + ((by - ay) * s) / d, hecho]);
+        puntos.push([
+          ax + ((bx - ax) * s) / d,
+          ay + ((by - ay) * s) / d,
+          hecho,
+        ]);
     }
     // Las más viejas primero (quedan abajo).
     for (let i = puntos.length - 1; i >= 0; i--) {
@@ -4020,20 +4126,45 @@
 
   // Las naves de las carátulas: dónde están (en 1920x1080), su alto y hacia
   // dónde miran. Las del humo (3 y 6) salen de su curva.
-  const CARATULA_CURVA_AZUL = [[870, 590], [634, 820], [96, 900]];
-  const CARATULA_CURVA_ROJA = [[1050, 410], [1286, 180], [1824, 100]];
+  const CARATULA_CURVA_AZUL = [
+    [870, 590],
+    [634, 820],
+    [96, 900],
+  ];
+  const CARATULA_CURVA_ROJA = [
+    [1050, 410],
+    [1286, 180],
+    [1824, 100],
+  ];
   const CARATULA_LLEGADA = { x: 768, y: 522, alto: 66, desde: [0, 640] };
 
   function crearCaratula() {
     const n = elegirCaratula();
-    const c = { n, lista: false, sale: null, estrellas: crearEstrellasCaratula() };
+    const c = {
+      n,
+      lista: false,
+      sale: null,
+      estrellas: crearEstrellasCaratula(),
+    };
     const rumboA = (a, b) => rumbo(b[0] - a[0], b[1] - a[1]);
     if (n === 3) {
       const azul = curvaCaratula(...CARATULA_CURVA_AZUL);
       const roja = curvaCaratula(...CARATULA_CURVA_ROJA);
       c.naves = [
-        { x: azul[0][0], y: azul[0][1], rot: rumboA(azul[3], azul[0]), rgb: CARATULA_AZUL, fase: 0 },
-        { x: roja[0][0], y: roja[0][1], rot: rumboA(roja[3], roja[0]), rgb: CARATULA_ROJO, fase: CARATULA_DESTELLO / 2 },
+        {
+          x: azul[0][0],
+          y: azul[0][1],
+          rot: rumboA(azul[3], azul[0]),
+          rgb: CARATULA_AZUL,
+          fase: 0,
+        },
+        {
+          x: roja[0][0],
+          y: roja[0][1],
+          rot: rumboA(roja[3], roja[0]),
+          rgb: CARATULA_ROJO,
+          fase: CARATULA_DESTELLO / 2,
+        },
       ];
       c.humo = lienzoCaratula((ctx2) => {
         for (const [nave, curva] of [
@@ -4041,7 +4172,12 @@
           [c.naves[1], CARATULA_CURVA_ROJA],
         ]) {
           const m = motorCaratula(nave.x, nave.y, 84, nave.rot);
-          humoCaratula(ctx2, curvaCaratula(m, curva[1], curva[2]), nave.rgb, 84);
+          humoCaratula(
+            ctx2,
+            curvaCaratula(m, curva[1], curva[2]),
+            nave.rgb,
+            84,
+          );
         }
       });
     } else if (n === 5) {
@@ -4053,16 +4189,28 @@
       c.rot = rumbo(L.x - L.desde[0], L.y - L.desde[1]);
       c.humo = lienzoCaratula((ctx2) => {
         const m = motorCaratula(L.x, L.y, L.alto, c.rot);
-        const atras = [m[0] - (L.x - L.desde[0]) * 1.2, m[1] - (L.y - L.desde[1]) * 1.2];
+        const atras = [
+          m[0] - (L.x - L.desde[0]) * 1.2,
+          m[1] - (L.y - L.desde[1]) * 1.2,
+        ];
         humoCaratula(ctx2, [m, atras], CARATULA_AZUL, L.alto);
       });
     } else if (n === 9) {
       // Arranca con unas vueltas ya dadas: el humo ya dibuja la órbita.
       c.ang = -Math.PI * 0.75;
       c.humo = [];
-      c.motor = { x: 0, y: 0, ok: false, tanque: ESTELA_TANQUE, recargando: false };
+      c.motor = {
+        x: 0,
+        y: 0,
+        ok: false,
+        tanque: ESTELA_TANQUE,
+        recargando: false,
+      };
       c.color =
-        "#" + CARATULA_AZUL.split(",").map((v) => Number(v).toString(16).padStart(2, "0")).join("");
+        "#" +
+        CARATULA_AZUL.split(",")
+          .map((v) => Number(v).toString(16).padStart(2, "0"))
+          .join("");
       const paso = 1 / 60;
       for (let f = 0; f < CARATULA_ORBITA_PREVIA; f += paso) {
         moverOrbitaCaratula(c, paso);
@@ -4070,11 +4218,15 @@
       }
     } else if (n === 11) {
       c.rocas = [];
-      for (let i = 0; i < CARATULA_ROCAS; i++) c.rocas.push(crearRocaCaratula(false));
+      for (let i = 0; i < CARATULA_ROCAS; i++)
+        c.rocas.push(crearRocaCaratula(false));
     } else if (n === 13) {
       c.tie = naveDe("tie").img;
       c.estrella = cargarImagen("naves/nuevas/estrella/estrella@2x.png");
-      c.lienzoTie = Object.assign(document.createElement("canvas"), { width: 203, height: 300 });
+      c.lienzoTie = Object.assign(document.createElement("canvas"), {
+        width: 203,
+        height: 300,
+      });
     }
     return c;
   }
@@ -4096,17 +4248,13 @@
     }
   }
 
-  // ¿Ya se puede dibujar todo? (Las naves, los anillos de los agujeros y lo
+  // ¿Ya se puede dibujar todo? (Las naves, las estrellas de los agujeros y lo
   // propio de cada carátula: el TIE y la Estrella.)
   function caratulaLista(c) {
     const cargada = (img) => img.complete && img.naturalWidth > 0;
     if (c.n === 13 && !(cargada(c.tie) && cargada(c.estrella))) return false;
-    return (
-      !!gusanoSprites &&
-      cargada(imgRivalTop) &&
-      cargada(imgRivalFondo) &&
-      cargada(imgFuego)
-    );
+    if (!gusanoSprites) return false;
+    return cargada(imgRivalTop) && cargada(imgRivalFondo) && cargada(imgFuego);
   }
 
   // El toque en la carátula: se funde a negro y sigue con el agujero de
@@ -4131,7 +4279,9 @@
     if (!c.lista && caratulaLista(c)) {
       c.lista = true;
       if (caratulaTexto) {
-        caratulaTexto.textContent = tactil ? "toca la pantalla" : "presiona cualquier tecla";
+        caratulaTexto.textContent = tactil
+          ? "toca la pantalla"
+          : "presiona cualquier tecla";
         caratulaTexto.classList.remove("cargando");
       }
     }
@@ -4226,10 +4376,23 @@
     );
   }
 
+  // El agujero de la carátula n, si tiene: dónde (en 1920x1080) y de qué
+  // tamaño.
+  function agujeroCaratula(n) {
+    if (n === 1) return { x: 960, y: 470, esc: 6.5 };
+    if (n === 2) return { x: 960, y: 500, esc: 1.5 };
+    if (n === 6) return { x: 1306, y: 470, esc: 1.25 };
+    if (n === 9)
+      return { x: CARATULA_ORBITA.x, y: CARATULA_ORBITA.y, esc: 1.5 };
+    return null;
+  }
+
   function dibujarCaratula(c, t, dt) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
     const { u } = medidaCaratula();
+    const giroAgujero = t * CUMULO_GIRO * 0.3;
+    const hueco = agujeroCaratula(c.n);
     dibujarEstrellasCaratula(
       c.estrellas,
       c.n === 2 || c.n === 13 ? t * CARATULA_DERIVA * u : 0,
@@ -4243,17 +4406,11 @@
     lc.drawImage(imgRivalFondo, 0, 0, lienzoRival.width, lienzoRival.height);
     lc.drawImage(lienzoFuegoRival, 0, 0);
     lc.drawImage(imgRivalTop, 0, 0, lienzoRival.width, lienzoRival.height);
-    const compas = MUSICA_COMPAS_RESPALDO;
-    const late =
-      1 +
-      CUMULO_PULSO_AMPLITUD *
-        pulsoCumulo(t % compas, compas / MUSICA_TIEMPOS_COMPAS);
-    const giroAgujero = t * CUMULO_GIRO * 0.3;
 
     if (c.n === 1) {
-      dibujarAgujero(960, 470, giroAgujero * 0.5, 6.5 * late, 0);
+      dibujarAgujero(hueco.x, hueco.y, giroAgujero * 0.5, hueco.esc);
     } else if (c.n === 2) {
-      dibujarAgujero(960, 500, giroAgujero, 1.5, 1);
+      dibujarAgujero(hueco.x, hueco.y, giroAgujero, hueco.esc);
       naveCaratula(700, 500, 96, 90, haloCaratula(CARATULA_AZUL));
       naveCaratula(1220, 500, 96, -90, haloCaratula(CARATULA_ROJO));
     } else if (c.n === 3) {
@@ -4261,9 +4418,20 @@
       for (const n of c.naves) {
         // Destello tenue: sube y baja en CARATULA_DESTELLO s, y cada nave
         // arranca a la mitad del de la otra.
-        const f = (((t - n.fase) % (CARATULA_DESTELLO * 2)) + CARATULA_DESTELLO * 2) % (CARATULA_DESTELLO * 2);
-        const destello = f < CARATULA_DESTELLO ? Math.sin((f / CARATULA_DESTELLO) * Math.PI) : 0;
-        naveCaratula(n.x, n.y, 84, n.rot, haloCaratula(n.rgb, 0.6 + 0.4 * destello));
+        const f =
+          (((t - n.fase) % (CARATULA_DESTELLO * 2)) + CARATULA_DESTELLO * 2) %
+          (CARATULA_DESTELLO * 2);
+        const destello =
+          f < CARATULA_DESTELLO
+            ? Math.sin((f / CARATULA_DESTELLO) * Math.PI)
+            : 0;
+        naveCaratula(
+          n.x,
+          n.y,
+          84,
+          n.rot,
+          haloCaratula(n.rgb, 0.6 + 0.4 * destello),
+        );
       }
     } else if (c.n === 4) {
       const luz = ctx.createRadialGradient(960, 470, 0, 960, 470, 360);
@@ -4305,7 +4473,7 @@
       naveCaratula(960, 800, 84, 0, haloCaratula(CARATULA_AZUL));
     } else if (c.n === 6) {
       const L = CARATULA_LLEGADA;
-      dibujarAgujero(1306, 470, giroAgujero, 1.25, 1);
+      dibujarAgujero(hueco.x, hueco.y, giroAgujero, hueco.esc);
       ctx.drawImage(c.humo, 0, 0, 1920, 1080);
       naveCaratula(L.x, L.y, L.alto, c.rot, haloCaratula(CARATULA_AZUL, 0.8));
     } else if (c.n === 9) {
@@ -4313,13 +4481,20 @@
       ctx.save();
       avanzarBocanadas(c.humo, dt, true);
       ctx.restore();
-      dibujarAgujero(O.x, O.y, giroAgujero, 1.5, 1);
+      dibujarAgujero(hueco.x, hueco.y, giroAgujero, hueco.esc);
       naveCaratula(c.x, c.y, O.alto, c.rot, haloCaratula(CARATULA_AZUL, 0.8));
     } else if (c.n === 11) {
       const L = CARATULA_LINTERNA;
       // La luz respira apenas.
       const respira = 1 + 0.06 * Math.sin(t * 1.3);
-      const luz = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.radio * respira);
+      const luz = ctx.createRadialGradient(
+        L.x,
+        L.y,
+        0,
+        L.x,
+        L.y,
+        L.radio * respira,
+      );
       luz.addColorStop(0, `rgba(${CARATULA_LUZ}, 0.11)`);
       luz.addColorStop(0.5, `rgba(${CARATULA_LUZ}, 0.05)`);
       luz.addColorStop(1, `rgba(${CARATULA_LUZ}, 0)`);
@@ -4332,7 +4507,8 @@
       ctx.fillStyle = "#000";
       for (const s of c.rocas) {
         const d = Math.hypot(s.x - L.x, s.y - L.y);
-        const alfa = 0.9 * Math.max(0, Math.min(1, (L.radio * 1.2 * respira - d) / 200));
+        const alfa =
+          0.9 * Math.max(0, Math.min(1, (L.radio * 1.2 * respira - d) / 200));
         if (alfa <= 0.01) continue;
         const cos = Math.cos(s.ang);
         const sin = Math.sin(s.ang);
@@ -4368,7 +4544,14 @@
       lt.drawImage(lienzoFuegoRival, 0, 0);
       lt.drawImage(c.tie, 0, 0, 203, 300);
       const T = CARATULA_TIE;
-      naveCaratula(T.x, T.y, T.alto, rumbo(E.x - T.x, E.y - T.y), haloCaratula(CARATULA_ROJO), c.lienzoTie);
+      naveCaratula(
+        T.x,
+        T.y,
+        T.alto,
+        rumbo(E.x - T.x, E.y - T.y),
+        haloCaratula(CARATULA_ROJO),
+        c.lienzoTie,
+      );
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
@@ -4400,8 +4583,8 @@
   let navesElegidas = null; // modo para el que ya se eligió (ver elegirModo)
   const SEL_AZUL = "90, 169, 255";
   const SEL_ROJO = "255, 90, 90";
-  const SEL_LLEGA = 0.6; // s que tarda la elegida en venir desde su retrato
-  const SEL_VUELVE = 0.3; // s que tarda la anterior en volver al suyo
+  const SEL_LLEGA = 0.45; // s que tarda la elegida en aparecer en el medio
+  const SEL_VUELVE = 0.3; // s que tarda la anterior en desvanecerse
   const SEL_RETRATO = { ancho: 84, alto: 100, sep: 10 }; // los de la cinta
   const SEL_CORRE = 10; // qué tan rápido corre la cinta hasta la elegida (1/s)
   const SEL_ACOMODA = 7; // qué tan rápido va la nave grande a su lugar si cambia (1/s)
@@ -4421,8 +4604,8 @@
       nave, // índice en NAVES_JUEGO (o azarNave)
       fuego, // índice en FUEGOS (o azarFuego)
       pos: nave, // dónde va la cinta (corre suave hasta nave)
-      llega: 0, // 0 a 1: la elegida viniendo desde su retrato (ver SEL_LLEGA)
-      sale: null, // { nave, t, x, y, alto, rot }: la anterior volviendo al suyo
+      llega: 0, // 0 a 1: la elegida apareciendo en el medio (ver SEL_LLEGA)
+      sale: null, // { nave, t, x, y, alto, rot }: la anterior desvaneciéndose
       pose: null, // dónde se dibujó la elegida el último cuadro
       lugar: null, // { x, y, alto }: dónde va la nave grande (se acomoda suave)
       enLugar: 0, // s que lleva en su lugar desde que llegó (ver SEL_SALE_A_VOLAR)
@@ -4431,18 +4614,33 @@
       rgb,
       etiqueta,
       llama: { nivel: 0, fase: Math.random() * 10 },
-      lienzoLlama: Object.assign(document.createElement("canvas"), { width: 203, height: 300 }),
-      lienzoNave: Object.assign(document.createElement("canvas"), { width: 203, height: 300 }),
+      lienzoLlama: Object.assign(document.createElement("canvas"), {
+        width: 203,
+        height: 300,
+      }),
+      lienzoNave: Object.assign(document.createElement("canvas"), {
+        width: 203,
+        height: 300,
+      }),
       vuelo: { modo: null, nave: 0 }, // la nave volando con el mouse encima (ver actualizarVueloSel)
     };
   }
 
   function abrirSelector(m) {
     const guardada = naveGuardada();
-    const indice = (lista, id) => (id === AZAR ? lista.length : lista.findIndex((x) => x.id === id));
+    const indice = (lista, id) =>
+      id === AZAR ? lista.length : lista.findIndex((x) => x.id === id);
     const lado = (j, rgb, etiqueta) =>
-      ladoSel(indice(NAVES_JUEGO, guardada[j].nave), indice(FUEGOS, guardada[j].fuego), rgb, etiqueta);
-    const lados = m === "dos" ? [lado("j1", SEL_AZUL, "1P"), lado("j2", SEL_ROJO, "2P")] : [lado("j1", SEL_AZUL, "1P")];
+      ladoSel(
+        indice(NAVES_JUEGO, guardada[j].nave),
+        indice(FUEGOS, guardada[j].fuego),
+        rgb,
+        etiqueta,
+      );
+    const lados =
+      m === "dos"
+        ? [lado("j1", SEL_AZUL, "1P"), lado("j2", SEL_ROJO, "2P")]
+        : [lado("j1", SEL_AZUL, "1P")];
     const gp = primerJoystick();
     selector = {
       modo: m,
@@ -4532,12 +4730,19 @@
     sonarMenu("selector");
   }
 
-  // Cambia la nave de un lado: la que estaba vuelve a su retrato desde donde
-  // iba (volando o en su lugar) y la nueva sale del suyo.
+  // Cambia la nave de un lado: la que estaba se desvanece donde iba (volando
+  // o en su lugar) y la nueva aparece en el medio.
   function cambiarNaveSel(l, nueva) {
     const v = l.vuelo;
     if (v.modo) {
-      l.sale = { nave: l.nave, t: 0, x: v.x, y: v.y, alto: medidasSel().altoNave[0], rot: v.rot };
+      l.sale = {
+        nave: l.nave,
+        t: 0,
+        x: v.x,
+        y: v.y,
+        alto: medidasSel().altoNave[0],
+        rot: v.rot,
+      };
       v.modo = null;
     } else if (l.pose) l.sale = { nave: l.nave, t: 0, ...l.pose };
     l.nave = nueva;
@@ -4568,7 +4773,8 @@
     if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       // Deslizó: la cinta corre para ese lado (hacia la izquierda, la de la
       // derecha pasa al medio).
-      const i = s.lados.length === 1 || s.pc ? s.lados.length - 1 : x < 960 ? 0 : 1;
+      const i =
+        s.lados.length === 1 || s.pc ? s.lados.length - 1 : x < 960 ? 0 : 1;
       accionSelector(i, dx < 0 ? "derecha" : "izquierda");
       return;
     }
@@ -4595,14 +4801,33 @@
 
   // Las teclas del selector (ver el keydown): true si la usó.
   const SEL_TECLAS_UNO = {
-    KeyW: "arriba", ArrowUp: "arriba", KeyS: "abajo", ArrowDown: "abajo",
-    KeyA: "izquierda", ArrowLeft: "izquierda", KeyD: "derecha", ArrowRight: "derecha",
-    KeyE: "ok", Enter: "ok", NumpadEnter: "ok", Space: "ok",
+    KeyW: "arriba",
+    ArrowUp: "arriba",
+    KeyS: "abajo",
+    ArrowDown: "abajo",
+    KeyA: "izquierda",
+    ArrowLeft: "izquierda",
+    KeyD: "derecha",
+    ArrowRight: "derecha",
+    KeyE: "ok",
+    Enter: "ok",
+    NumpadEnter: "ok",
+    Space: "ok",
   };
-  const SEL_TECLAS_J1 = { KeyW: "arriba", KeyS: "abajo", KeyA: "izquierda", KeyD: "derecha", KeyE: "ok" };
+  const SEL_TECLAS_J1 = {
+    KeyW: "arriba",
+    KeyS: "abajo",
+    KeyA: "izquierda",
+    KeyD: "derecha",
+    KeyE: "ok",
+  };
   const SEL_TECLAS_J2 = {
-    ArrowUp: "arriba", ArrowDown: "abajo", ArrowLeft: "izquierda", ArrowRight: "derecha",
-    Enter: "ok", NumpadEnter: "ok",
+    ArrowUp: "arriba",
+    ArrowDown: "abajo",
+    ArrowLeft: "izquierda",
+    ArrowRight: "derecha",
+    Enter: "ok",
+    NumpadEnter: "ok",
   };
   function teclaSelector(ev) {
     if (ev.code === "Escape" || ev.code === "Backspace") {
@@ -4616,15 +4841,21 @@
       // Con los lados dados vuelta en el menú (y sin joystick) las flechas son
       // del 1 y WASD del 2, como en el juego (tecladoAlReves).
       const alReves = controlesCambiados && !primerJoystick();
-      if (SEL_TECLAS_J1[ev.code]) accionSelector(alReves ? 1 : 0, SEL_TECLAS_J1[ev.code]);
-      else if (SEL_TECLAS_J2[ev.code]) accionSelector(alReves ? 0 : 1, SEL_TECLAS_J2[ev.code]);
+      if (SEL_TECLAS_J1[ev.code])
+        accionSelector(alReves ? 1 : 0, SEL_TECLAS_J1[ev.code]);
+      else if (SEL_TECLAS_J2[ev.code])
+        accionSelector(alReves ? 0 : 1, SEL_TECLAS_J2[ev.code]);
     }
     ev.preventDefault();
   }
 
-  // El joystick: la cruceta o el stick, A y B, contando solo lo recién
-  // apretado. Con dos jugadores es del 2, salvo que se hayan cambiado los
-  // lados en el menú (como en el juego).
+  // El joystick: la cruceta o el stick, A y B. A y B cuentan una vez por
+  // apretada; las direcciones, como una tecla: un paso al empujar y, si se las
+  // sostiene, repiten solas (con los mismos tiempos que el menú, ver
+  // MENU_PAD_ESPERA), así la cinta corre sin fin como con el teclado. Con dos
+  // jugadores es del 2, salvo que se hayan cambiado los lados en el menú
+  // (como en el juego).
+  const SEL_PAD_REPITEN = ["arriba", "abajo", "izquierda", "derecha"];
   function leerPadSelector(gp) {
     const joy = leerJoystick();
     return {
@@ -4636,7 +4867,7 @@
       volver: botonPad(gp, PAD_B),
     };
   }
-  function padSelector() {
+  function padSelector(dt) {
     const s = selector;
     const gp = primerJoystick();
     if (!gp) {
@@ -4647,11 +4878,34 @@
     const antes = s.pad || ahora;
     s.pad = ahora;
     const i = s.modo === "dos" && !controlesCambiados ? 1 : 0;
-    for (const accion of ["arriba", "abajo", "izquierda", "derecha", "ok", "volver"])
-      if (ahora[accion] && !antes[accion]) {
+    // Lo que falta para el próximo paso de cada dirección sostenida, en s. Una
+    // que ya venía sostenida al abrir (o al conectar el joystick) no tiene y no
+    // repite hasta soltarla y volver a empujarla.
+    const falta = s.padFalta || (s.padFalta = {});
+    for (const accion of [
+      "arriba",
+      "abajo",
+      "izquierda",
+      "derecha",
+      "ok",
+      "volver",
+    ]) {
+      let paso = ahora[accion] && !antes[accion];
+      if (paso) falta[accion] = MENU_PAD_ESPERA;
+      else if (!ahora[accion]) delete falta[accion];
+      else if (
+        SEL_PAD_REPITEN.includes(accion) &&
+        accion in falta &&
+        (falta[accion] -= dt) <= 0
+      ) {
+        falta[accion] = MENU_PAD_REPITE;
+        paso = true;
+      }
+      if (paso) {
         accionSelector(i, accion);
         if (!selector) return; // se cerró
       }
+    }
   }
 
   // Las medidas de ahora (un lado o dos: con dos jugadores y eligiendo la de
@@ -4662,7 +4916,7 @@
   function actualizarSelector(dt) {
     const s = selector;
     s.t += dt;
-    padSelector();
+    padSelector(dt);
     if (!selector) return;
     const m = medidasSel();
     s.lados.forEach((l, i) => {
@@ -4671,20 +4925,32 @@
       if (l.sale && (l.sale.t += dt) >= SEL_VUELVE) l.sale = null;
       // Vuela por toda la pantalla; con dos lados, cada uno por su mitad.
       // (En el celular, dentro de lo que se ve: ver SEL_RECORTE_T.)
-      const b = tactil ? { ...SEL_VUELO.borde, y0: 170, y1: 720 } : SEL_VUELO.borde;
-      l.borde = s.lados.length === 1 ? b : i ? { ...b, x0: 1020 } : { ...b, x1: 900 };
+      const b = tactil
+        ? { ...SEL_VUELO.borde, y0: 170, y1: 720 }
+        : SEL_VUELO.borde;
+      l.borde =
+        s.lados.length === 1 ? b : i ? { ...b, x0: 1020 } : { ...b, x1: 900 };
       // La cinta corre hasta la elegida, por el camino corto.
-      l.pos += difCircular(l.nave - l.pos, selNaves()) * (1 - Math.exp(-dt * SEL_CORRE));
+      l.pos +=
+        difCircular(l.nave - l.pos, selNaves()) *
+        (1 - Math.exp(-dt * SEL_CORRE));
       // La nave grande va a su lugar (cambia al pasar de uno a dos lados).
       const meta = { x: centroSel(i), y: m.yNave, alto: m.altoNave[0] };
       if (!l.lugar) l.lugar = meta;
       const k = 1 - Math.exp(-dt * SEL_ACOMODA);
-      for (const c of ["x", "y", "alto"]) l.lugar[c] += (meta[c] - l.lugar[c]) * k;
+      for (const c of ["x", "y", "alto"])
+        l.lugar[c] += (meta[c] - l.lugar[c]) * k;
       actualizarVueloSel(l, centroSel(i), m, dt);
       // El fuego: a pleno en su lugar; volando, según lo rápido que va.
       const v = l.vuelo;
       const vel = v.modo ? 15 + Math.hypot(v.vx, v.vy) * 0.12 : 65;
-      animarFuego(l.llama, l.lienzoLlama, fuegoTenido(FUEGOS[fuegoMostradoSel(l)].id), dt, vel);
+      animarFuego(
+        l.llama,
+        l.lienzoLlama,
+        fuegoTenido(FUEGOS[fuegoMostradoSel(l)].id),
+        dt,
+        vel,
+      );
     });
     if (s.modo === "dos") {
       if (s.lados.every((l) => l.listo)) {
@@ -4705,7 +4971,9 @@
 
   // "Al azar" muestra las naves (o los fuegos) pasando, en un orden mezclado:
   // cuál se ve ahora. Cada lado arranca en otra.
-  const SEL_ORDEN_AZAR = NAVES_JUEGO.map((_, i) => i).sort(() => Math.random() - 0.5);
+  const SEL_ORDEN_AZAR = NAVES_JUEGO.map((_, i) => i).sort(
+    () => Math.random() - 0.5,
+  );
   function naveMostradaSel(l, i = 0) {
     if (!azarNave(l.nave)) return l.nave;
     const k = Math.floor(selector.t / SEL_AZAR_CADA) + i * 5;
@@ -4788,11 +5056,17 @@
     if (r) return r;
     const img = NAVES_JUEGO[i].img;
     if (!img.complete || !img.naturalWidth) return null;
-    const c = Object.assign(document.createElement("canvas"), { width: 203, height: 300 });
+    const c = Object.assign(document.createElement("canvas"), {
+      width: 203,
+      height: 300,
+    });
     const g = c.getContext("2d");
     g.drawImage(img, 0, 0, 203, 300);
     const px = g.getImageData(0, 0, 203, 300).data;
-    let x0 = 203, y0 = 300, x1 = 0, y1 = 0;
+    let x0 = 203,
+      y0 = 300,
+      x1 = 0,
+      y1 = 0;
     for (let y = 0; y < 300; y++)
       for (let x = 0; x < 203; x++)
         if (px[(y * 203 + x) * 4 + 3] > 20) {
@@ -4804,13 +5078,23 @@
     const w = Math.max(1, x1 - x0 + 1);
     const h = Math.max(1, y1 - y0 + 1);
     const hacer = (filtro) => {
-      const k = Object.assign(document.createElement("canvas"), { width: w, height: h });
+      const k = Object.assign(document.createElement("canvas"), {
+        width: w,
+        height: h,
+      });
       const kg = k.getContext("2d");
       kg.filter = filtro;
       kg.drawImage(c, x0, y0, w, h, 0, 0, w, h);
       return k;
     };
-    r = { color: hacer("none"), gris: hacer("grayscale(0.8) brightness(0.75)"), x: x0, y: y0, w, h };
+    r = {
+      color: hacer("none"),
+      gris: hacer("grayscale(0.8) brightness(0.75)"),
+      x: x0,
+      y: y0,
+      w,
+      h,
+    };
     retratosSel.set(i, r);
     return r;
   }
@@ -4830,7 +5114,12 @@
     if (!r) return { x, y, d, cx: ccx, cy: ccy, esc: 0.25, nx: ccx, ny: ccy };
     const esc = Math.min((R.ancho - 16) / r.w, (R.alto - 16) / r.h);
     return {
-      x, y, d, cx: ccx, cy: ccy, esc,
+      x,
+      y,
+      d,
+      cx: ccx,
+      cy: ccy,
+      esc,
       nx: ccx - (r.x + r.w / 2 - 101.5) * esc,
       ny: ccy - (r.y + r.h / 2 - 150) * esc,
     };
@@ -4847,19 +5136,33 @@
       if (lejos > medio + 0.5) continue;
       const alfa = Math.max(0, Math.min(1, medio + 0.5 - lejos));
       const elegida = j === l.nave;
-      if (alfa > 0.3) zonaSel(c.x, c.y, R.ancho, R.alto, () => tocarRetratoSel(i, j));
+      if (alfa > 0.3)
+        zonaSel(c.x, c.y, R.ancho, R.alto, () => tocarRetratoSel(i, j));
       ctx.globalAlpha = alfa;
       ctx.beginPath();
       ctx.roundRect(c.x, c.y, R.ancho, R.alto, 8);
-      ctx.fillStyle = elegida ? `rgba(${l.rgb}, 0.1)` : "rgba(255, 255, 255, 0.035)";
+      ctx.fillStyle = elegida
+        ? `rgba(${l.rgb}, 0.1)`
+        : "rgba(255, 255, 255, 0.035)";
       ctx.fill();
       if (azarNave(j)) {
-        preguntaSel(c.cx, c.cy, R.alto * 0.5, elegida ? `rgb(${l.rgb})` : "rgba(255, 255, 255, 0.6)");
+        preguntaSel(
+          c.cx,
+          c.cy,
+          R.alto * 0.5,
+          elegida ? `rgb(${l.rgb})` : "rgba(255, 255, 255, 0.6)",
+        );
       } else {
         const r = retratoSel(j);
         if (r) {
           ctx.globalAlpha = alfa * (elegida ? 1 : 0.6);
-          ctx.drawImage(elegida ? r.color : r.gris, c.cx - (r.w * c.esc) / 2, c.cy - (r.h * c.esc) / 2, r.w * c.esc, r.h * c.esc);
+          ctx.drawImage(
+            elegida ? r.color : r.gris,
+            c.cx - (r.w * c.esc) / 2,
+            c.cy - (r.h * c.esc) / 2,
+            r.w * c.esc,
+            r.h * c.esc,
+          );
           ctx.globalAlpha = alfa;
         }
       }
@@ -4891,7 +5194,9 @@
     for (const dir of [-1, 1]) {
       const x = cx + dir * a;
       const y = m.yFila + R.alto / 2;
-      zonaSel(x - 30, y - 40, 60, 80, () => accionSelector(i, dir > 0 ? "derecha" : "izquierda"));
+      zonaSel(x - 30, y - 40, 60, 80, () =>
+        accionSelector(i, dir > 0 ? "derecha" : "izquierda"),
+      );
       ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
       ctx.beginPath();
       ctx.moveTo(x + dir * 7, y);
@@ -4911,40 +5216,53 @@
 
   const suave = (p) => 1 - Math.pow(1 - p, 3);
   // Crece pasándose un poquito y vuelve (como si frenara al llegar).
-  const conRebote = (p) => 1 + 2.4 * Math.pow(p - 1, 3) + 1.4 * Math.pow(p - 1, 2);
+  const conRebote = (p) =>
+    1 + 2.4 * Math.pow(p - 1, 3) + 1.4 * Math.pow(p - 1, 2);
 
   // La nave grande de un lado, con su fuego y su halo; o, si recién la
-  // eligieron, viniendo desde su retrato: crece y navega hacia el frente (con
-  // la nariz hacia donde va). Antes, la anterior volviendo al suyo.
+  // eligieron, apareciendo ahí en el medio: crece un poco en su lugar (con un
+  // rebotecito) mientras se prende. Antes, la anterior desvaneciéndose donde
+  // estaba, achicándose apenas.
   function grandeSel(l, i, cx, m) {
     const s = selector;
     if (l.sale) {
       const q = Math.min(1, l.sale.t / SEL_VUELVE);
-      const e = q * q * q;
-      const c = cajaRetratoSel(l, l.sale.nave, cx, m);
       naveGrandeSel(
-        l, l.sale.nave,
-        l.sale.x + (c.nx - l.sale.x) * e,
-        l.sale.y + (c.ny - l.sale.y) * e,
-        l.sale.alto + (300 * c.esc - l.sale.alto) * e,
-        l.sale.rot * (1 - e), 0, 1 - q, false, i,
+        l,
+        l.sale.nave,
+        l.sale.x,
+        l.sale.y,
+        l.sale.alto * (1 - 0.2 * suave(q)),
+        l.sale.rot,
+        0,
+        1 - q,
+        false,
+        i,
       );
     }
-    const c = cajaRetratoSel(l, l.nave, cx, m);
     const p = l.llega;
     const e = suave(p);
     const lugar = l.lugar || { x: cx, y: m.yNave, alto: m.altoNave[0] };
-    const x = lugar.x;
-    const y = lugar.y + Math.sin(s.t * 1.6 + i) * 4 * e;
     const pose = {
-      x: c.nx + (x - c.nx) * e,
-      y: c.ny + (y - c.ny) * e,
-      alto: 300 * c.esc + (lugar.alto - 300 * c.esc) * conRebote(p),
-      rot: rumbo(x - c.nx, y - c.ny) * Math.sin(Math.PI * p),
+      x: lugar.x,
+      y: lugar.y + Math.sin(s.t * 1.6 + i) * 4 * e,
+      alto: lugar.alto * (0.7 + 0.3 * conRebote(p)),
+      rot: 0,
     };
     l.pose = pose;
     if (l.vuelo.modo) return; // está volando (ver dibujarVueloSel)
-    naveGrandeSel(l, l.nave, pose.x, pose.y, pose.alto, pose.rot, e, 1, true, i);
+    naveGrandeSel(
+      l,
+      l.nave,
+      pose.x,
+      pose.y,
+      pose.alto,
+      pose.rot,
+      e,
+      Math.min(1, p * 2.5),
+      true,
+      i,
+    );
   }
 
   // Una nave de 203x300 centrada en (x, y), girada rot grados, con el halo
@@ -5004,7 +5322,17 @@
     if (!fuente) return;
     const ancho = (alto * FUEGO_W) / (FUEGO_BOTTOM - FUEGO_TOP);
     ctx.globalAlpha = alfa;
-    ctx.drawImage(fuente, FUEGO_X, FUEGO_TOP, FUEGO_W, FUEGO_BOTTOM - FUEGO_TOP, x - ancho / 2, y - alto / 2, ancho, alto);
+    ctx.drawImage(
+      fuente,
+      FUEGO_X,
+      FUEGO_TOP,
+      FUEGO_W,
+      FUEGO_BOTTOM - FUEGO_TOP,
+      x - ancho / 2,
+      y - alto / 2,
+      ancho,
+      alto,
+    );
     ctx.globalAlpha = 1;
   }
 
@@ -5015,12 +5343,34 @@
     const paso = tam * 2.5;
     const x0 = cx - ((n - 1) * paso) / 2;
     const nombre = azarFuego(l.fuego) ? "al azar" : FUEGOS[l.fuego].nombre;
-    textoSel("fuego", x0 - paso * 0.9, y, tam, "rgba(255, 255, 255, 0.55)", "right");
-    textoSel(nombre, x0 + (n - 1) * paso + paso * 0.9, y, tam, "rgba(255, 255, 255, 0.85)", "left");
+    textoSel(
+      "fuego",
+      x0 - paso * 0.9,
+      y,
+      tam,
+      "rgba(255, 255, 255, 0.55)",
+      "right",
+    );
+    textoSel(
+      nombre,
+      x0 + (n - 1) * paso + paso * 0.9,
+      y,
+      tam,
+      "rgba(255, 255, 255, 0.85)",
+      "left",
+    );
     for (let j = 0; j < n; j++) {
       const elegido = j === l.fuego;
-      fuegoSel(j, x0 + j * paso, y, elegido ? tam * 2 : tam * 1.1, elegido ? 1 : 0.5);
-      zonaSel(x0 + j * paso - paso / 2, y - tam * 1.4, paso, tam * 2.8, () => tocarFuegoSel(i, j));
+      fuegoSel(
+        j,
+        x0 + j * paso,
+        y,
+        elegido ? tam * 2 : tam * 1.1,
+        elegido ? 1 : 0.5,
+      );
+      zonaSel(x0 + j * paso - paso / 2, y - tam * 1.4, paso, tam * 2.8, () =>
+        tocarFuegoSel(i, j),
+      );
     }
   }
 
@@ -5034,7 +5384,8 @@
     if ("letterSpacing" in ctx) ctx.letterSpacing = `${tam * 0.14}px`;
     const anchos = items.map((b) => ctx.measureText(b.texto).width + 56);
     if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
-    let x = 960 - (anchos.reduce((a, b) => a + b, 0) + sep * (items.length - 1)) / 2;
+    let x =
+      960 - (anchos.reduce((a, b) => a + b, 0) + sep * (items.length - 1)) / 2;
     items.forEach((b, k) => {
       const w = anchos[k];
       const rgb = b.rgb || "255, 255, 255";
@@ -5051,32 +5402,113 @@
     });
   }
 
-  const nombreSel = (l) => (azarNave(l.nave) ? "al azar" : NAVES_JUEGO[l.nave].nombre);
+  const nombreSel = (l) =>
+    azarNave(l.nave) ? "al azar" : NAVES_JUEGO[l.nave].nombre;
 
-  // Las teclas de abajo: cajitas con la tecla y lo que hace.
+  // Las del joystick, para la ayuda de abajo (ver ayudaSel): la cruceta con
+  // los brazos que se usan marcados y los botones redondos.
+  const SEL_CRUZ_H = { cruz: "h" }; // los costados
+  const SEL_CRUZ_V = { cruz: "v" }; // arriba y abajo
+  const SEL_CRUZ = { cruz: "hv" }; // toda
+  const SEL_BOTON_A = { boton: "A" };
+  const SEL_BOTON_B = { boton: "B" };
+
+  // Una del joystick, centrada en (x, y), con el trazo que ya está puesto.
+  function teclaPadSel(t, x, y) {
+    ctx.beginPath();
+    if (t.boton) {
+      ctx.arc(x, y, 13, 0, Math.PI * 2);
+      ctx.stroke();
+      textoSel(
+        t.boton,
+        x,
+        y + 1,
+        14,
+        "rgba(255, 255, 255, 0.7)",
+        "center",
+        0.05,
+      );
+      return;
+    }
+    const a = 4.5; // medio ancho de un brazo
+    const l = 13; // medio largo de la cruz
+    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+    if (t.cruz.includes("h")) ctx.fillRect(x - l, y - a, l * 2, a * 2);
+    if (t.cruz.includes("v")) ctx.fillRect(x - a, y - l, a * 2, l * 2);
+    const puntas = [
+      [-a, -l],
+      [a, -l],
+      [a, -a],
+      [l, -a],
+      [l, a],
+      [a, a],
+      [a, l],
+      [-a, l],
+      [-a, a],
+      [-l, a],
+      [-l, -a],
+      [-a, -a],
+    ];
+    puntas.forEach(([px, py], k) =>
+      k ? ctx.lineTo(x + px, y + py) : ctx.moveTo(x + px, y + py),
+    );
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Las teclas de abajo: cajitas con la tecla y lo que hace. Una tecla puede
+  // ser del joystick (SEL_CRUZ..., SEL_BOTON_...): con uno conectado, la ayuda
+  // muestra sus botones en vez de las teclas (ver dibujarSelector).
   function ayudaSel(items, y) {
     const tam = 15;
     ctx.font = `${tam}px Spaceport, ui-monospace, Consolas, monospace`;
     if ("letterSpacing" in ctx) ctx.letterSpacing = "3px";
-    const caja = (t) => Math.max(26, ctx.measureText(t).width + 12);
+    const caja = (t) =>
+      typeof t === "string" ? Math.max(26, ctx.measureText(t).width + 12) : 26;
     const medidas = items.map(({ teclas, texto }) => {
       const cajas = teclas.map(caja);
-      return { cajas, ancho: cajas.reduce((a, b) => a + b + 5, 0) + 6 + ctx.measureText(texto).width };
+      return {
+        cajas,
+        ancho:
+          cajas.reduce((a, b) => a + b + 5, 0) +
+          6 +
+          ctx.measureText(texto).width,
+      };
     });
     const sep = 34;
-    let x = 960 - (medidas.reduce((a, m) => a + m.ancho, 0) + sep * (items.length - 1)) / 2;
+    let x =
+      960 -
+      (medidas.reduce((a, m) => a + m.ancho, 0) + sep * (items.length - 1)) / 2;
     items.forEach(({ teclas, texto }, i) => {
       teclas.forEach((t, k) => {
         const w = medidas[i].cajas[k];
         ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
         ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.roundRect(x, y - 13, w, 26, 4);
-        ctx.stroke();
-        textoSel(t, x + w / 2, y + 1, 14, "rgba(255, 255, 255, 0.7)", "center", 0.05);
+        if (typeof t === "string") {
+          ctx.beginPath();
+          ctx.roundRect(x, y - 13, w, 26, 4);
+          ctx.stroke();
+          textoSel(
+            t,
+            x + w / 2,
+            y + 1,
+            14,
+            "rgba(255, 255, 255, 0.7)",
+            "center",
+            0.05,
+          );
+        } else teclaPadSel(t, x + w / 2, y);
         x += w + 5;
       });
-      textoSel(texto, x + 3, y + 1, tam, "rgba(255, 255, 255, 0.6)", "left", 0.12);
+      textoSel(
+        texto,
+        x + 3,
+        y + 1,
+        tam,
+        "rgba(255, 255, 255, 0.6)",
+        "left",
+        0.12,
+      );
       ctx.font = `${tam}px Spaceport, ui-monospace, Consolas, monospace`;
       if ("letterSpacing" in ctx) ctx.letterSpacing = "3px";
       x += 6 + ctx.measureText(texto).width + sep;
@@ -5144,7 +5576,16 @@
     if (!v.modo) {
       v.nave = l.nave;
       if (!hover) return;
-      Object.assign(v, { modo: "vuela", x: cx, y: m.yNave, vx: 0, vy: 0, rot: 0, meta: puntoAlAzarSel(l), mira: 0 });
+      Object.assign(v, {
+        modo: "vuela",
+        x: cx,
+        y: m.yNave,
+        vx: 0,
+        vy: 0,
+        rot: 0,
+        meta: puntoAlAzarSel(l),
+        mira: 0,
+      });
     }
     // Cambió la nave: la que vuela se va (y después entra la otra).
     if (v.nave !== l.nave && v.modo !== "sale") v.modo = "sale";
@@ -5189,7 +5630,10 @@
     const dy = meta.y - v.y;
     const d = Math.hypot(dx, dy);
     // Va hacia el punto y frena al llegar.
-    const quiere = Math.min(SEL_VUELO.vel, (SEL_VUELO.vel * d) / SEL_VUELO.frena);
+    const quiere = Math.min(
+      SEL_VUELO.vel,
+      (SEL_VUELO.vel * d) / SEL_VUELO.frena,
+    );
     const qx = d > 0.5 ? (dx / d) * quiere : 0;
     const qy = d > 0.5 ? (dy / d) * quiere : 0;
     const k = 1 - Math.exp(-dt * SEL_VUELO.agil);
@@ -5201,16 +5645,19 @@
     if (v.modo === "vuelve") {
       // De vuelta en su lugar, mirando para arriba: se queda ahí.
       v.rot = girarSel(v.rot, rapidez > 80 ? rumbo(v.vx, v.vy) : 0, dt);
-      const derecha = ((((v.rot % 360) + 540) % 360) - 180);
+      const derecha = (((v.rot % 360) + 540) % 360) - 180;
       if (d < 4 && rapidez < 30 && Math.abs(derecha) < 3) v.modo = null;
       return;
     }
     if (d < 24 && rapidez < 120) {
       // Llegó: mira a la flechita un rato y elige otro punto.
       if (!v.mira)
-        v.mira = SEL_VUELO.mira[0] + Math.random() * (SEL_VUELO.mira[1] - SEL_VUELO.mira[0]);
+        v.mira =
+          SEL_VUELO.mira[0] +
+          Math.random() * (SEL_VUELO.mira[1] - SEL_VUELO.mira[0]);
       v.mira -= dt;
-      if (mouse) v.rot = girarSel(v.rot, rumbo(mouse.x - v.x, mouse.y - v.y), dt);
+      if (mouse)
+        v.rot = girarSel(v.rot, rumbo(mouse.x - v.x, mouse.y - v.y), dt);
       if (v.mira <= 0) {
         v.mira = 0;
         v.meta = puntoAlAzarSel(l);
@@ -5250,25 +5697,65 @@
   // SEL_RECORTE_T, ver medidaCaratula), con los botones de abajo.
   const SEL_UNO = tactil
     ? {
-        yTitulo: 150, ySub: 186,
-        yNave: 330, altoNave: [200], yNombre: 460, tamNombre: 24,
-        yFuego: 510, tamFuego: 18, yFila: 552, medioCinta: 4.5, yNota: 686, yAyuda: 748,
+        yTitulo: 150,
+        ySub: 186,
+        yNave: 330,
+        altoNave: [200],
+        yNombre: 460,
+        tamNombre: 24,
+        yFuego: 510,
+        tamFuego: 18,
+        yFila: 552,
+        medioCinta: 4.5,
+        yNota: 686,
+        yAyuda: 748,
       }
     : {
-        yTitulo: 200, ySub: 236,
-        yNave: 405, altoNave: [260], yNombre: 580, tamNombre: 22,
-        yFuego: 635, tamFuego: 17, yFila: 700, medioCinta: 4.5, yNota: 850, yAyuda: 905,
+        yTitulo: 200,
+        ySub: 236,
+        yNave: 405,
+        altoNave: [260],
+        yNombre: 580,
+        tamNombre: 22,
+        yFuego: 635,
+        tamFuego: 17,
+        yFila: 700,
+        medioCinta: 4.5,
+        yNota: 850,
+        yAyuda: 905,
       };
   const SEL_DOS = tactil
     ? {
-        yTitulo: 130, cx: [560, 1360], yJ: 185,
-        yNave: 300, altoNave: [180], yNombre: 420, tamNombre: 22,
-        yFuego: 468, tamFuego: 17, yEstado: 512, yFila: 548, medioCinta: 2.8, yNota: 684, yAyuda: 748,
+        yTitulo: 130,
+        cx: [560, 1360],
+        yJ: 185,
+        yNave: 300,
+        altoNave: [180],
+        yNombre: 420,
+        tamNombre: 22,
+        yFuego: 468,
+        tamFuego: 17,
+        yEstado: 512,
+        yFila: 548,
+        medioCinta: 2.8,
+        yNota: 684,
+        yAyuda: 748,
       }
     : {
-        yTitulo: 165, cx: [560, 1360], yJ: 240,
-        yNave: 375, altoNave: [220], yNombre: 525, tamNombre: 20,
-        yFuego: 580, tamFuego: 16, yEstado: 638, yFila: 715, medioCinta: 2.8, yNota: 862, yAyuda: 915,
+        yTitulo: 165,
+        cx: [560, 1360],
+        yJ: 240,
+        yNave: 375,
+        altoNave: [220],
+        yNombre: 525,
+        tamNombre: 20,
+        yFuego: 580,
+        tamFuego: 16,
+        yEstado: 638,
+        yFila: 715,
+        medioCinta: 2.8,
+        yNota: 862,
+        yAyuda: 915,
       };
   const SEL_RECORTE_T = { ancho: 1520, y0: 100, y1: 792 };
 
@@ -5280,37 +5767,83 @@
     transformarCaratula();
     s.zonas = [];
     const gris = "rgba(255, 255, 255, 0.45)";
-    const nota = () => textoSel("todas con la misma velocidad y el mismo impacto", 960, medidasSel().yNota, 15, gris);
+    const nota = () =>
+      textoSel(
+        "todas con la misma velocidad y el mismo impacto",
+        960,
+        medidasSel().yNota,
+        15,
+        gris,
+      );
     if (s.lados.length === 1) {
       const m = SEL_UNO;
       const l = s.lados[0];
       tituloSel("Elegi tu nave", m.yTitulo, 30);
-      textoSel(s.modo === "online" ? "online" : "contra la PC", 960, m.ySub, 16, "rgba(255, 255, 255, 0.55)");
+      textoSel(
+        s.modo === "online" ? "online" : "contra la PC",
+        960,
+        m.ySub,
+        16,
+        "rgba(255, 255, 255, 0.55)",
+      );
       textoSel(nombreSel(l), 960, m.yNombre, m.tamNombre, "#fff");
       fuegosSel(l, 960, m.yFuego, m.tamFuego, 0);
       cintaSel(l, 960, m, 0);
       nota();
       if (tactil)
-        botonesSel([
-          { texto: "volver", hacer: () => accionSelector(0, "volver") },
-          { texto: s.modo === "pc" ? "seguir" : "jugar", rgb: l.rgb, hacer: () => accionSelector(0, "ok") },
-        ], m.yAyuda);
+        botonesSel(
+          [
+            { texto: "volver", hacer: () => accionSelector(0, "volver") },
+            {
+              texto: s.modo === "pc" ? "seguir" : "jugar",
+              rgb: l.rgb,
+              hacer: () => accionSelector(0, "ok"),
+            },
+          ],
+          m.yAyuda,
+        );
+      else if (primerJoystick())
+        ayudaSel(
+          [
+            { teclas: [SEL_CRUZ_H], texto: "nave" },
+            { teclas: [SEL_CRUZ_V], texto: "fuego" },
+            {
+              teclas: [SEL_BOTON_A],
+              texto: s.modo === "pc" ? "seguir" : "jugar",
+            },
+            { teclas: [SEL_BOTON_B], texto: "volver" },
+          ],
+          m.yAyuda,
+        );
       else
-        ayudaSel([
-          { teclas: ["A", "D"], texto: "nave" },
-          { teclas: ["W", "S"], texto: "fuego" },
-          { teclas: ["E"], texto: s.modo === "pc" ? "seguir" : "jugar" },
-          { teclas: ["esc"], texto: "volver" },
-        ], m.yAyuda);
+        ayudaSel(
+          [
+            { teclas: ["A", "D"], texto: "nave" },
+            { teclas: ["W", "S"], texto: "fuego" },
+            { teclas: ["E"], texto: s.modo === "pc" ? "seguir" : "jugar" },
+            { teclas: ["esc"], texto: "volver" },
+          ],
+          m.yAyuda,
+        );
       grandeSel(l, 0, 960, m);
       dibujarVueloSel(l, m);
     } else {
       const m = SEL_DOS;
-      tituloSel(s.pc ? "Elegi la nave de la PC" : "Elegi tu nave", m.yTitulo, 30);
+      tituloSel(
+        s.pc ? "Elegi la nave de la PC" : "Elegi tu nave",
+        m.yTitulo,
+        30,
+      );
       textoSel("vs", 960, m.yNave, 26, "rgba(255, 255, 255, 0.35)");
       s.lados.forEach((l, i) => {
         const cx = m.cx[i];
-        textoSel(i ? (s.pc ? "PC" : "J2") : "J1", cx, m.yJ, 22, `rgb(${l.rgb})`);
+        textoSel(
+          i ? (s.pc ? "PC" : "J2") : "J1",
+          cx,
+          m.yJ,
+          22,
+          `rgb(${l.rgb})`,
+        );
         textoSel(nombreSel(l), cx, m.yNombre, m.tamNombre, "#fff");
         fuegosSel(l, cx, m.yFuego, m.tamFuego, i);
         if (s.pc) {
@@ -5318,38 +5851,106 @@
           if (!i) textoSel("lista", cx, m.yEstado, 18, `rgb(${l.rgb})`);
           else cintaSel(l, cx, m, i);
         } else {
-          textoSel(l.listo ? "listo" : "eligiendo", cx, m.yEstado, 18, l.listo ? `rgb(${l.rgb})` : gris);
+          textoSel(
+            l.listo ? "listo" : "eligiendo",
+            cx,
+            m.yEstado,
+            18,
+            l.listo ? `rgb(${l.rgb})` : gris,
+          );
           cintaSel(l, cx, m, i);
         }
       });
       nota();
       if (tactil && s.pc) {
-        botonesSel([
-          { texto: "volver", hacer: () => accionSelector(1, "volver") },
-          { texto: "jugar", rgb: s.lados[1].rgb, hacer: () => accionSelector(1, "ok") },
-        ], m.yAyuda);
+        botonesSel(
+          [
+            { texto: "volver", hacer: () => accionSelector(1, "volver") },
+            {
+              texto: "jugar",
+              rgb: s.lados[1].rgb,
+              hacer: () => accionSelector(1, "ok"),
+            },
+          ],
+          m.yAyuda,
+        );
       } else if (tactil) {
-        botonesSel([
-          { texto: "J1 listo", rgb: s.lados[0].rgb, hacer: () => accionSelector(0, "ok") },
-          { texto: "volver", hacer: () => accionSelector(0, "volver") },
-          { texto: "J2 listo", rgb: s.lados[1].rgb, hacer: () => accionSelector(1, "ok") },
-        ], m.yAyuda);
+        botonesSel(
+          [
+            {
+              texto: "J1 listo",
+              rgb: s.lados[0].rgb,
+              hacer: () => accionSelector(0, "ok"),
+            },
+            { texto: "volver", hacer: () => accionSelector(0, "volver") },
+            {
+              texto: "J2 listo",
+              rgb: s.lados[1].rgb,
+              hacer: () => accionSelector(1, "ok"),
+            },
+          ],
+          m.yAyuda,
+        );
+      } else if (s.pc && primerJoystick()) {
+        ayudaSel(
+          [
+            { teclas: [SEL_CRUZ_H], texto: "nave" },
+            { teclas: [SEL_CRUZ_V], texto: "fuego" },
+            { teclas: [SEL_BOTON_A], texto: "jugar" },
+            { teclas: [SEL_BOTON_B], texto: "volver a la tuya" },
+          ],
+          m.yAyuda,
+        );
       } else if (s.pc) {
-        ayudaSel([
-          { teclas: ["A", "D"], texto: "nave" },
-          { teclas: ["W", "S"], texto: "fuego" },
-          { teclas: ["E"], texto: "jugar" },
-          { teclas: ["esc"], texto: "volver a la tuya" },
-        ], m.yAyuda);
+        ayudaSel(
+          [
+            { teclas: ["A", "D"], texto: "nave" },
+            { teclas: ["W", "S"], texto: "fuego" },
+            { teclas: ["E"], texto: "jugar" },
+            { teclas: ["esc"], texto: "volver a la tuya" },
+          ],
+          m.yAyuda,
+        );
+      } else if (primerJoystick()) {
+        // El joystick es del 2 (o del 1 si se cambiaron los lados, ver
+        // padSelector) y el otro sigue con su lado del teclado.
+        const pad = [
+          { teclas: [SEL_CRUZ], texto: controlesCambiados ? "J1" : "J2" },
+          {
+            teclas: [SEL_BOTON_A],
+            texto: controlesCambiados ? "J1 listo" : "J2 listo",
+          },
+        ];
+        const teclado = controlesCambiados
+          ? [
+              { teclas: ["▲", "◀", "▼", "▶"], texto: "J2" },
+              { teclas: ["enter"], texto: "J2 listo" },
+            ]
+          : [
+              { teclas: ["W", "A", "S", "D"], texto: "J1" },
+              { teclas: ["E"], texto: "J1 listo" },
+            ];
+        ayudaSel(
+          [
+            ...(controlesCambiados
+              ? [...pad, ...teclado]
+              : [...teclado, ...pad]),
+            { teclas: ["esc", SEL_BOTON_B], texto: "volver" },
+          ],
+          m.yAyuda,
+        );
       } else {
-        const alReves = controlesCambiados && !primerJoystick();
-        ayudaSel([
-          { teclas: ["W", "A", "S", "D"], texto: alReves ? "J2" : "J1" },
-          { teclas: ["▲", "◀", "▼", "▶"], texto: alReves ? "J1" : "J2" },
-          { teclas: ["E"], texto: alReves ? "J2 listo" : "J1 listo" },
-          { teclas: ["enter"], texto: alReves ? "J1 listo" : "J2 listo" },
-          { teclas: ["esc"], texto: "volver" },
-        ], m.yAyuda);
+        const alReves = controlesCambiados; // sin joystick: ver tecladoAlReves
+        ayudaSel(
+          [
+            { teclas: ["W", "A", "S", "D"], texto: alReves ? "J2" : "J1" },
+            { teclas: ["▲", "◀", "▼", "▶"], texto: alReves ? "J1" : "J2" },
+            { teclas: ["E"], texto: alReves ? "J2 listo" : "J1 listo" },
+            { teclas: ["enter"], texto: alReves ? "J1 listo" : "J2 listo" },
+            { teclas: ["esc"], texto: "volver" },
+          ],
+          m.yAyuda,
+        );
       }
       s.lados.forEach((l, i) => grandeSel(l, i, m.cx[i], m));
       for (const l of s.lados) dibujarVueloSel(l, m);
@@ -5446,6 +6047,7 @@
   // verse hasta que se elija un modo) y queda el menú.
   function terminarPresentacion() {
     presenta = null;
+    limpiarPasajes();
     window.shipLibre = false;
     window.shipZoom = 1;
     particulas = [];
@@ -5652,6 +6254,7 @@
     ganado = true;
     final = { t: 0, fase: 1 };
     cumulos = [];
+    limpiarPasajes();
     particulas = [];
     poligonos = [];
     poligonosRival = [];
@@ -6147,7 +6750,7 @@
     for (const p of puntos) {
       // Salen en todas direcciones, como las chispas, y un resorte las lleva a su lugar.
       const ang = Math.random() * Math.PI * 2;
-      const vel = 60 + Math.random() * 90;
+      const vel = 90 + Math.random() * 135;
       const inclx = p.dx - p.dy * cursiva; // tumbado hacia un costado
       const rx = inclx * cos - p.dy * sen;
       const ry = inclx * sen + p.dy * cos;
@@ -6163,7 +6766,7 @@
         ty: cy + desy + ry + Math.sin(ta) * td,
         r:
           NUMERO_RADIO[0] + Math.random() * (NUMERO_RADIO[1] - NUMERO_RADIO[0]),
-        t: -Math.random() * 0.08, // salen apenas escalonadas
+        t: -Math.random() * 0.05, // salen apenas escalonadas
         cae: false,
         color, // del jugador que hizo el gol (ver dibujarCumulos)
         // Para titilar como las de fondo (ver dibujarEstrellas): cada una a su
@@ -6182,7 +6785,7 @@
     e.t += dt;
     if (e.t < 0) return;
     if (e.t < NUMERO_CAE_A) {
-      const K = 130;
+      const K = 300; // firme: el número queda armado a los ~0,2 s
       const C = 2 * Math.sqrt(K) * 0.7;
       for (let resto = dt; resto > 0; resto -= 1 / 120) {
         const h = Math.min(resto, 1 / 120);
@@ -6320,6 +6923,7 @@
   function golPropio(entrado) {
     const salida = entrado.par || entrado;
     chispas(entrado.x, entrado.y);
+    pasarAgujero("jugador", entrado, salida);
     if (window.shipPlace) window.shipPlace(salida.x, salida.y, true);
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     if (esTutorial()) {
@@ -6472,7 +7076,10 @@
     presionJugador = Math.max(0, presionJugador - PRESION_BAJA * dt);
     presionRival = Math.max(0, presionRival - PRESION_BAJA * dt);
     const busqueda = fuerzaBusqueda(tQuieta, presionJugador);
-    const busquedaRival = fuerzaBusqueda(rival ? rival.quieta : 0, presionRival);
+    const busquedaRival = fuerzaBusqueda(
+      rival ? rival.quieta : 0,
+      presionRival,
+    );
     // Fuera de juego o parpadeando, la nave no es el foco de su lluvia: las
     // que ya venían dejan de corregir y siguen derecho.
     const focoJugador =
@@ -6837,9 +7444,7 @@
         x: W * (0.1 + Math.random() * 0.8),
         y: H * (0.3 + Math.random() * 0.55),
         hasta:
-          tiempo +
-          PASEO_SEG[0] +
-          Math.random() * (PASEO_SEG[1] - PASEO_SEG[0]),
+          tiempo + PASEO_SEG[0] + Math.random() * (PASEO_SEG[1] - PASEO_SEG[0]),
       };
     }
     const q = rival.paseo;
@@ -6880,7 +7485,13 @@
   const FUEGO_CX = 102;
   const FUEGO_FRANJA = 2;
   function actualizarFuegoRival(dt, velocidad) {
-    animarFuego(fuegoRival, lienzoFuegoRival, fuegoTenido(naveRival.fuego), dt, velocidad);
+    animarFuego(
+      fuegoRival,
+      lienzoFuegoRival,
+      fuegoTenido(naveRival.fuego),
+      dt,
+      velocidad,
+    );
   }
 
   // Un fuego (f: { nivel, fase }) dibujado en lienzo (203x300) desde fuente
@@ -6891,7 +7502,10 @@
     f.nivel += (meta - f.nivel) * (1 - Math.exp(-dt / tau));
     if (f.nivel < 0.004 && meta === 0) f.nivel = 0;
     f.fase += dt * (0.35 + 0.65 * f.nivel);
-    if (!fuente || (fuente === imgFuego && (!imgFuego.complete || !imgFuego.naturalWidth)))
+    if (
+      !fuente ||
+      (fuente === imgFuego && (!imgFuego.complete || !imgFuego.naturalWidth))
+    )
       return;
     const s = f.fase;
     const amp = 0.15 + 0.85 * f.nivel;
@@ -7026,8 +7640,7 @@
     // Quieta, con la misma vara que la del jugador (QUIETA_MOV px/s; durante la
     // gracia no cuenta): sus piedras la buscan con más fuerza (fuerzaBusqueda).
     const vel = Math.hypot(rival.vx, rival.vy) * 60; // px por cuadro -> px/s
-    rival.quieta =
-      tiempo >= gracia && vel < QUIETA_MOV ? rival.quieta + dt : 0;
+    rival.quieta = tiempo >= gracia && vel < QUIETA_MOV ? rival.quieta + dt : 0;
     const margen = 40;
     if (modo === "dos" || modo === "pc") {
       // Los costados no frenan, dan la vuelta (igual que la nave del
@@ -7116,6 +7729,7 @@
     const salida = entrado.par || entrado;
     chispas(entrado.x, entrado.y);
     chispas(salida.x, salida.y);
+    pasarAgujero("rival", entrado, salida);
     rival.x = salida.x; // sale por el otro, con el rumbo que traía
     rival.y = salida.y;
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
@@ -7128,7 +7742,11 @@
     if (callado) {
       // (habla la del jugador)
     } else if (modo === "dos") {
-      decirGol(golesRival, vozDeHito(false), ganaria(golesRival, cumulosTomados));
+      decirGol(
+        golesRival,
+        vozDeHito(false),
+        ganaria(golesRival, cumulosTomados),
+      );
     } else {
       decirHitoRival();
     }
@@ -7170,6 +7788,7 @@
     }
     cumulos = [];
     mostrarTiempo();
+    subirMarcador();
   }
 
   // Vuelve todo a como estaba antes del final de la partida.
@@ -7178,6 +7797,28 @@
     window.shipLento = 1;
     scene.classList.remove("fin-perdiste");
     ship.classList.remove("fin-perdiste");
+    bajarMarcador();
+  }
+
+  // Con el cartel del final, el marcador se muda a la capa de arriba (ver
+  // .game-capa en styles.css): así queda por encima de la nave, que va por
+  // encima de toda la escena. Va primero en la capa, así el menú de la pausa
+  // y el cartel de salir, si se abren, quedan encima de él. Jugando vuelve a
+  // su lugar, por debajo de la nave.
+  let marcadorCasa = null; // { padre, siguiente }: dónde estaba el marcador
+  function subirMarcador() {
+    const cuadrado = timerEl.parentNode;
+    if (!capaEl || marcadorCasa) return;
+    marcadorCasa = {
+      padre: cuadrado.parentNode,
+      siguiente: cuadrado.nextSibling,
+    };
+    capaEl.insertBefore(cuadrado, capaEl.firstChild);
+  }
+  function bajarMarcador() {
+    if (!marcadorCasa) return;
+    marcadorCasa.padre.insertBefore(timerEl.parentNode, marcadorCasa.siguiente);
+    marcadorCasa = null;
   }
 
   // El segundo en cámara lenta del final: las piedras que venían siguen su
@@ -7253,6 +7894,7 @@
     });
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     chispas(entrado.x, entrado.y);
+    pasarAgujero("jugador", entrado, salida);
     if (window.shipPlace) window.shipPlace(salida.x, salida.y, true);
     cumulosTomados++;
     crearNumeroEstrellas(salida.x, salida.y, cumulosTomados, colorPropio());
@@ -7354,8 +7996,7 @@
     const ahora = performance.now();
     const m = red.mapa;
     if (m) {
-      const listo =
-        window.innerWidth === m.w && window.innerHeight === m.h;
+      const listo = window.innerWidth === m.w && window.innerHeight === m.h;
       if (listo || ahora > m.hasta) empezarOnline();
     } else if (ahora > red.midiendoHasta) {
       empezarOnline();
@@ -7540,7 +8181,8 @@
       conectando: "conectando",
       midiendo: "rival encontrado",
       esperando: clave
-        ? BUSCANDO_HTML + "<br /><small>con la clave " +
+        ? BUSCANDO_HTML +
+          "<br /><small>con la clave " +
           clave +
           "<br />esc para cancelar</small>"
         : BUSCANDO_HTML + "<br /><small>esc para cancelar</small>",
@@ -7558,7 +8200,8 @@
   function animarPuntosOnline() {
     const el = modoEl && modoEl.querySelector(".game-puntos");
     if (!el) return;
-    const paso = Math.floor(reloj / BUSCANDO_PUNTO_DURA) % BUSCANDO_PUNTOS.length;
+    const paso =
+      Math.floor(reloj / BUSCANDO_PUNTO_DURA) % BUSCANDO_PUNTOS.length;
     if (el.textContent !== BUSCANDO_PUNTOS[paso])
       el.textContent = BUSCANDO_PUNTOS[paso];
   }
@@ -7575,9 +8218,14 @@
       ship.classList.toggle("color-rival", !soyAnfitrion());
       conectarDirecto();
       // La nave y el fuego que eligió cada uno (ver "El selector de naves").
-      enviarOnline({ tipo: "nave", nave: eleccionJ1.nave, fuego: eleccionJ1.fuego });
+      enviarOnline({
+        tipo: "nave",
+        nave: eleccionJ1.nave,
+        fuego: eleccionJ1.fuego,
+      });
       // El mismo cielo en las dos pantallas: la semilla del anfitrión.
-      if (soyAnfitrion()) enviarOnline({ tipo: "cielo", semilla: semillaCielo });
+      if (soyAnfitrion())
+        enviarOnline({ tipo: "cielo", semilla: semillaCielo });
       // Antes de jugar, el mapa (ver "El mapa del online").
       red.estado = "midiendo";
       red.midiendoHasta = performance.now() + MAPA_ESPERA_OTRO;
@@ -7643,6 +8291,7 @@
     frenarMusica();
     cumulos = [];
     mostrarTiempo();
+    subirMarcador();
   }
 
   // Lo que se le manda al rival cada ENVIO_CADA: la nave (centro de su caja en
@@ -8042,6 +8691,7 @@
   function mostrarGolInvitado(entrado, salida) {
     chispas(entrado.x, entrado.y);
     chispas(salida.x, salida.y);
+    pasarAgujero("rival", entrado, salida);
     crearNumeroEstrellas(salida.x, salida.y, golesRival, colorRival());
     actualizarColor();
     sonarCruce();
@@ -8119,6 +8769,7 @@
         const e = aPx(m.e);
         const s = aPx(m.s);
         chispas(e.x, e.y);
+        pasarAgujero("jugador", e, s);
         if (window.shipPlace) window.shipPlace(s.x, s.y, true);
         crearNumeroEstrellas(s.x, s.y, cumulosTomados, colorPropio());
         decirGol(cumulosTomados, vozDeHito(true), false); // el final, en revisarFin
@@ -8130,6 +8781,7 @@
       const [e, s] = (m.a || [m.e, m.s]).map(aPx);
       chispas(e.x, e.y);
       chispas(s.x, s.y);
+      pasarAgujero("rival", e, s);
       crearNumeroEstrellas(s.x, s.y, golesRival, colorRival());
       sonarCruce();
       if (m.quien === "anfitrion") decirHitoRival();
@@ -8159,6 +8811,16 @@
     const k = escalaNaveMundo();
     const lado = cajaNave;
     const ancho = (lado * lienzoRival.width) / lienzoRival.height;
+    const sale = rival.sale;
+    // Online la nave del rival puede llegar al agujero de salida un poco
+    // después del gol: mientras siga lejos, no se ve (ya se metió su copia).
+    if (
+      sale &&
+      enLinea() &&
+      Math.hypot(rival.x - sale.hueco.x, rival.y - sale.hueco.y) >
+        sale.hueco.radio() * 4
+    )
+      return;
     ctx.save();
     ctx.translate(rival.x, rival.y);
     ctx.rotate((rival.rot * Math.PI) / 180);
@@ -8176,9 +8838,17 @@
     // IA (luzRival, ver actualizarRival); online la nave del rival queda
     // siempre "iluminada". Se va tiñendo con sus goles y, encima, su halo: rojo o
     // azul según le haya tocado (ver esAzul).
+    ctx.filter = filtroRival();
+    // El sprite va pegado a la izquierda de su caja.
+    ctx.drawImage(lienzoRival, -lado / 2, -lado / 2, ancho, lado);
+    ctx.restore();
+  }
+
+  // El filtro de la nave del rival (ver dibujarRival).
+  function filtroRival() {
     const gris = 1 - Math.min(1, tinteNaves);
     const iluminada = modo === "dos" || modo === "pc" ? luzRival : true;
-    ctx.filter =
+    return (
       "grayscale(" +
       gris.toFixed(3) +
       ") brightness(" +
@@ -8190,10 +8860,8 @@
           : HALO_AZUL_BAJA
         : esAzul()
           ? HALO_ROJO
-          : HALO_AZUL);
-    // El sprite va pegado a la izquierda de su caja.
-    ctx.drawImage(lienzoRival, -lado / 2, -lado / 2, ancho, lado);
-    ctx.restore();
+          : HALO_AZUL)
+    );
   }
 
   // Opacidad del parpadeo: baja a 0.35 y vuelve, 0.3 s por vuelta (mismo ritmo
@@ -8312,53 +8980,201 @@
     ctx.globalAlpha = 1;
   }
 
-  // Un anillo de estrellas con brillo, dibujado en un canvas aparte (una sola
-  // vez): el resplandor (shadowBlur) es lo caro, así no se recalcula por cuadro.
-  function armarAnillo(radio, cantidad, r, color) {
-    const K = SPRITE_ESCALA;
-    const lado = Math.ceil((radio + r + CUMULO_BRILLO * 2) * 2 * K);
-    const lienzo = document.createElement("canvas");
-    lienzo.width = lienzo.height = lado;
-    const c = lienzo.getContext("2d");
-    c.translate(lado / 2, lado / 2);
-    c.fillStyle = color;
-    c.shadowColor = color;
-    c.shadowBlur = CUMULO_BRILLO * K;
-    for (let i = 0; i < cantidad; i++) {
-      const a = (i / cantidad) * Math.PI * 2;
-      // Varias pasadas: el resplandor se refuerza y se nota más, sin correrse
-      // ni un píxel (el sprite mide lo mismo, ver CUMULO_BRILLO_PASADAS).
-      for (let k = 0; k < CUMULO_BRILLO_PASADAS; k++) {
-        c.beginPath();
-        c.arc(
-          Math.cos(a) * radio * K,
-          Math.sin(a) * radio * K,
-          r * K,
-          0,
-          Math.PI * 2,
-        );
-        c.fill();
+  // Las estrellas de la esfera (ver ESFERA_...), siempre las mismas: hacia
+  // dónde está cada una (en la superficie del globo), qué tan adentro queda en
+  // el cúmulo (fracción del radio), qué tan prendida, de qué tamaño (px del
+  // mundo, a escala del juego) y su lugar en la fila de los colores (ver
+  // tintarEsfera). En el celular y en calidad baja, menos.
+  function armarEsfera() {
+    const cant =
+      calidadBaja() || tactil
+        ? Math.round(ESFERA_ESTRELLAS * 0.65)
+        : ESFERA_ESTRELLAS;
+    const azar = dados(4211);
+    const normal = () =>
+      Math.sqrt(-2 * Math.log(1 - azar())) * Math.cos(2 * Math.PI * azar());
+    const dir = new Float32Array(cant * 3);
+    const cumulo = new Float32Array(cant);
+    const brillo = new Float32Array(cant);
+    const tam = new Float32Array(cant);
+    const orden = new Float32Array(cant);
+    for (let i = 0; i < cant; i++) {
+      const x = normal();
+      const y = normal();
+      const z = normal();
+      const n = Math.hypot(x, y, z) || 1;
+      dir[i * 3] = x / n;
+      dir[i * 3 + 1] = y / n;
+      dir[i * 3 + 2] = z / n;
+      cumulo[i] = Math.pow(azar(), ESFERA_CUMULO);
+      brillo[i] = 0.35 + 0.65 * azar();
+      tam[i] = 0.8 + 0.5 * azar();
+      orden[i] = azar();
+    }
+    return {
+      cant,
+      dir,
+      cumulo,
+      brillo,
+      tam,
+      orden,
+      tinte: new Uint8Array(cant), // 0 blanca, 1 azul, 2 roja (ver tintarEsfera)
+      cambio: new Float32Array(cant).fill(-10), // s (performance.now) en que cambió de color
+      azul: 0, // la parte azul y la roja que se ven ahora (van hacia las de repartoEquipos)
+      rojo: 0,
+      tintadoEn: 0,
+      atlas: null,
+    };
+  }
+
+  // Qué parte de las estrellas de los agujeros es de cada equipo (azul y
+  // rojo, de 0 a 1): cada gol pinta 1/CUMULOS_PARA_COLOR del color de quien
+  // lo hizo, y el resto queda blanco; si entre los dos pasan del total, se
+  // reparten según el resultado (9 a 9 o 10 a 10: mitad y mitad).
+  function repartoEquipos() {
+    const [azules, rojos] = esAzul()
+      ? [cumulosTomados, golesRival]
+      : [golesRival, cumulosTomados];
+    let azul = azules / CUMULOS_PARA_COLOR;
+    let rojo = rojos / CUMULOS_PARA_COLOR;
+    if (azul + rojo > 1) {
+      const total = azul + rojo;
+      azul /= total;
+      rojo /= total;
+    }
+    return { azul, rojo };
+  }
+
+  // Los colores de las estrellas de los agujeros (todas las esferas iguales),
+  // una vez por cuadro. Cada estrella tiene su lugar en una fila (orden): las
+  // primeras son azules y las últimas rojas, tantas como diga el reparto (que
+  // se acerca de a poco al del resultado), y las del medio blancas. Así, con
+  // un gol solo cambian las blancas que pasan a ser de quien lo hizo (y al
+  // repartir, las del límite), y cada una que cambia brilla un momento (ver
+  // dibujarAgujero). En el tutorial, que no tiene rival, quedan blancas.
+  function tintarEsfera(ahora) {
+    const e = gusanoSprites;
+    const meta = esTutorial() ? { azul: 0, rojo: 0 } : repartoEquipos();
+    const dt = Math.min(0.1, Math.max(0, ahora - e.tintadoEn));
+    e.tintadoEn = ahora;
+    if (!meta.azul && !meta.rojo) {
+      // Partida nueva (o tutorial): todas blancas, de una.
+      if (e.azul || e.rojo) {
+        e.azul = e.rojo = 0;
+        e.tinte.fill(0);
+      }
+      return;
+    }
+    const acerca = Math.min(1, dt * ESFERA_PINTA);
+    e.azul += (meta.azul - e.azul) * acerca;
+    e.rojo += (meta.rojo - e.rojo) * acerca;
+    for (let i = 0; i < e.cant; i++) {
+      const o = e.orden[i];
+      const t = o < e.azul ? 1 : o >= 1 - e.rojo ? 2 : 0;
+      if (t !== e.tinte[i]) {
+        e.tinte[i] = t;
+        e.cambio[i] = ahora;
       }
     }
-    return lienzo;
+  }
+
+  // Las estrellitas ya dibujadas: un punto con un halo suave, en ESFERA_NIVELES
+  // brillos (del apagado al más prendido) y en varios tamaños (así ninguna se
+  // achica mucho al dibujarla: titilaría), para cada color: blanco (en el
+  // tutorial, del blanco al salmón con el color de la partida k), azul y rojo.
+  // Se rehacen solo cuando cambia k (de a 1/32).
+  const ESFERA_NIVELES = 8;
+  const ESFERA_SPRITES = [10, 20, 40, 80]; // px de lado; el punto mide lado / 10 de radio
+  function atlasEstrellas(k) {
+    const e = gusanoSprites;
+    const kq = Math.round(Math.max(0, Math.min(1, k)) * 32) / 32;
+    if (e.atlas && e.atlas.k === kq) return e.atlas;
+    const [a, b] = GUSANO_COLORES;
+    const mezcla = (c) =>
+      [0, 1, 2].map((q) => a[c][q] + (b[c][q] - a[c][q]) * kq);
+    // Los de cada equipo: apagado, prendido y lo más prendido.
+    const equipo = (hex) => {
+      const base = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      return {
+        tenue: base.map((v) => v * 0.42),
+        luz: base,
+        pico: base.map((v) => v + (255 - v) * 0.55),
+      };
+    };
+    const paletas = [
+      { tenue: mezcla("tenue"), luz: mezcla("luz"), pico: mezcla("pico") },
+      equipo(BORDE_JUGADOR), // el azul
+      equipo(BORDE_RIVAL), // el rojo
+    ];
+    // El color de cada brillo, como en la maqueta: del apagado a la luz y lo
+    // más prendido yendo al pico; y lo prendido (alfa).
+    const colorDe = (p, nv) => {
+      const u = (nv / (ESFERA_NIVELES - 1)) * 1.3;
+      return [0, 1, 2].map((q) =>
+        Math.round(
+          Math.min(
+            255,
+            p.tenue[q] * (1 - Math.min(1, u)) +
+              p.luz[q] * Math.min(1, u) +
+              p.pico[q] * Math.max(0, u - 0.85) * 1.5,
+          ),
+        ),
+      );
+    };
+    const alfas = [];
+    for (let nv = 0; nv < ESFERA_NIVELES; nv++)
+      alfas.push(Math.min(1, 0.4 + 0.8 * (nv / (ESFERA_NIVELES - 1)) * 1.3));
+    const tintes = paletas.map((p) => {
+      const tamanos = ESFERA_SPRITES.map((lado) => {
+        const R = lado / 10;
+        const sigma = 2.4 * R;
+        const niveles = [];
+        for (let nv = 0; nv < ESFERA_NIVELES; nv++) {
+          const col = colorDe(p, nv);
+          const c = document.createElement("canvas");
+          c.width = c.height = lado;
+          const lc = c.getContext("2d");
+          const img = lc.createImageData(lado, lado);
+          for (let j = 0; j < lado; j++) {
+            for (let i = 0; i < lado; i++) {
+              const d = Math.hypot(i + 0.5 - lado / 2, j + 0.5 - lado / 2);
+              const borde = Math.max(0, 1 - (d / (lado / 2)) ** 2); // el halo se apaga antes del borde
+              const v = Math.min(
+                1,
+                Math.max(0, R - d + 0.5) +
+                  0.24 * Math.exp(-(d * d) / (2 * sigma * sigma)) * borde,
+              );
+              const o = (j * lado + i) * 4;
+              img.data[o] = col[0];
+              img.data[o + 1] = col[1];
+              img.data[o + 2] = col[2];
+              img.data[o + 3] = 255 * v;
+            }
+          }
+          lc.putImageData(img, 0, 0);
+          niveles.push(c);
+        }
+        return { lado, R, niveles };
+      });
+      // Para las chicas, que van sin dibujo (ver dibujarAgujero): el color.
+      const colores = [];
+      for (let nv = 0; nv < ESFERA_NIVELES; nv++)
+        colores.push(`rgb(${colorDe(p, nv).join(", ")})`);
+      return { tamanos, colores };
+    });
+    e.atlas = {
+      k: kq,
+      tintes,
+      alfas,
+      luz: paletas[0].luz.map(Math.round).join(", "),
+    };
+    return e.atlas;
   }
 
   // Todo lo caro de dibujar se arma acá, una sola vez (al entrar al escenario).
   function armarSprites() {
-    // Los dos anillos de los agujeros, cada uno en blanco y en naranja.
-    gusanoSprites = {
-      afuera: [CUMULO_COLOR_INICIO, CUMULO_COLOR_FIN].map((color) =>
-        armarAnillo(CUMULO_ANILLO, CUMULO_ESTRELLAS, CUMULO_ESTRELLA_R, color),
-      ),
-      adentro: [CUMULO_COLOR_INICIO, CUMULO_COLOR_FIN].map((color) =>
-        armarAnillo(
-          CUMULO_ANILLO * CUMULO_INTERIOR_RADIO,
-          CUMULO_INTERIOR,
-          CUMULO_ESTRELLA_R * 0.75,
-          color,
-        ),
-      ),
-    };
+    // Las estrellas de los agujeros (ver dibujarAgujero).
+    gusanoSprites = armarEsfera();
     // La luz de la nave: el mismo degradado que el resto de la página (el
     // ::before de .starry-cohete-pair en styles.css). Se arranca en un color
     // según de quién es (blanco en el tutorial, que no tiene equipo; azul o
@@ -8386,23 +9202,6 @@
       rojo: armarLuzSprite(LUZ_RGB_INICIO_RIVAL),
       fin: armarLuzSprite(LUZ_RGB_FIN),
     };
-  }
-
-  // Dibuja un sprite de anillo rotado. Como los anillos de estrellas son
-  // parejos, rotar el sprite se ve igual que mover cada estrella.
-  function dibujarAnilloSprite(sprite, x, y, giro, esc, alfa) {
-    if (alfa <= 0.01) return;
-    const lado = (sprite.width / SPRITE_ESCALA) * esc;
-    ctx.save();
-    // Los anillos son luz: se suman a lo que hay detrás en vez de taparlo
-    // ("lighter"). El agujero se ve bastante más luminoso sin ocupar ni un
-    // píxel más -lo que crece es el brillo, no el tamaño-.
-    ctx.globalCompositeOperation = "lighter";
-    ctx.translate(x, y);
-    ctx.rotate(giro);
-    ctx.globalAlpha = alfa;
-    ctx.drawImage(sprite, -lado / 2, -lado / 2, lado, lado);
-    ctx.restore();
   }
 
   // Color intermedio entre el de inicio y el de fin de los agujeros (para las
@@ -8460,12 +9259,9 @@
     return mezclarColores(CUMULO_COLOR_INICIO, CUMULO_COLOR_FIN, k);
   }
 
-  // Agujeros de gusano: un circulito de estrellas con brillo girando muy rápido,
-  // con otro anillo más chico girando para el otro lado y el centro negro (el
-  // "agujero"). Empiezan blancos y, a medida que se colorea la nave, pasan a
-  // naranja: son dos sprites (blanco y naranja) que se funden con colorNave.
-  // Y las chispas de cuando se entra o se sale.
-  // 0..1: qué tanto se está estirando el agujero. pos = segundos desde el pulso
+  // Agujeros de gusano: la esfera de estrellas (ver ESFERA_...) y las chispas
+  // de cuando se entra o se sale.
+  // 0..1: qué tanto se está juntando el agujero con la música. pos = segundos desde el pulso
   // del compás y tiempo = lo que dura un tiempo de la música (los dos en segundos
   // del audio original). Sube rápido (el "estirón", que arranca justo con el
   // bombo) y baja más despacio, los dos con suavizado.
@@ -8479,35 +9275,201 @@
     return s * s * (3 - 2 * s);
   }
 
-  // Un agujero en (x, y), girado ang, de tamaño esc (1 = el del juego) y con
-  // el color k (0 = blanco, 1 = naranja).
-  function dibujarAgujero(x, y, ang, esc, k) {
-    // El agujero: un disco negro que tapa lo que hay detrás (la luz, las
-    // estrellas del fondo) y deja bien visible el "pozo" del medio.
-    ctx.fillStyle = "#000";
-    ctx.beginPath();
-    ctx.arc(x, y, CUMULO_ANILLO * CUMULO_DISCO_RADIO * esc, 0, Math.PI * 2);
-    ctx.fill();
-    for (let v = 0; v < 2; v++) {
-      // v = 0: blanco (se apaga con k); v = 1: naranja (aparece con k).
-      const alfa = v === 0 ? 1 - k : k;
-      dibujarAnilloSprite(gusanoSprites.afuera[v], x, y, ang, esc, alfa);
-      dibujarAnilloSprite(
-        gusanoSprites.adentro[v],
-        x,
-        y,
-        -ang * 1.7,
-        esc,
-        alfa,
+  // Para dónde está torcido el eje de giro del agujero en (x, y): cada uno
+  // para otro lado (sale de dónde está, que no cambia).
+  function tuerceAgujero(x, y) {
+    return (
+      ((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1) * Math.PI * 2
+    );
+  }
+
+  // El tamaño (esc, 0 a 1) y lo juntas que están las estrellas (junta: 0
+  // globo, 1 cúmulo) de un agujero según lo abierto que esté (0 a 1): se
+  // agranda enseguida y se abre en globo a lo largo de toda la apertura; al
+  // cerrarse, al revés (se junta en cúmulo y se achica al final).
+  function formaAgujero(abierto) {
+    const a = Math.max(0, Math.min(1, abierto));
+    const u = Math.min(1, a / 0.45);
+    return { esc: u * u * (3 - 2 * u), junta: 1 - a * a * (3 - 2 * a) };
+  }
+
+  // Un agujero en (x, y): la esfera de estrellas (ver ESFERA_...). ang avanza
+  // con el tiempo (la hace girar), esc es su tamaño (1 = el del juego), junta
+  // cuánto se juntaron las estrellas (0 globo, 1 cúmulo), k el color de las
+  // blancas (0 blanco, 1 salmón: ver GUSANO_COLORES) y equipos, si van con los
+  // colores del resultado (ver tintarEsfera).
+  function dibujarAgujero(x, y, ang, esc, junta = 0, k = 0, equipos = false) {
+    const e = gusanoSprites;
+    if (esc <= 0.001) return;
+    junta = Math.max(0, Math.min(1, junta));
+    const R = ESFERA_RADIO * esc; // px del mundo
+    const atlas = atlasEstrellas(k);
+    const m = ctx.getTransform();
+    const pantalla = Math.sqrt(m.a * m.a + m.b * m.b); // px de pantalla por px del mundo
+    const ahora = performance.now() / 1000;
+    // El vidrio, que se ve cuando es globo: el cielo apenas más oscuro adentro
+    // y un borde de luz muy suave.
+    const globo = 1 - junta;
+    if (globo > 0.01) {
+      const luz = atlas.luz;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, R * 1.1);
+      g.addColorStop(0, `rgba(0, 0, 0, ${0.1 * globo})`);
+      g.addColorStop(0.72, `rgba(0, 0, 0, ${0.1 * globo})`);
+      g.addColorStop(0.86, `rgba(${luz}, ${0.03 * globo})`);
+      g.addColorStop(0.91, `rgba(${luz}, ${0.12 * globo})`);
+      g.addColorStop(1, `rgba(${luz}, 0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, R * 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Primero, dónde va cada estrella, de qué tamaño, con qué brillo (nivel
+    // del atlas) y de qué color: entre su lugar en el globo y el suyo en el
+    // cúmulo, girada (alrededor del eje, que está inclinado hacia quien mira y
+    // torcido). La que recién cambió de color brilla un momento.
+    const phi = ang * ESFERA_GIRO;
+    const cf = Math.cos(phi);
+    const sf = Math.sin(phi);
+    const ci = Math.cos(ESFERA_INCLINA);
+    const si = Math.sin(ESFERA_INCLINA);
+    const t = tuerceAgujero(x, y);
+    const ct = Math.cos(t);
+    const st = Math.sin(t);
+    const achica = Math.max(0.35, esc); // las estrellas no se achican tanto como la esfera
+    const n = e.cant;
+    const GRUPOS = 2 * 3 * ESFERA_NIVELES; // atrás o adelante, color y brillo
+    const b =
+      e.cuadro ||
+      (e.cuadro = {
+        x: new Float32Array(n),
+        y: new Float32Array(n),
+        r: new Float32Array(n),
+        grupo: new Uint8Array(n),
+        orden: new Uint16Array(n),
+        desde: new Uint16Array(GRUPOS + 1),
+      });
+    b.desde.fill(0);
+    for (let i = 0; i < n; i++) {
+      const rr = 1 - junta + junta * e.cumulo[i];
+      const dx = e.dir[i * 3] * rr;
+      const dy = e.dir[i * 3 + 1] * rr;
+      const dz = e.dir[i * 3 + 2] * rr;
+      const x1 = dx * cf + dz * sf;
+      const z1 = -dx * sf + dz * cf;
+      const y2 = dy * ci - z1 * si;
+      const z2 = dy * si + z1 * ci;
+      const sx = x1 * ct - y2 * st;
+      const sy = x1 * st + y2 * ct;
+      const frente = (z2 + 1) / 2; // 1 la de más adelante
+      const luz =
+        0.75 +
+        0.5 *
+          Math.max(
+            0,
+            (sx * ESFERA_LUZ[0] + sy * ESFERA_LUZ[1] + z2 * ESFERA_LUZ[2]) /
+              Math.max(rr, 1e-3),
+          );
+      const tinte = equipos ? e.tinte[i] : 0;
+      const destello = equipos
+        ? Math.max(0, 1 - (ahora - e.cambio[i]) / ESFERA_DESTELLO)
+        : 0;
+      const B =
+        ESFERA_BRILLO *
+        e.brillo[i] *
+        (0.3 + 0.7 * Math.pow(frente, 1.3)) *
+        luz *
+        (1 + 0.25 * junta) *
+        (1 + 1.3 * destello);
+      const nivel = Math.min(
+        ESFERA_NIVELES - 1,
+        Math.round((Math.min(1.3, B) / 1.3) * (ESFERA_NIVELES - 1)),
       );
+      b.x[i] = x + sx * R;
+      b.y[i] = y + sy * R;
+      b.r[i] = e.tam[i] * (0.4 + 0.55 * frente) * achica * (1 + 0.5 * destello); // px del mundo: el radio del punto
+      // Los grupos: primero todos los de atrás (se dibujan antes).
+      b.grupo[i] =
+        (z2 < 0 ? 0 : 3 * ESFERA_NIVELES) + tinte * ESFERA_NIVELES + nivel;
+      b.desde[b.grupo[i] + 1]++;
+    }
+    // Ordenadas por grupo, en una pasada (cuántas hay de cada uno y dónde empieza).
+    for (let g = 0; g < GRUPOS; g++) b.desde[g + 1] += b.desde[g];
+    const lugar = b.desde.slice(0, GRUPOS);
+    for (let i = 0; i < n; i++) b.orden[lugar[b.grupo[i]]++] = i;
+    // Las chicas en pantalla (casi todas, en el juego) van sin dibujo: un
+    // punto, todas las del mismo grupo en un solo trazo (cientos de dibujos
+    // sueltos tardan). Las más prendidas, con un halo apenas. Las grandes (en
+    // la carátula, o de cerca), con su dibujo con halo.
+    const GRANDE = 1.6; // px de pantalla de radio desde el que van con dibujo
+    for (let g = 0; g < GRUPOS; g++) {
+      const i0 = b.desde[g];
+      const i1 = b.desde[g + 1];
+      if (i0 === i1) continue;
+      const nivel = g % ESFERA_NIVELES;
+      const tinte = atlas.tintes[Math.floor(g / ESFERA_NIVELES) % 3];
+      for (let capa = nivel >= 3 ? 0 : 1; capa < 2; capa++) {
+        const halo = capa === 0;
+        const k2 = halo ? 2.2 : 1;
+        ctx.beginPath();
+        let hay = false;
+        for (let j = i0; j < i1; j++) {
+          const i = b.orden[j];
+          if (b.r[i] * pantalla >= GRANDE) continue;
+          const r = b.r[i] * k2;
+          ctx.moveTo(b.x[i] + r, b.y[i]);
+          ctx.arc(b.x[i], b.y[i], r, 0, Math.PI * 2);
+          hay = true;
+        }
+        if (!hay) continue;
+        ctx.globalAlpha = atlas.alfas[nivel] * (halo ? 0.2 : 1);
+        ctx.fillStyle = tinte.colores[nivel];
+        ctx.fill();
+      }
+      ctx.globalAlpha = atlas.alfas[nivel];
+      for (let j = i0; j < i1; j++) {
+        const i = b.orden[j];
+        const rp = b.r[i] * pantalla;
+        if (rp < GRANDE) continue;
+        // El dibujo más chico que no haya que agrandar (o el más grande).
+        let d = tinte.tamanos[tinte.tamanos.length - 1];
+        for (const c of tinte.tamanos)
+          if (c.R >= rp) {
+            d = c;
+            break;
+          }
+        const lado = (b.r[i] * d.lado) / d.R;
+        ctx.drawImage(
+          d.niveles[nivel],
+          b.x[i] - lado / 2,
+          b.y[i] - lado / 2,
+          lado,
+          lado,
+        );
+      }
     }
     ctx.globalAlpha = 1;
   }
 
-  // Las chispas de entrar y salir de los agujeros, del color k de los agujeros.
-  function dibujarChispas(k) {
+  // El color de las chispas y de las flechitas que señalan los agujeros: en
+  // el tutorial, del blanco al naranja con el color de la nave; con rival,
+  // del blanco al color de quien va ganando, más cuanto más gana (ver
+  // repartoEquipos).
+  function colorAgujeros() {
+    if (esTutorial())
+      return mezclaAgujeros(Math.max(0, Math.min(1, colorNave)));
+    const { azul, rojo } = repartoEquipos();
+    const d = azul - rojo;
+    return mezclarColores(
+      "#ffffff",
+      d >= 0 ? BORDE_JUGADOR : BORDE_RIVAL,
+      Math.min(1, Math.abs(d) * 2),
+    );
+  }
+
+  // Las chispas de entrar y salir de los agujeros, de ese color (ver colorAgujeros).
+  function dibujarChispas(color) {
     if (!particulas.length) return;
-    ctx.fillStyle = mezclaAgujeros(k);
+    ctx.fillStyle = color;
     ctx.beginPath();
     for (const p of particulas) {
       const r = 2 * (1 - p.t / 0.7);
@@ -8517,26 +9479,315 @@
     ctx.fill();
   }
 
+  // Cómo está ahora un agujero del juego: abierto (0 a 1), su tamaño (esc) y
+  // qué tan juntas están sus estrellas (junta: 0 globo, 1 cúmulo). Nace como
+  // cúmulo y se abre en globo, y al irse se vuelve a juntar y se achica (ver
+  // formaAgujero). ritmo: dónde va la música en su compás: con cada pulso se
+  // junta un poco (ESFERA_MUSICA), todos a la vez. Laten solo con la música:
+  // si no suena (audio bloqueado o sin cargar), no.
+  function medidaCumulo(c, ritmo) {
+    const abierto = Math.min(
+      1,
+      (c.t - (c.prendeT || 0)) / ESFERA_ABRE,
+      (CUMULO_VIDA - c.t) / 1.5,
+    );
+    const pulso = ritmo
+      ? pulsoCumulo(ritmo.pos, ritmo.compas / MUSICA_TIEMPOS_COMPAS)
+      : 0;
+    const f = formaAgujero(abierto);
+    return {
+      abierto,
+      esc: f.esc,
+      junta: Math.max(f.junta, ESFERA_MUSICA * pulso),
+    };
+  }
+
+  // --- La nave entra al agujero y sale del otro -------------------------------
+  // Al entrar, sigue de largo una copia de la nave (un pasaje, dibujada en el
+  // lienzo) derecho al centro de la esfera, achicándose y apagándose, y la
+  // esfera se junta en cúmulo: se la traga. Al salir, la nave aparece entera,
+  // siempre encima del agujero. Es solo lo que se ve: el gol cuenta al tocar
+  // el agujero, como siempre, y la nave de verdad ya sale por el otro. Los dos
+  // agujeros quedan abiertos mientras tanto y después se cierran
+  // (huecosCerrando).
+  const PASAJE_VEL_MIN = 320; // px del mundo por segundo: la copia entra por lo menos así de rápido
+  const PASAJE_MAX = 0.6; // s que tarda como mucho la copia en meterse
+  const PASAJE_SALE = 0.6; // s que se espera a que el rival online llegue al agujero de salida (ver dibujarRival)
+  const PASAJE_CIERRA = 0.5; // s que tarda en cerrarse un agujero después (se junta y se achica)
+  // El de salida se cierra enseguida: ahí se arma el número del gol (ver
+  // crearNumeroEstrellas) y tiene que leerse cuando lo dice la voz (arranca a
+  // hablar apenas se cruza y dice el número entre los 0,2 y los 0,6 s).
+  // Abierto, sus estrellas tapan las del número.
+  const SALIDA_ABIERTA = 0.08; // s que queda abierto (lo justo para ver salir la nave)
+  const SALIDA_CIERRA = 0.25; // s que tarda en cerrarse
+  // El temblor del joystick al hacer un gol: cortito y muy suave (ms y fuerza
+  // de 0 a 1 de cada motor: el débil es el que se siente más fino).
+  const VIBRA_GOL = { duracion: 80, fuerte: 0.4, debil: 0.25 };
+  let pasajes = []; // las copias que entran (ver copiarNave)
+  let huecosCerrando = []; // los agujeros por los que se pasó: { x, y, ang, esc, t, espera, cierra, traga, radio() }
+  const velNave = { x: 0, y: 0 }; // la del jugador, px del mundo por segundo (ver cuadro)
+
+  // Qué tan abierto sigue un agujero por el que se pasó (1 a 0).
+  const aperturaCerrando = (h) =>
+    h.t < h.espera ? 1 : Math.max(0, 1 - (h.t - h.espera) / h.cierra);
+
+  // Pasó una nave, quien ("jugador" o "rival"): entró por entrado y sale por
+  // salida (agujeros del juego, o solo dónde estaban si vienen del online).
+  // Se llama antes de moverla al de salida.
+  function pasarAgujero(quien, entrado, salida) {
+    vibrarGol(quien);
+    const ritmo = compasMusica();
+    const cerrando = (c) => {
+      const h = {
+        x: c.x,
+        y: c.y,
+        ang: c.ang || 0,
+        esc: c.t !== undefined ? medidaCumulo(c, ritmo).esc || 1 : 1,
+        t: 0,
+        espera: SALIDA_ABIERTA,
+        cierra: SALIDA_CIERRA,
+      };
+      h.radio = () => GUSANO_RADIO * h.esc * aperturaCerrando(h);
+      huecosCerrando.push(h);
+      return h;
+    };
+    const entra = cerrando(entrado);
+    entra.traga = true; // se junta mientras se mete la copia (ver dibujarCumulos)
+    entra.cierra = PASAJE_CIERRA; // el de entrada, sin apuro
+    const sale = salida && salida !== entrado ? cerrando(salida) : entra;
+    const copia = copiarNave(quien, entra);
+    // El de entrada se queda abierto hasta que se mete la copia (si no hay
+    // copia, o si es el mismo agujero que el de salida, lo que dura el pasaje
+    // de siempre).
+    entra.espera = copia && sale !== entra ? copia.dura : PASAJE_SALE;
+    if (copia) pasajes.push(copia);
+    // La de verdad sale por el otro con el rumbo que traía, entera y encima
+    // del agujero. Del rival se anota por dónde (ver dibujarRival).
+    if (quien === "rival" && rival) rival.sale = { hueco: sale, t: 0 };
+  }
+
+  // Si quien hizo el gol juega con joystick, le tiembla apenas (ver
+  // VIBRA_GOL): el jugador, salvo que con dos jugadores el joystick lo tenga el
+  // 2; el rival, solo si es el jugador 2 con el joystick (no la PC ni el de
+  // online).
+  function vibrarGol(quien) {
+    const deJ2 = modo === "dos" && !!window.j2Joystick;
+    if (quien === "rival" ? !deJ2 : deJ2) return;
+    const gp = primerJoystick();
+    if (!gp) return;
+    const V = VIBRA_GOL;
+    try {
+      if (gp.vibrationActuator && gp.vibrationActuator.playEffect)
+        gp.vibrationActuator
+          .playEffect("dual-rumble", {
+            duration: V.duracion,
+            strongMagnitude: V.fuerte,
+            weakMagnitude: V.debil,
+          })
+          .catch(() => {});
+      else if (gp.hapticActuators && gp.hapticActuators[0])
+        gp.hapticActuators[0].pulse(V.debil, V.duracion); // Firefox
+    } catch (e) {} // (un joystick que no vibra)
+  }
+
+  // Una copia de la nave (quien), tal como está, que sigue de largo derecho al
+  // centro del agujero (hueco: { x, y }) y se mete (ver dibujarPasajes). En el
+  // mundo, o en pantalla si pantalla (la presentación).
+  function copiarNave(quien, hueco, pantalla = false) {
+    let x, y, rot, k, vx, vy, capas;
+    if (quien === "jugador") {
+      const p = window.shipPose;
+      if (!p || !p.listo) return null;
+      const mitad = cajaNave / 2;
+      x = pantalla ? p.x + mitad : cam.ox + (p.x + mitad - cam.ox) / cam.z;
+      y = pantalla ? p.y + mitad : cam.oy + (p.y + mitad - cam.oy) / cam.z;
+      rot = p.rot;
+      k = pantalla ? Math.abs(p.escala) : escalaNaveMundo();
+      vx = pantalla ? 0 : velNave.x;
+      vy = pantalla ? 0 : velNave.y;
+      capas = capasJugador();
+    } else {
+      if (!rival) return null;
+      x = rival.x;
+      y = rival.y;
+      rot = rival.rot;
+      k = escalaNaveMundo();
+      vx = (rival.vx || 0) * 60; // px por cuadro -> px/s
+      vy = (rival.vy || 0) * 60;
+      capas = capasRival();
+    }
+    if (!capas.length) return null;
+    let dx = hueco.x - x;
+    let dy = hueco.y - y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 1) {
+      dx /= dist;
+      dy /= dist;
+    } else {
+      dx = Math.sin((rot * Math.PI) / 180);
+      dy = -Math.cos((rot * Math.PI) / 180);
+    }
+    const minima = PASAJE_VEL_MIN * (pantalla ? cam.z : 1);
+    // Llega al centro (a más tardar en PASAJE_MAX), y ahí ya desapareció.
+    const vel = Math.max(
+      minima,
+      Math.min(Math.hypot(vx, vy), minima * 5),
+      dist / PASAJE_MAX,
+    );
+    const dura = dist / vel;
+    const hacia = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    return {
+      x0: x,
+      y0: y,
+      dx,
+      dy,
+      vel,
+      dist,
+      esfera: ESFERA_RADIO * (pantalla ? cam.z : 1), // el radio de la esfera a la que va
+      dura,
+      t: 0,
+      rot0: rot,
+      hacia,
+      k,
+      capas,
+      hueco,
+    };
+  }
+
+  // Las capas de la nave del jugador como se ven ahora (atrás, fuego y
+  // adelante, cada una con su filtro y su opacidad: ver .in-game en
+  // styles.css), sacadas del HTML. Una foto: el fuego después sigue solo.
+  function capasJugador() {
+    const caja = parseFloat(getComputedStyle(ship).opacity);
+    const alfaCaja = Number.isNaN(caja) ? 1 : caja;
+    const capas = [];
+    for (const sel of [
+      ".starry-cohete-fondo",
+      ".starry-cohete-fuego",
+      ".starry-cohete-top",
+    ]) {
+      const el = ship.querySelector(sel);
+      if (!el) continue;
+      const estilo = getComputedStyle(el);
+      if (estilo.display === "none" || estilo.visibility === "hidden") continue;
+      const foto = document.createElement("canvas");
+      foto.width = 203;
+      foto.height = 300;
+      try {
+        foto.getContext("2d").drawImage(el, 0, 0, 203, 300);
+      } catch (e) {
+        continue; // una imagen que no cargó
+      }
+      const opacidad = parseFloat(estilo.opacity);
+      capas.push({
+        img: foto,
+        filtro:
+          estilo.filter && estilo.filter !== "none" ? estilo.filter : "none",
+        alfa: alfaCaja * (Number.isNaN(opacidad) ? 1 : opacidad),
+      });
+    }
+    return capas;
+  }
+
+  // La del rival: el lienzo en el que se arma para dibujarla (ver dibujarRival).
+  function capasRival() {
+    const foto = document.createElement("canvas");
+    foto.width = lienzoRival.width;
+    foto.height = lienzoRival.height;
+    foto.getContext("2d").drawImage(lienzoRival, 0, 0);
+    return [
+      {
+        img: foto,
+        filtro: filtroRival(),
+        alfa: modo === "dos" ? 1 : RIVAL_OPACIDAD,
+      },
+    ];
+  }
+
+  // Las copias que se están metiendo: van al centro de la esfera, achicándose
+  // (desde que les falta un 80 % del radio) y apagándose al final.
+  function dibujarPasajes() {
+    for (const p of pasajes) {
+      const s = Math.min(p.dist, p.vel * p.t);
+      const falta = p.dist - s; // hasta el centro
+      const u = Math.min(1, falta / (0.8 * p.esfera));
+      const achica = u * u * (3 - 2 * u);
+      const apaga = Math.min(1, falta / (0.35 * p.esfera));
+      if (achica <= 0.01 || apaga <= 0.01) continue;
+      // Gira enseguida hacia el agujero.
+      let giro = p.hacia - p.rot0;
+      giro -= 360 * Math.round(giro / 360);
+      const rot = p.rot0 + giro * Math.min(1, p.t / 0.12);
+      const lado = cajaNave;
+      const ancho = (lado * 203) / 300;
+      ctx.save();
+      ctx.translate(p.x0 + p.dx * s, p.y0 + p.dy * s);
+      ctx.rotate((rot * Math.PI) / 180);
+      ctx.scale(p.k * achica, p.k * achica);
+      // El sprite va pegado a la izquierda de su caja, como la nave de verdad.
+      for (const c of p.capas) {
+        ctx.globalAlpha = c.alfa * apaga;
+        ctx.filter = c.filtro;
+        ctx.drawImage(c.img, -lado / 2, -lado / 2, ancho, lado);
+      }
+      ctx.restore();
+    }
+  }
+
+  // Cada cuadro, en el juego y en la presentación.
+  function avanzarPasajes(dt) {
+    if (pasajes.length) {
+      for (const p of pasajes) p.t += dt;
+      pasajes = pasajes.filter((p) => p.t < p.dura);
+    }
+    if (huecosCerrando.length) {
+      for (const h of huecosCerrando) {
+        h.t += dt;
+        h.ang += CUMULO_GIRO * dt;
+      }
+      huecosCerrando = huecosCerrando.filter((h) => aperturaCerrando(h) > 0);
+    }
+    if (rival && rival.sale && (rival.sale.t += dt) >= PASAJE_SALE)
+      rival.sale = null;
+  }
+
+  function limpiarPasajes() {
+    pasajes = [];
+    huecosCerrando = [];
+    if (rival) rival.sale = null;
+  }
+
   function dibujarCumulos() {
-    const k = Math.max(0, Math.min(1, colorNave));
-    // Dónde va la música en su compás (todos los agujeros pulsan a la vez, al
-    // compás). Sin música que seguir (audio bloqueado o sin cargar) pulsan con su
-    // propio reloj, a la velocidad normal.
+    // Las estrellas: con rival, blancas y de los colores del resultado (ver
+    // tintarEsfera); en el tutorial, del blanco al salmón con el color de la
+    // nave.
+    tintarEsfera(performance.now() / 1000);
+    const equipos = !esTutorial();
+    const k = equipos ? 0 : Math.max(0, Math.min(1, colorNave));
     const ritmo = compasMusica();
     for (const c of cumulos) {
       if (!prendido(c)) continue; // todavía no (ver prendeT en crearPar)
-      const compas = ritmo ? ritmo.compas : MUSICA_COMPAS_RESPALDO;
-      const pos = ritmo ? ritmo.pos : c.t % compas;
-      // Aparecen y se van achicándose (no con transparencia); en el medio
-      // pulsan (ver pulsoCumulo).
-      const esc =
-        Math.min(1, (c.t - (c.prendeT || 0)) / 0.5, (CUMULO_VIDA - c.t) / 1.5) *
-        (1 +
-          CUMULO_PULSO_AMPLITUD *
-            pulsoCumulo(pos, compas / MUSICA_TIEMPOS_COMPAS));
-      dibujarAgujero(c.x, c.y, c.ang, esc, k);
+      const m = medidaCumulo(c, ritmo);
+      dibujarAgujero(c.x, c.y, c.ang, m.esc, m.junta, k, equipos);
     }
-    dibujarChispas(k);
+    // Los que se están cerrando después de que pasó una nave, y la copia que
+    // se mete (ver "La nave entra al agujero y sale del otro"). El de entrada
+    // se junta en cúmulo mientras se la traga.
+    for (const h of huecosCerrando) {
+      const f = formaAgujero(aperturaCerrando(h));
+      const u = h.traga ? Math.min(1, h.t / Math.max(0.2, h.espera)) : 0;
+      dibujarAgujero(
+        h.x,
+        h.y,
+        h.ang,
+        h.esc * f.esc,
+        Math.max(f.junta, u * u * (3 - 2 * u)),
+        k,
+        equipos,
+      );
+    }
+    dibujarPasajes();
+    dibujarChispas(colorAgujeros());
     if (numeroEstrellas.length) {
       // Titilan igual que las estrellas de fondo (ver dibujarEstrellas): por
       // eso no van todas en un solo trazo como las chispas, cada una necesita
@@ -8680,18 +9931,24 @@
     // Y la del jugador. shipPose viene en pantalla y pegada a la izquierda de
     // su caja (ver circulosNave), así que el centro es media caja más allá.
     const p = window.shipPose;
-    const yo = p && p.listo ? { x: p.x + cajaNave / 2, y: p.y + cajaNave / 2 } : null;
+    const yo =
+      p && p.listo ? { x: p.x + cajaNave / 2, y: p.y + cajaNave / 2 } : null;
     if (yo && !ship.classList.contains("fuera-de-juego"))
       puntero(yo.x, yo.y, colorPropio());
     // Los agujeros aparecen en cualquier lugar del mapa (ver crearCumulo):
     // cada uno que quede fuera de la pantalla lleva su flecha en el borde,
     // que se ve como un agujero: negra por dentro y con el borde y el brillo
-    // del color de su anillo (blanco al principio y cada vez más salmón, como
-    // ellos). Así siempre se sabe dónde están los dos.
-    const colorAgujero = mezclaAgujeros(Math.max(0, Math.min(1, colorNave)));
+    // del color de los agujeros (el de quien va ganando, ver colorAgujeros).
+    // Así siempre se sabe dónde están los dos.
+    const colorAgujero = colorAgujeros();
     for (const c of cumulos)
       if (prendido(c))
-        puntero(aPantalla(c.x, cam.ox), aPantalla(c.y, cam.oy), colorAgujero, "#000");
+        puntero(
+          aPantalla(c.x, cam.ox),
+          aPantalla(c.y, cam.oy),
+          colorAgujero,
+          "#000",
+        );
   }
 
   // Del mundo a la pantalla: la inversa de lo que hace circulosNave, y lo mismo
@@ -8765,6 +10022,7 @@
       if (pausa === "salir") navegarSalirJoystick();
     }
     orientarNaveJugador();
+    avanzarPasajes(dt);
 
     if (presenta) {
       actualizarPresentacion(dt);
@@ -8926,8 +10184,9 @@
         }
         const centro = circulos[1];
         if (centro && navePrev && dt > 0) {
-          const vel =
-            Math.hypot(centro.x - navePrev.x, centro.y - navePrev.y) / dt;
+          velNave.x = (centro.x - navePrev.x) / dt;
+          velNave.y = (centro.y - navePrev.y) / dt;
+          const vel = Math.hypot(velNave.x, velNave.y);
           tQuieta = vel < QUIETA_MOV ? tQuieta + dt : 0;
         }
         navePrev = centro ? { x: centro.x, y: centro.y } : null;
@@ -9052,7 +10311,14 @@
   try {
     zoomAbierto = localStorage.getItem(ZOOM_GUARDADO) !== "cerrado";
   } catch (e) {}
-  window.toque = { x: 0, y: 0, activo: false, impulso: false, estela: false, zoomAbierto };
+  window.toque = {
+    x: 0,
+    y: 0,
+    activo: false,
+    impulso: false,
+    estela: false,
+    zoomAbierto,
+  };
   const tactilEl = document.getElementById("game-tactil");
   if (tactil && tactilEl) {
     document.documentElement.classList.add("tactil");
@@ -9064,26 +10330,36 @@
     const botones = [...tactilEl.querySelectorAll("[data-toque]")];
     const botonZoom = document.getElementById("game-tactil-zoom");
     const mostrarZoom = () => {
-      botonZoom.textContent = window.toque.zoomAbierto ? "zoom abierto" : "zoom cerrado";
+      botonZoom.textContent = window.toque.zoomAbierto
+        ? "zoom abierto"
+        : "zoom cerrado";
     };
     mostrarZoom();
     botonZoom.addEventListener("pointerdown", (ev) => {
       ev.preventDefault();
       window.toque.zoomAbierto = !window.toque.zoomAbierto;
       try {
-        localStorage.setItem(ZOOM_GUARDADO, window.toque.zoomAbierto ? "abierto" : "cerrado");
+        localStorage.setItem(
+          ZOOM_GUARDADO,
+          window.toque.zoomAbierto ? "abierto" : "cerrado",
+        );
       } catch (e) {}
       mostrarZoom();
       botonZoom.classList.add("apretado");
     });
     for (const tipo of ["pointerup", "pointercancel", "pointerleave"])
-      botonZoom.addEventListener(tipo, () => botonZoom.classList.remove("apretado"));
+      botonZoom.addEventListener(tipo, () =>
+        botonZoom.classList.remove("apretado"),
+      );
     let dedo = null; // { id, x, y }: el pulgar del stick
     let escala = 1; // cuánto se agrandan los controles (ver --tactil-escala)
     const medirEscala = () => {
       const k = window.calidad ? window.calidad.escalaMarco() : 1;
       escala = 1 / k;
-      document.documentElement.style.setProperty("--tactil-escala", escala.toFixed(4));
+      document.documentElement.style.setProperty(
+        "--tactil-escala",
+        escala.toFixed(4),
+      );
     };
     const reposo = () => {
       stick.style.left = 110 * escala + "px";
@@ -9153,7 +10429,14 @@
     // Se ven solo jugando (ni en el menú, ni en el selector, ni en la pausa,
     // ni con el final): al esconderse se suelta todo.
     (function mirarTactil() {
-      const ver = !!modo && !pausa && !final && !ganado && !selector && !presenta && !claveAbierta();
+      const ver =
+        !!modo &&
+        !pausa &&
+        !final &&
+        !ganado &&
+        !selector &&
+        !presenta &&
+        !claveAbierta();
       if (tactilEl.hidden === ver) {
         tactilEl.hidden = !ver;
         if (!ver) {
@@ -9174,7 +10457,8 @@
     if (!tactil) return;
     let ventana = window;
     try {
-      if (window.parent !== window && window.parent.document) ventana = window.parent;
+      if (window.parent !== window && window.parent.document)
+        ventana = window.parent;
     } catch (e) {} // (otro origen: se queda con esta)
     const doc = ventana.document;
     const el = doc.documentElement;
@@ -9269,7 +10553,9 @@
           entrarConSonido(() => elegirApuntada(true));
         } else if (alMenu) {
           // Como después de la presentación.
-          const j = opcionesModo.findIndex((el) => el.dataset.elegir === alMenu);
+          const j = opcionesModo.findIndex(
+            (el) => el.dataset.elegir === alMenu,
+          );
           if (j >= 0) apuntarOpcion(j, true);
         } else if (!presentada && !embebido) {
           empezarPresentacion();
@@ -9279,6 +10565,7 @@
       } else {
         cancelAnimationFrame(raf);
         if (presenta) terminarPresentacion();
+        limpiarPasajes();
         if (esperaToque) {
           esperaToque = null;
           if (presentaToque) presentaToque.hidden = true;

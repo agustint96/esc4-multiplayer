@@ -942,7 +942,9 @@ html.entra-juego .game-cuadrado {
 }
 /* Capa por encima de la nave (z-index 253) y de la pantalla negra
    (.game-tapa): ahí van el menú de la pausa y el cartel de salir, que si no
-   quedarían tapados por la nave. No recibe clicks, sus opciones sí. */
+   quedarían tapados por la nave, y, al terminar la partida, el marcador con
+   el cartel del ganador (debajo de los otros dos, ver subirMarcador en
+   esc4-game.js). No recibe clicks, sus opciones sí. */
 .game-capa {
   position: fixed;
   inset: 0;
