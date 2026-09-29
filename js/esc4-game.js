@@ -1013,11 +1013,12 @@
   // así todo arranca limpio. Online es como irse: al rival le llega que se fue
   // (se cierra la conexión) y a él le aparece el cartel. Se vuelve directo al
   // menú, sin la presentación (ver CLAVE_AL_MENU en setActive); recargar la
-  // página a mano sí la muestra.
+  // página a mano sí la muestra. apuntar: el modo en el que arranca apuntado
+  // el menú (al perder contra la PC, "contra la PC"); si no, el primero.
   const CLAVE_AL_MENU = "esc4-al-menu";
-  function salirAlMenu() {
+  function salirAlMenu(apuntar) {
     try {
-      sessionStorage.setItem(CLAVE_AL_MENU, "1");
+      sessionStorage.setItem(CLAVE_AL_MENU, apuntar || "1");
     } catch (e) {}
     location.reload();
   }
@@ -1804,6 +1805,13 @@
   // 203x300 (el de las nuevas está en naves/nuevas/) y el de atrás, que lleva
   // el resplandor de la luz: el cohete tiene su silueta y las demás usan el
   // propio dibujo (misma forma).
+  // Los vehículos con ruedas (costado: true) se ven desde arriba (el dibujo
+  // del selector) yendo para arriba o para abajo, y de costado yendo para los
+  // lados: tienen uno de perfil mirando a cada lado, _der y _izq, con la
+  // trompa para arriba y el techo hacia donde queda arriba al girarlo para
+  // ese lado, así el techo nunca queda abajo (ver ladoDeRumbo). Son dos
+  // dibujos y no uno espejado para que lo escrito (el número del colectivo)
+  // se lea derecho.
   const NAVES_JUEGO = [
     { id: "cohete", nombre: "Clasico" },
     { id: "atomica", nombre: "Atomica" },
@@ -1815,12 +1823,19 @@
     { id: "iss", nombre: "ISS" },
     { id: "tie", nombre: "Caza TIE" },
     { id: "estrella", nombre: "Estrella de la Muerte" },
-    { id: "van", nombre: "Breaking Bad" },
-    { id: "delorean", nombre: "DeLorean" },
+    { id: "van", nombre: "Breaking Bad", costado: true },
+    { id: "delorean", nombre: "DeLorean", costado: true },
+    { id: "colectivo", nombre: "Colectivo", costado: true },
   ].map((n) => {
     const dir = n.id === "cohete" ? "parallax/" : `naves/nuevas/${n.id}/`;
     const off = `${dir}${n.id}.webp`;
     const on = `${dir}${n.id}_on.webp`;
+    // Cada lado del perfil, con los mismos datos que la nave: off, on, fondo e
+    // img (las imágenes, recién al elegirla: ver cargarPerfiles).
+    const perfil = (lado) => {
+      const onLado = `${dir}${n.id}_${lado}_on.webp`;
+      return { off: `${dir}${n.id}_${lado}.webp`, on: onLado, fondo: onLado, img: null, listo: false };
+    };
     return {
       ...n,
       off,
@@ -1828,8 +1843,49 @@
       fondo: n.id === "cohete" ? "parallax/cohete_fondo.webp" : on,
       img: n.id === "cohete" ? imgRivalTop : cargarImagen(on),
       imgFondo: n.id === "cohete" ? imgRivalFondo : null,
+      costado: n.costado ? { der: perfil("der"), izq: perfil("izq") } : null,
     };
   });
+  // Cómo se ve un vehículo de costado yendo con ese giro (grados, 0 para
+  // arriba y 90 a la derecha): "arriba" (desde arriba) a menos de
+  // COSTADO_ENTRA grados de la vertical, para arriba o para abajo, y si no
+  // "der" o "izq". Para volver a verse de costado tiene que pasar los
+  // COSTADO_SALE grados (antes: cómo se veía), así cerca del borde no cambia
+  // a cada rato.
+  const COSTADO_ENTRA = Math.sin((25 * Math.PI) / 180);
+  const COSTADO_SALE = Math.sin((35 * Math.PI) / 180);
+  function ladoDeRumbo(rot, antes) {
+    const s = Math.sin((rot * Math.PI) / 180);
+    const umbral = antes === "arriba" ? COSTADO_SALE : COSTADO_ENTRA;
+    if (s > umbral) return "der";
+    if (s < -umbral) return "izq";
+    return "arriba";
+  }
+  // Los perfiles de un vehículo de costado se cargan una sola vez y recién
+  // cuando alguien lo elige (no al abrir la página), y se decodifican de
+  // antemano (decode) para que cambiar de lado jugando sea instantáneo: hasta
+  // que los dos (apagado y prendido) están listos, se sigue viendo desde arriba.
+  function cargarPerfiles(n) {
+    if (!n.costado || n.costado.der.img) return;
+    for (const v of [n.costado.der, n.costado.izq]) {
+      v.img = cargarImagen(v.on);
+      Promise.all([v.img.decode(), cargarImagen(v.off).decode()]).then(
+        () => (v.listo = true),
+        () => {},
+      );
+    }
+  }
+  // La imagen de una nave para ese giro: si es de costado, la que toque (lo
+  // guarda en quien.lado, para la próxima; a un perfil que no está listo no
+  // se pasa); si no, la de siempre.
+  function imgDeNave(n, quien) {
+    if (!n.costado) return n.img;
+    cargarPerfiles(n);
+    const lado = ladoDeRumbo(quien.rot, quien.lado);
+    if (lado === "arriba" || n.costado[lado].listo) quien.lado = lado;
+    const v = n.costado[quien.lado];
+    return v ? v.img : n.img;
+  }
   // Los fuegos: el dibujo de cohete_fuego.webp tal cual (clásico) o
   // recoloreado (ver fuegoTenido): la parte de afuera y la de adentro (la
   // celeste) pasan cada una a un degradé de dos colores según lo clara que
@@ -1898,14 +1954,15 @@
   // La nave del jugador 1 (la de script.js, en el DOM): los sprites y el
   // fuego (window.naveJ1 y window.fuegoJ1, los lee script.js).
   let eleccionJ1 = { nave: "cohete", fuego: "clasico" };
+  // Si es de costado, cómo se ve la del jugador: "arriba", "der" o "izq" (ver orientarNaveJugador).
+  const ladoJ1 = { rot: 0, lado: "arriba" };
+  let naveJugador = naveDe("cohete"); // la de eleccionJ1 (orientarNaveJugador la mira cada cuadro)
   function aplicarNaveJugador(eleccion) {
     eleccionJ1 = { nave: naveDe(eleccion.nave).id, fuego: fuegoDe(eleccion.fuego).id };
-    const n = naveDe(eleccionJ1.nave);
-    window.naveJ1 = n.id === "cohete" ? null : { off: n.off, on: n.on };
-    const top = ship.querySelector(".starry-cohete-top");
-    const fondo = ship.querySelector(".starry-cohete-fondo");
-    if (top) top.src = ship.classList.contains("luz-on") ? n.on : n.off;
-    if (fondo) fondo.src = n.fondo;
+    naveJugador = naveDe(eleccionJ1.nave);
+    cargarPerfiles(naveJugador); // mientras tanto están las instrucciones
+    ladoJ1.lado = "arriba";
+    ponerSpritesJugador();
     const f = fuegoDe(eleccionJ1.fuego);
     window.fuegoJ1 = f.afuera ? fuegoTenido(f.id) : null;
     // Si el fuego todavía no se pudo teñir (no había cargado), en cuanto cargue.
@@ -1913,12 +1970,39 @@
       imgFuego.addEventListener("load", () => aplicarNaveJugador(eleccionJ1), { once: true });
   }
 
+  // Los sprites de la nave del jugador (y window.naveJ1, que script.js usa al
+  // prender y apagar la luz): los de la nave (desde arriba), o los del perfil
+  // que toque si es de costado y va para un lado.
+  function ponerSpritesJugador() {
+    const n = naveJugador;
+    const v = (n.costado && n.costado[ladoJ1.lado]) || n;
+    window.naveJ1 = n.id === "cohete" ? null : { off: v.off, on: v.on };
+    const top = ship.querySelector(".starry-cohete-top");
+    const fondo = ship.querySelector(".starry-cohete-fondo");
+    if (top) top.src = ship.classList.contains("luz-on") ? v.on : v.off;
+    if (fondo) fondo.src = v.fondo;
+  }
+
+  // Cada cuadro: si la del jugador es de costado y cambió cómo se ve
+  // (según el giro que publica script.js), le cambian los sprites.
+  function orientarNaveJugador() {
+    const n = naveJugador;
+    const p = window.shipPose;
+    if (!n.costado || !p || !p.listo) return;
+    const antes = ladoJ1.lado;
+    ladoJ1.rot = p.rot;
+    imgDeNave(n, ladoJ1);
+    if (ladoJ1.lado !== antes) ponerSpritesJugador();
+  }
+
   // La nave del rival (la de la PC, el jugador 2 u online), que dibuja este
   // archivo (ver dibujarRival y actualizarFuegoRival). Arranca como el cohete.
-  const naveRival = { id: "cohete", img: imgRivalTop, fondo: imgRivalFondo, fuego: "clasico" };
+  const naveRival = { id: "cohete", img: imgRivalTop, fondo: imgRivalFondo, fuego: "clasico", costado: null };
   function aplicarNaveRival(eleccion) {
     const n = naveDe(eleccion && eleccion.nave);
     naveRival.id = n.id;
+    naveRival.costado = n.costado;
+    cargarPerfiles(n);
     naveRival.img = n.img;
     naveRival.fondo = n.imgFondo;
     naveRival.fuego = fuegoDe(eleccion && eleccion.fuego).id;
@@ -4552,7 +4636,7 @@
   function dibujarVueloSel(l, m) {
     const v = l.vuelo;
     if (!v.modo) return;
-    const img = NAVES_JUEGO[v.nave].img;
+    const img = imgDeNave(NAVES_JUEGO[v.nave], v);
     if (!img.complete || !img.naturalWidth) return;
     const alto = m.altoNave[0];
     const ancho = (alto * 203) / 300;
@@ -7425,7 +7509,7 @@
     if (!rival || ganado) return;
     if (enLinea() && !rival.visto) return; // todavía no llegó dónde está
     if (rival.stun > 0 && rival.t >= DURACION_CHOQUE) return; // fuera de juego: no se ve
-    const img = naveRival.img;
+    const img = imgDeNave(naveRival, rival); // si es de costado, el lado lo guarda rival.lado
     if (!img.complete || !img.naturalWidth) return;
     const w = lienzoRival.width;
     const h = lienzoRival.height;
@@ -8058,6 +8142,7 @@
       }
       if (pausa === "salir") navegarSalirJoystick();
     }
+    orientarNaveJugador();
 
     if (presenta) {
       actualizarPresentacion(dt);
@@ -8242,10 +8327,13 @@
             window.shipLento = 1;
             if (window.shipMove) window.shipMove(0, 0);
           }
-          // Si se fue el rival online, de vuelta a la elección; si no, otra
+          // Si se fue el rival online, de vuelta a la elección; contra la PC
+          // (gane quien gane), al menú parado en "contra la PC" (con la
+          // dificultad que se venía jugando, que queda guardada); si no, otra
           // partida (online, con el mismo rival).
           if (fin.t >= FIN_DURA) {
             if (fin.ganador === "abandono" || esTutorial()) salirAlMenu();
+            else if (modo === "pc") salirAlMenu("pc");
             else reiniciar(true);
           }
         } else {
@@ -8379,11 +8467,13 @@
         // directo, sin pasar por el menú. Una sola vez: si no, cada recarga
         // volvería a ese modo.
         let dePausa = null;
-        let alMenu = false; // se volvió al menú (ver salirAlMenu): sin presentación
+        // Se volvió al menú (ver salirAlMenu): sin presentación. "1", o el
+        // modo en el que arranca apuntado.
+        let alMenu = null;
         try {
           dePausa = JSON.parse(sessionStorage.getItem(CLAVE_MODO_PAUSA));
           sessionStorage.removeItem(CLAVE_MODO_PAUSA);
-          alMenu = sessionStorage.getItem(CLAVE_AL_MENU) === "1";
+          alMenu = sessionStorage.getItem(CLAVE_AL_MENU);
           sessionStorage.removeItem(CLAVE_AL_MENU);
         } catch (e) {}
         const i = dePausa
@@ -8397,6 +8487,8 @@
           // Como después de la presentación: el menú sin la nave (vuelve al
           // elegir un modo, ver elegirModo).
           ship.classList.add("game-sin-nave");
+          const j = opcionesModo.findIndex((el) => el.dataset.elegir === alMenu);
+          if (j >= 0) apuntarOpcion(j, true);
         } else if (!presentada && !embebido) {
           empezarPresentacion();
         }
