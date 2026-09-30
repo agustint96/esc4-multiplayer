@@ -16,8 +16,9 @@ nunca la misma dos veces seguidas; `?caratula=N` elige una), todavía sin
 nombre del juego, cada una con una animación mínima; abajo dice "cargando" y
 después "presiona cualquier tecla". Ese toque es el que deja sonar al
 navegador. Luego se aclara y aparece un agujero de gusano, llega la nave (a
-color), lo mira y se mete. En otra pantalla, la del menú, sale por otro
-agujero y se va hacia la derecha, y ahí la nave sigue de largo (vuelve al
+color), lo mira y lo cruza: pasa por encima del borde de este lado y se mete
+por debajo del de enfrente. En otra pantalla, la del menú, asoma por debajo
+del borde de atrás de otro agujero, lo cruza y se va hacia la derecha, y ahí la nave sigue de largo (vuelve al
 elegir un modo). Una tecla durante el logo lo saltea; pasada la carátula,
 cualquier tecla, un click o el botón A saltean el resto. Mientras la nave mira el
 menú no hay ninguna opción marcada: recién cuando se va se marca la primera.
@@ -156,7 +157,8 @@ probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
   juego o parpadeando no nacen piedras suyas y las que venían dejan de
   perseguirla.
 - Los **agujeros de gusano** aparecen de a pares, como siempre: el primero que
-  entra a uno suma un gol y sale por el otro. Aparecen en cualquier lugar del
+  entra a uno suma un gol y sale por el otro: se mete por debajo del borde
+  de enfrente de uno y asoma por debajo del borde de atrás del otro. Aparecen en cualquier lugar del
   mapa (no solo en lo que ve tu cámara) y nunca pegados a ninguna de las dos
   naves, así no le quedan más cerca a una. Online los crea el anfitrión, pero
   en su pantalla se prenden recién cuando al invitado ya le llegaron: los dos

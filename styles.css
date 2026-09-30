@@ -765,6 +765,13 @@ html.entra-juego .game-cuadrado {
 .starry-cohete-pair.game-sin-nave {
   visibility: hidden;
 }
+/* Saliendo de un agujero de gusano la nave lo está cruzando: la dibuja
+   esc4-game.js en el lienzo, entre las luces del agujero (asoma por debajo
+   del borde de atrás y pasa por encima del de adelante: ver "La nave entra
+   al agujero y sale del otro"). Vuelve cuando terminó de cruzarlo. */
+.starry-cohete-pair.game-en-agujero {
+  visibility: hidden;
+}
 /* "presiona cualquier tecla" en la pantalla negra, mientras la presentación
    espera un toque para poder sonar. Mismas letras que el pie del menú, titilando. */
 .game-presenta-toque {

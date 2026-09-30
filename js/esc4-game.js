@@ -36,8 +36,11 @@
 // Estrellas: se ven algunas estrellas blancas sobre el fondo, también en la
 // intro y en el final (solo decoración, no se chocan). En distintos puntos del mapa aparecen agujeros de
 // gusano de a pares: un circulito de estrellas con brillo girando muy rápido,
-// con el centro negro. Al entrar en uno la nave sale por el otro, y cada pasaje
-// la va pintando de color (sube la saturación de su filtro, ver --nave-sat
+// con el centro negro y, en el negro, el otro lado (otro cielo, azulado y
+// violeta, que se corre despacio). Al entrar en uno la nave sale por el otro
+// (se mete por debajo del borde de enfrente de uno y asoma por debajo del
+// borde de atrás del otro: ver "La nave entra al agujero y sale del otro"),
+// y cada pasaje la va pintando de color (sube la saturación de su filtro, ver --nave-sat
 // en styles.css y aplicarColorNave) hasta quedar con todos sus
 // colores: los agujeros hacen el mismo recorrido, arrancan blancos y terminan
 // naranja (el del parallax 7). Al perder todo vuelve a blanco y negro.
@@ -394,56 +397,56 @@
   // predominante del parallax 7) a medida que se colorea la nave.
   const CUMULO_COLOR_INICIO = "#ffffff";
   const CUMULO_COLOR_FIN = "#cb681a";
-  const CUMULO_ANILLO = 16; // px del mundo: la medida de base del agujero
-  const CUMULO_RADIO = 26; // px del mundo: zona de entrada (un poco más que el agujero)
-  const CUMULO_DISCO_RADIO = 1.15; // por CUMULO_ANILLO (ver GUSANO_RADIO)
-  const CUMULO_GIRO = 9; // radianes por segundo: lo que avanza el ángulo de cada agujero (la esfera gira ESFERA_GIRO de eso)
-  // El agujero es una esfera transparente de estrellas (maqueta en
-  // agujeros/maqueta-globo-cumulo.gif): un globo de estrellas que gira -las de
-  // adelante brillan y las de atrás se ven apagadas a través- y que a veces se
-  // junta en un cúmulo: cada estrella tiene su lugar en la superficie y otro
-  // adentro, en la misma dirección, y va de uno al otro. Nace como cúmulo y se
-  // abre en globo, al cerrarse se vuelve a juntar, cuando se traga una nave
-  // (el de entrada de un gol) se junta de golpe y, con la música, se junta un
-  // poco en cada compás. Las estrellas muestran el resultado: cada gol pinta
-  // una parte del color de quien lo hizo, azul o rojo, y el resto quedan
-  // blancas (ver repartoEquipos). En el tutorial, que no tiene rival, van del
-  // blanco al salmón del sitio a medida que se colorea la nave (ver
-  // GUSANO_COLORES).
-  // px del mundo: la medida de base de los agujeros (lo que se usa para saber
-  // si el rival, online, ya está cerca del de salida: ver dibujarRival).
-  const GUSANO_RADIO = CUMULO_ANILLO * CUMULO_DISCO_RADIO * 1.05;
-  const ESFERA_RADIO = 44; // px del mundo: el globo (más grande que la zona de entrada, CUMULO_RADIO)
-  const ESFERA_ESTRELLAS = 420; // cuántas (en el celular y en calidad baja, menos: ver armarEsfera)
-  const ESFERA_CUMULO = 0.75; // qué tan al medio quedan en el cúmulo (1 parejo; menos, más al medio)
-  const ESFERA_GIRO = 0.144; // fracción de CUMULO_GIRO: lo que gira (~1,3 rad/s)
-  const ESFERA_INCLINA = 0.45; // rad: el eje de giro, inclinado hacia quien mira
-  const ESFERA_LUZ = [-0.45, -0.6, 0.66].map(
-    (v) => v / Math.hypot(-0.45, -0.6, 0.66),
-  ); // de arriba a la izquierda y de adelante
-  const ESFERA_ABRE = 0.9; // s que tarda en abrirse (de cúmulo a globo)
-  const ESFERA_MUSICA = 0.35; // cuánto se junta en el pulso de cada compás (0 nada, 1 cúmulo)
-  const ESFERA_BRILLO = 1.25; // qué tan prendidas están las estrellas (1 como la maqueta)
-  const ESFERA_PINTA = 6; // qué tan rápido se pintan las estrellas con un gol (1/s: con 6, casi en 0,3 s)
-  const ESFERA_DESTELLO = 0.8; // s que brilla una estrella que cambió de color
-  // Los colores de las estrellas blancas (en el tutorial, al principio de la
-  // partida y al final; en el medio, mezclados): apagadas, prendidas y las
-  // más prendidas. Las de los equipos salen de BORDE_JUGADOR (el azul) y
-  // BORDE_RIVAL (el rojo), ver atlasEstrellas.
-  const GUSANO_COLORES = [
-    { tenue: [72, 74, 80], luz: [236, 238, 244], pico: [255, 255, 255] },
-    { tenue: [112, 60, 52], luz: [241, 146, 128], pico: [255, 190, 172] }, // el salmón: --accent en styles.css
-  ];
+  // Cuántas veces más grande que el agujero original (anillo de 16 px): agranda
+  // todo junto -el anillo, sus estrellas, el brillo y la zona de entrada-, así
+  // se ve igual pero más grande y se entra apenas se lo toca. Vale para todos
+  // los agujeros: el juego, la presentación y las carátulas.
+  const CUMULO_TAMANO = 2;
+  const CUMULO_BRILLO = 6 * CUMULO_TAMANO; // px del mundo: resplandor de cada estrella (se arma una sola vez en el sprite)
+  // Cuántas veces se repinta cada estrella al armar el sprite: sube el brillo
+  // sin tocar el tamaño (el resplandor llega igual de lejos, solo es más
+  // intenso). Va junto con el "lighter" de dibujarAnilloSprite.
+  const CUMULO_BRILLO_PASADAS = 3;
+  const SPRITE_ESCALA = 4; // px de sprite por px del mundo (nítido con zoom y pantallas densas)
+  const CUMULO_ANILLO = 16 * CUMULO_TAMANO; // px del mundo: radio del circulito de estrellas
+  const CUMULO_RADIO = 26 * CUMULO_TAMANO; // px del mundo: zona de entrada (un poco más que el anillo)
+  const CUMULO_ESTRELLAS = 28; // estrellas del anillo de afuera
+  const CUMULO_INTERIOR = 14; // estrellas del anillo de adentro (giran para el otro lado)
+  const CUMULO_ESTRELLA_R = 1.7 * CUMULO_TAMANO; // px del mundo: radio de cada estrella. Todas iguales y casi pegadas: 28 estrellas de 3,4 px de diámetro ~ el perímetro del círculo (100 px), por CUMULO_TAMANO
+  // El disco negro del medio, más grande que el anillo (antes medía justo
+  // CUMULO_ANILLO y el resplandor del anillo de afuera asomaba la mitad para
+  // afuera, sobre el fondo del juego: ahora el anillo entero queda sobre negro).
+  const CUMULO_DISCO_RADIO = 1.15; // por CUMULO_ANILLO
+  // El anillo de adentro, más lejos del centro que antes (era 0,55): así el
+  // negro sin nada encima -el "fondo negro del medio"- es un círculo más grande
+  // y se nota más, en vez de quedar tapado enseguida por el anillo chico.
+  const CUMULO_INTERIOR_RADIO = 0.72; // por CUMULO_ANILLO
+  // "El otro lado" (agujeros/agujeros-elegidos.html): en el negro se asoma otro
+  // cielo, estrellitas azuladas y una nube violeta, que se corre despacio por
+  // su cuenta (como mirando por una ventana) y la nube se aviva con el pulso.
+  const OTRO_CIELO_ESTRELLAS = 120;
+  const OTRO_CIELO_ESCALA = 8; // px de sprite por px del mundo (la carátula 1 lo agranda 6,5 veces)
+  const OTRO_CIELO_DERIVA = { x: 0.15, y: 0.1 }; // cuánto se corre, por el radio del negro
+  const OTRO_CIELO_AVIVA = 0.6; // cuánto más se prende la nube en el pico del pulso
+  const CUMULO_GIRO = 9; // radianes por segundo: giran muy rápido (más de una vuelta por segundo)
   const CUMULO_VIDA = 14; // segundos que dura el par de agujeros si no entran
   const CUMULO_DISTANCIA_PAR = 260; // px del mundo: separación mínima entre los dos agujeros del par
   const CUMULO_PRIMERO = 2.5; // segundos hasta el primer par
   const CUMULO_INTERVALO = [3, 6]; // segundos entre un par y el siguiente (al azar)
   const CUMULO_DISTANCIA_MIN = 160; // px del mundo: no aparecen encima de la nave
-  // Pulso: una vez por compás de la música (todos los agujeros a la vez) las
-  // estrellas se juntan un poco y vuelven (ver ESFERA_MUSICA). Solo es
-  // visual: la zona de entrada no cambia.
+  // Pulso: el agujero se estira y vuelve a su tamaño una vez por compás de la
+  // música (los dos del par a la vez). Solo es visual: la zona de entrada no
+  // cambia. Importante: el pico (el disco en lo más alto del pulso) no puede
+  // superar la zona real de entrada (CUMULO_RADIO, 26 px por CUMULO_TAMANO)
+  // -si no, se ve el dibujo entrando en la piedra antes de que en verdad se
+  // pueda cruzar-. Por eso no es un número suelto: CUMULO_PULSO_AMPLITUD sale
+  // de CUMULO_PICO_ORIGINAL (el crecimiento de pulso de toda la vida, 1,4 =
+  // +40 %) dividido CUMULO_DISCO_RADIO, así el pico queda siempre en 1,4 veces
+  // el anillo (22,4 px por CUMULO_TAMANO), lo agrande o no el disco.
+  const CUMULO_PICO_ORIGINAL = 1.4;
+  const CUMULO_PULSO_AMPLITUD = CUMULO_PICO_ORIGINAL / CUMULO_DISCO_RADIO - 1;
   const CUMULO_PULSO_TIEMPOS = 1.25; // lo que dura cada pulso (estirar y volver), en tiempos de la música
-  const CUMULO_PULSO_ATAQUE = 0.25; // fracción del pulso que se dedica a juntarse (el resto es volver)
+  const CUMULO_PULSO_ATAQUE = 0.25; // fracción del pulso que se dedica a estirar (el resto es volver)
   // La música del juego (nivel4.ogg) está en 5 tiempos: 145,6 BPM y el bucle son
   // exactamente 60 compases (123,62 s), y el archivo arranca en el primer tiempo
   // (ahí entra el bombo). Se midió sobre el audio; si se cambia la canción hay que
@@ -475,7 +478,7 @@
   const MUSICA_TIEMPOS_COMPAS = 5;
   const MUSICA_COMPASES_BUCLE = 60; // compases que dura el bucle entero
   const MUSICA_PULSO_TIEMPO = 0; // en qué tiempo del compás cae el pulso (0 = el primero, 4 = el último): para correrlo si se siente desfasado
-  const MUSICA_COMPAS_RESPALDO = 2.0604; // segundos del compás a velocidad normal: para ubicar la música del <audio> (sin Web Audio) en un compás
+  const MUSICA_COMPAS_RESPALDO = 2.0604; // segundos del compás a velocidad normal: se usa si no se puede saber dónde va la música
   // La batería entra al empezar el compás 7 (12,36 s; medido sobre el audio). En
   // el tutorial, cada partida arranca la música ahí, ya con la batería; al dar
   // la vuelta el bucle sigue desde el principio, como siempre.
@@ -847,7 +850,8 @@
     ];
   }
   armarCielo(semillaCielo);
-  let gusanoSprites = null; // las estrellas de los agujeros, ya armadas (ver armarEsfera)
+  let gusanoSprites = null; // anillos de los agujeros ya dibujados con brillo (ver armarSprites)
+  let otroCieloSprite = null; // las estrellitas del otro lado de los agujeros (ver armarSprites)
   let luzSprites = null; // la luz de la nave ya dibujada (degradado), en blanco y en salmón
   let cumulos = []; // cúmulos de estrellas azules en el mapa
   let particulas = []; // chispas de cuando se choca un cúmulo
@@ -1860,6 +1864,7 @@
     { id: "van", nombre: "Breaking Bad", costado: true },
     { id: "delorean", nombre: "DeLorean", costado: true },
     { id: "colectivo", nombre: "18", costado: true },
+    { id: "colapinto", nombre: "Colapinto", costado: true },
   ].map((n) => {
     const dir = n.id === "cohete" ? "parallax/" : `naves/nuevas/${n.id}/`;
     const off = `${dir}${n.id}.webp`;
@@ -2982,7 +2987,7 @@
   // Dónde está la música dentro de su compás, en segundos del audio original:
   // { pos: segundos desde el pulso del compás, compas: lo que dura el compás }, o
   // null si no hay música sonando o no se puede saber dónde va (ahí los agujeros
-  // no laten, ver medidaCumulo).
+  // pulsan con su propio reloj, ver dibujarCumulos).
   function compasMusica() {
     let pos, duracion;
     if (musicaFuente && musicaBuffer) {
@@ -3346,16 +3351,21 @@
   // 2. Entrada: el negro se aclara (no del todo: el fondo queda como con
   //    PRESENTA_FONDO) y en el medio se abre un agujero de gusano. Llega la nave
   //    desde la izquierda, a color, lo mira y se mete volando derecho: igual
-  //    que en el juego, del mismo tamaño, sin achicarse ni girar. Al llegar a la
-  //    zona de entrada (CUMULO_RADIO) desaparece de golpe por el agujero, con
-  //    el sonido de cruzar (sin chispas). Se funde a negro.
+  //    que en el juego, del mismo tamaño, sin girar. Al llegar a la zona de
+  //    entrada (CUMULO_RADIO) suena el cruce (sin chispas) y lo cruza como en
+  //    el juego: pasa por encima del borde de este lado, se ve entera encima
+  //    del negro y se mete por debajo del borde de enfrente (ver "La nave
+  //    entra al agujero y sale del otro"). Ya adentro, el agujero se cierra y
+  //    se funde a negro.
   // 3. Salida: otra pantalla, ya la del menú (fondo negro con sus estrellas).
   //    El menú ya está centrado, desde que se levanta la pantalla negra (no hay
-  //    cámara que se mueva). Se abre otro agujero a la izquierda y la nave
-  //    aparece en él de golpe, del mismo tamaño de siempre. Vuela hacia el menú
-  //    y frena antes de llegar, gira y lo mira un momento, y después gira otra
-  //    vez, acelera y se va por la derecha. No vuelve a verse hasta que se
-  //    elige un modo.
+  //    cámara que se mueva). Se abre otro agujero a la izquierda, blanco (el
+  //    menú es oscuro, como el principio del juego), y la nave sale (tampoco
+  //    acá hay chispas): arranca despacio, asoma por debajo del borde de
+  //    atrás, cruza por encima del negro y pasa por encima del borde de
+  //    adelante. Vuela hacia el menú y frena antes de llegar, gira y lo mira
+  //    un momento, y después gira otra vez, acelera y se va por la derecha. No
+  //    vuelve a verse hasta que se elige un modo.
   // Pasada la carátula, cualquier tecla, un click o el botón A saltean el
   // resto. Una sola vez por página.
   //
@@ -3374,21 +3384,25 @@
   const PRESENTA_ACLARA = 2.4; // lo que tarda en aclarar la pantalla de entrada
   const PRESENTA_FONDO = 2 / CUMULOS_PARA_COLOR; // el fondo como con 2 agujeros
   // (Los agujeros miden lo mismo que en el juego: 1 por el zoom de la cámara,
-  // cam.z, ver dibujarPresentacion. La nave, también: shipZoom = 1.)
-  const PRESENTA_AGUJERO_COLOR = 0; // el color de los agujeros: 0 = como al empezar el juego (blancos), 1 = como al final
-  const PRESENTA_ABRE = 0.9; // s que tarda un agujero en abrirse (o en cerrarse): de cúmulo a globo, como ESFERA_ABRE
+  // cam.z, ver escalaAgujeroPresentacion. La nave, también: shipZoom = 1.)
+  // Color de cada agujero: 0 = blanco (como al principio del juego), 1 = naranja (como al final).
+  const PRESENTA_ENTRADA_COLOR = 1; // el de la pantalla de entrada
+  const PRESENTA_SALIDA_COLOR = 0; // el que la escupe en el menú, que es oscuro
+  const PRESENTA_ABRE = 0.5; // s que tarda un agujero en abrirse (o en cerrarse)
   const PRESENTA_AGUJERO_EN = 0.9; // cuándo se abre el agujero de entrada
   const PRESENTA_LLEGA_EN = 1.8; // cuándo empieza a entrar la nave
   const PRESENTA_LLEGADA = 2.6; // lo que tarda en llegar
   const PRESENTA_ENTRA_EN = 4.2; // cuándo se mete en el agujero: lo mira apenas (desde ~3,6 s, cuando casi llegó y se da vuelta hacia él)
   const PRESENTA_ENTRADA = 1.1; // lo que tarda en cruzar volando derecho hasta el centro del agujero (entra antes: al llegar a la zona de entrada)
+  const PRESENTA_NEGRO_TRAS = 0.2; // s desde que el agujero de entrada empieza a cerrarse hasta que se funde a negro
   const PRESENTA_FUNDE = 0.7; // fundido a negro entre la entrada y la salida
   const PRESENTA_NEGRO_ENTRE = 0.3; // s de negro entre las dos pantallas
   const PRESENTA_LEVANTA = 0.6; // lo que tarda en verse la pantalla de salida
   const PRESENTA_SALE_EN = 0.9; // cuándo sale la nave del segundo agujero
   const PRESENTA_SALIDA = 0.5; // s desde que sale la nave hasta que el agujero empieza a cerrarse (con +0.4)
+  const PRESENTA_CRUCE_MAX = 1.5; // s que puede tardar en cruzar el agujero de salida (como PASAJE_CRUCE_MAX)
   const PRESENTA_VE_X = 0.4; // dónde frena a mirar el menú (fracción del ancho; el menú está en 0,5)
-  const PRESENTA_VIAJE = 1.3; // s que tarda en llegar ahí desde el agujero (frena suave)
+  const PRESENTA_VIAJE = 1.5; // s que tarda en llegar ahí desde detrás del agujero (arranca y frena suave)
   const PRESENTA_MIRA = 1.3; // s que se queda mirando el menú antes de irse
   const PRESENTA_VELOCIDAD = 0.6; // pantallas por segundo que vuela hacia la derecha al irse
   const PRESENTA_ARRANQUE = 0.8; // s que tarda en llegar a esa velocidad
@@ -3513,9 +3527,19 @@
   }
 
   // Un agujero de la presentación en (x, y) del mundo, que se abre en abre
-  // (segundos de la fase).
-  function agujeroPresentacion(x, y, abre) {
-    const a = { x, y, abre, cierra: null, ang: Math.random() * Math.PI * 2 };
+  // (segundos de la fase), del color k (0 = blanco, 1 = naranja). entran y
+  // salen: la nave que se mete o que sube (ver huecoPasado).
+  function agujeroPresentacion(x, y, abre, k) {
+    const a = {
+      x,
+      y,
+      abre,
+      k,
+      cierra: null,
+      ang: Math.random() * Math.PI * 2,
+      entran: [],
+      salen: [],
+    };
     presenta.agujeros.push(a);
     return a;
   }
@@ -3573,8 +3597,12 @@
       empezarEntrada();
     }
     p.f += dt;
-    for (const h of p.agujeros) h.ang += CUMULO_GIRO * dt;
-    moverChispas(dt);
+    for (const h of p.agujeros) {
+      h.ang += CUMULO_GIRO * dt;
+      // La nave que pasa por él (ver "La nave entra al agujero y sale del
+      // otro").
+      avanzarPasos(h, cam.z * aperturaPresentacion(h, p.f), dt);
+    }
     if (p.fase === "entrada") actualizarEntrada();
     else actualizarSalida();
     if (presenta) dibujarPresentacion(); // (si la nave ya se fue, terminó)
@@ -3622,7 +3650,12 @@
     tapa.classList.remove("cae");
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const hueco = agujeroPresentacion(w / 2, h / 2, PRESENTA_AGUJERO_EN);
+    const hueco = agujeroPresentacion(
+      w / 2,
+      h / 2,
+      PRESENTA_AGUJERO_EN,
+      PRESENTA_ENTRADA_COLOR,
+    );
     // La nave se queda abajo a la izquierda del agujero, mirándolo.
     const lejos = Math.min(260, w * 0.3);
     p.destino = { x: hueco.x - lejos, y: hueco.y + lejos * 0.35 };
@@ -3667,8 +3700,9 @@
     } else {
       // Se mete: derecho hacia el centro del agujero, cada vez más rápido y
       // siempre del mismo tamaño. Al llegar a la zona de entrada (CUMULO_RADIO,
-      // por el zoom: la misma que en el juego) desaparece de golpe y el agujero
-      // se cierra.
+      // por el zoom: la misma que en el juego) la nave de verdad se esconde y
+      // sigue de largo una copia que lo cruza a la velocidad que traía (sin
+      // chispas).
       const u = Math.min(1, (f - PRESENTA_ENTRA_EN) / PRESENTA_ENTRADA);
       const k = u * u;
       pos = {
@@ -3677,24 +3711,36 @@
       };
       mira = rumbo(hueco.x - p.pos.x, hueco.y - p.pos.y);
       if (
-        hueco.cierra === null &&
+        p.cruzoEn === undefined &&
         Math.hypot(hueco.x - pos.x, hueco.y - pos.y) < CUMULO_RADIO * cam.z
       ) {
         p.cruzoEn = f;
-        // Sigue de largo una copia que se mete en el agujero (ver "La nave
-        // entra al agujero y sale del otro"): el agujero espera a que pase.
-        const copia = copiarNave("jugador", hueco, true);
-        if (copia) pasajes.push(copia);
-        hueco.cierra = f + (copia ? copia.dura : 0);
-        // Se junta en cúmulo mientras se la traga (ver dibujarPresentacion).
-        hueco.traga = { desde: f, dura: Math.max(0.2, copia ? copia.dura : 0) };
-        mostrarNave(false); // (sin chispas: en la presentación no van)
+        const vel =
+          (Math.hypot(hueco.x - p.pos.x, hueco.y - p.pos.y) * 2 * u) /
+          PRESENTA_ENTRADA;
+        const nave = naveQuePasa("jugador", true);
+        if (nave)
+          hueco.entran.push(
+            copiarNave(nave, hueco, radioMaximo(cam.z), {
+              vel,
+              escala: cam.z,
+            }),
+          );
+        mostrarNave(false);
         sonarCruce();
       }
     }
+    // Ya adentro (escondida más allá del borde de enfrente), se cierra.
+    if (
+      p.cruzoEn !== undefined &&
+      hueco.cierra === null &&
+      !hueco.entran.length
+    )
+      hueco.cierra = f;
     window.shipPlace(pos.x, pos.y, true);
     if (mira !== undefined) window.shipFace(mira);
-    const negroEn = (p.cruzoEn || PRESENTA_ENTRA_EN + PRESENTA_ENTRADA) + 0.3;
+    const negroEn =
+      hueco.cierra !== null ? hueco.cierra + PRESENTA_NEGRO_TRAS : Infinity;
     if (!p.funde && f >= negroEn) {
       p.funde = true;
       tapa.style.transition = `opacity ${PRESENTA_FUNDE}s ease`;
@@ -3709,18 +3755,31 @@
     const p = presenta;
     pasarFase("salida");
     fondoDeGolpe(() => scene.style.setProperty("--fondo-color", "0"));
-    particulas = [];
     const w = window.innerWidth;
     p.agujeros = [];
     const hueco = agujeroPresentacion(
       w * 0.2,
       window.innerHeight * POSICION_Y_INICIAL,
       0,
+      PRESENTA_SALIDA_COLOR,
     );
     sonarPortal();
-    p.x = hueco.x;
-    mostrarNave(false); // aparece cuando sale del agujero (actualizarSalida)
-    window.shipPlace(hueco.x, hueco.y);
+    // Arranca escondida detrás del agujero, mirando para la derecha: con la
+    // punta en el borde de atrás y el centro del dibujo a la altura del
+    // centro del agujero (ver puntoDeSalida).
+    const pose = window.shipPose;
+    const k = pose && pose.listo ? Math.abs(pose.escala) : 1;
+    const desde = puntoDeSalida(
+      { x: hueco.x, y: hueco.y, esc: cam.z },
+      { x: 1, y: 0 },
+      rumbo(1, 0),
+      k,
+    );
+    p.x0 = desde.x;
+    p.x = desde.x;
+    p.dy = desde.y - hueco.y;
+    mostrarNave(false); // se ve cuando cruza el agujero (actualizarSalida)
+    window.shipPlace(desde.x, desde.y);
     if (modoEl) {
       modoEl.inert = true; // se ve, pero todavía no se lo puede usar
       modoEl.hidden = false;
@@ -3741,14 +3800,31 @@
     const p = presenta;
     const w = window.innerWidth;
     const hueco = p.agujeros[0];
-    // Sale de golpe, mirando para la derecha, y vuela hasta un punto antes del
-    // menú (PRESENTA_VE_X) frenando suave. Ahí gira, lo mira PRESENTA_MIRA
-    // segundos, vuelve a girar para la derecha y acelera hasta
+    // Sale del agujero mirando para la derecha y arrancando despacio: asoma
+    // por debajo del borde de atrás, lo cruza y vuela hasta un punto antes
+    // del menú (PRESENTA_VE_X) frenando suave. Ahí gira, lo mira
+    // PRESENTA_MIRA segundos, vuelve a girar para la derecha y acelera hasta
     // PRESENTA_VELOCIDAD hasta salir de la pantalla. El menú no se mueve.
     const s = p.f - PRESENTA_SALE_EN;
     if (s >= 0 && !p.salio) {
       p.salio = true;
-      mostrarNave(true); // aparece de golpe, entera y encima del agujero (sin chispas)
+      // La de verdad se ve recién cuando termina de cruzarlo: hasta ahí va
+      // una copia, entre las capas del agujero (ver avanzarCruce).
+      const capas = capasJugador();
+      if (capas.length)
+        hueco.salen.push({
+          quien: "jugador",
+          dir: { x: 1, y: 0 },
+          capas,
+          t: 0,
+          max: PRESENTA_CRUCE_MAX,
+          desde: null, // la nave de verdad ya arranca escondida
+          desliza: 0,
+          pantalla: true,
+          llego: true,
+          espera: 0,
+        });
+      else mostrarNave(true);
       sonarCruce();
     }
     const veX = w * PRESENTA_VE_X;
@@ -3757,7 +3833,7 @@
     if (s >= 0) {
       if (s < PRESENTA_VIAJE) {
         const u = s / PRESENTA_VIAJE;
-        p.x = hueco.x + (veX - hueco.x) * (1 - Math.pow(1 - u, 3));
+        p.x = p.x0 + (veX - p.x0) * u * u * (3 - 2 * u);
       } else if (s < seVa) {
         p.x = veX;
         if (p.miraAlMenu === undefined)
@@ -3773,46 +3849,62 @@
             : v * (t - PRESENTA_ARRANQUE / 2));
       }
       // Ya afuera, el agujero se cierra.
-      if (hueco.cierra === null && s >= PRESENTA_SALIDA + 0.4)
+      if (
+        hueco.cierra === null &&
+        s >= PRESENTA_SALIDA + 0.4 &&
+        !hueco.salen.length
+      )
         hueco.cierra = p.f;
     }
-    const y = hueco.y + Math.sin(p.f * 2.3) * NAVE_FLOTA.y;
+    const y = hueco.y + p.dy + Math.sin(p.f * 2.3) * NAVE_FLOTA.y;
     window.shipPlace(p.x, y, true);
     window.shipFace(mira);
     if (p.x > w + 160) terminarPresentacion(); // ya se fue
   }
 
+  // El pulso de los agujeros de la presentación, con su propio reloj (f).
+  function pulsoPresentacion(f) {
+    const compas = MUSICA_COMPAS_RESPALDO;
+    return pulsoCumulo(f % compas, compas / MUSICA_TIEMPOS_COMPAS);
+  }
+
   // Qué tan abierto está un agujero de la presentación (0 a 1): se abre y se
-  // cierra en PRESENTA_ABRE.
-  function aberturaPresentacion(h, f) {
+  // cierra achicándose, como en el juego.
+  function aperturaPresentacion(h, f) {
     return Math.min(
       Math.max(0, (f - h.abre) / PRESENTA_ABRE),
       h.cierra === null ? 1 : Math.max(0, 1 - (f - h.cierra) / PRESENTA_ABRE),
     );
   }
 
+  // Tamaño de un agujero de la presentación ahora: abierto y, en el medio,
+  // pulsa.
+  function escalaAgujeroPresentacion(h, f) {
+    return (
+      cam.z * // el tamaño del juego: 1 por el zoom de su cámara
+      aperturaPresentacion(h, f) *
+      (1 + CUMULO_PULSO_AMPLITUD * pulsoPresentacion(f))
+    );
+  }
+
   function dibujarPresentacion() {
     const p = presenta;
     dibujarCieloPresentacion();
-    // Los agujeros, como en el juego (del tamaño del juego: 1 por el zoom de
-    // su cámara), pero sin latir: laten solo con la música (ver medidaCumulo)
-    // y acá todavía no suena. El de entrada se junta mientras se traga la nave.
     for (const h of p.agujeros) {
-      const forma = formaAgujero(aberturaPresentacion(h, p.f));
-      const u = h.traga ? Math.min(1, (p.f - h.traga.desde) / h.traga.dura) : 0;
-      const esc = cam.z * forma.esc;
-      if (esc > 0.01)
-        dibujarAgujero(
-          h.x,
-          h.y,
-          h.ang,
-          esc,
-          Math.max(forma.junta, u * u * (3 - 2 * u)),
-          PRESENTA_AGUJERO_COLOR,
-        );
+      const esc = escalaAgujeroPresentacion(h, p.f);
+      if (esc <= 0.01) continue;
+      // Con la nave que está pasando entre sus capas.
+      const oculto = ladoOculto(h);
+      dibujarAgujero(
+        h.x,
+        h.y,
+        h.ang,
+        esc,
+        h.k,
+        pulsoPresentacion(p.f),
+        oculto ? { oculto, dibujar: (R) => dibujarPasajes(h, R) } : null,
+      );
     }
-    dibujarPasajes();
-    dibujarChispas(mezclaAgujeros(PRESENTA_AGUJERO_COLOR));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
@@ -3845,8 +3937,8 @@
   // Todavía sin nombre del juego. Abajo, "cargando" hasta que están las
   // imágenes y después "presiona cualquier tecla": ese toque es el que deja
   // sonar al navegador. Cada una se mueve apenas:
-  // 1. Anillo: el agujero, solo y grande (no late: los agujeros laten solo con
-  //    la música, y en la carátula todavía no suena).
+  // 1. Anillo: el agujero blanco, solo, late con el tempo de la música (como los
+  //    agujeros del juego).
   // 2. Duelo: las dos naves chiquitas frente a frente y un agujero entre ellas;
   //    las estrellas se corren muy despacio.
   // 3. Estelas: las dos naves casi cruzándose, cada una con su humo (el de la X
@@ -4248,13 +4340,17 @@
     }
   }
 
-  // ¿Ya se puede dibujar todo? (Las naves, las estrellas de los agujeros y lo
+  // ¿Ya se puede dibujar todo? (Las naves, los anillos de los agujeros y lo
   // propio de cada carátula: el TIE y la Estrella.)
   function caratulaLista(c) {
     const cargada = (img) => img.complete && img.naturalWidth > 0;
     if (c.n === 13 && !(cargada(c.tie) && cargada(c.estrella))) return false;
-    if (!gusanoSprites) return false;
-    return cargada(imgRivalTop) && cargada(imgRivalFondo) && cargada(imgFuego);
+    return (
+      !!gusanoSprites &&
+      cargada(imgRivalTop) &&
+      cargada(imgRivalFondo) &&
+      cargada(imgFuego)
+    );
   }
 
   // El toque en la carátula: se funde a negro y sigue con el agujero de
@@ -4376,23 +4472,10 @@
     );
   }
 
-  // El agujero de la carátula n, si tiene: dónde (en 1920x1080) y de qué
-  // tamaño.
-  function agujeroCaratula(n) {
-    if (n === 1) return { x: 960, y: 470, esc: 6.5 };
-    if (n === 2) return { x: 960, y: 500, esc: 1.5 };
-    if (n === 6) return { x: 1306, y: 470, esc: 1.25 };
-    if (n === 9)
-      return { x: CARATULA_ORBITA.x, y: CARATULA_ORBITA.y, esc: 1.5 };
-    return null;
-  }
-
   function dibujarCaratula(c, t, dt) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
     const { u } = medidaCaratula();
-    const giroAgujero = t * CUMULO_GIRO * 0.3;
-    const hueco = agujeroCaratula(c.n);
     dibujarEstrellasCaratula(
       c.estrellas,
       c.n === 2 || c.n === 13 ? t * CARATULA_DERIVA * u : 0,
@@ -4406,11 +4489,15 @@
     lc.drawImage(imgRivalFondo, 0, 0, lienzoRival.width, lienzoRival.height);
     lc.drawImage(lienzoFuegoRival, 0, 0);
     lc.drawImage(imgRivalTop, 0, 0, lienzoRival.width, lienzoRival.height);
+    const compas = MUSICA_COMPAS_RESPALDO;
+    const pulso = pulsoCumulo(t % compas, compas / MUSICA_TIEMPOS_COMPAS);
+    const late = 1 + CUMULO_PULSO_AMPLITUD * pulso;
+    const giroAgujero = t * CUMULO_GIRO * 0.3;
 
     if (c.n === 1) {
-      dibujarAgujero(hueco.x, hueco.y, giroAgujero * 0.5, hueco.esc);
+      dibujarAgujero(960, 470, giroAgujero * 0.5, 6.5 * late, 0, pulso);
     } else if (c.n === 2) {
-      dibujarAgujero(hueco.x, hueco.y, giroAgujero, hueco.esc);
+      dibujarAgujero(960, 500, giroAgujero, 1.5, 1);
       naveCaratula(700, 500, 96, 90, haloCaratula(CARATULA_AZUL));
       naveCaratula(1220, 500, 96, -90, haloCaratula(CARATULA_ROJO));
     } else if (c.n === 3) {
@@ -4418,20 +4505,9 @@
       for (const n of c.naves) {
         // Destello tenue: sube y baja en CARATULA_DESTELLO s, y cada nave
         // arranca a la mitad del de la otra.
-        const f =
-          (((t - n.fase) % (CARATULA_DESTELLO * 2)) + CARATULA_DESTELLO * 2) %
-          (CARATULA_DESTELLO * 2);
-        const destello =
-          f < CARATULA_DESTELLO
-            ? Math.sin((f / CARATULA_DESTELLO) * Math.PI)
-            : 0;
-        naveCaratula(
-          n.x,
-          n.y,
-          84,
-          n.rot,
-          haloCaratula(n.rgb, 0.6 + 0.4 * destello),
-        );
+        const f = (((t - n.fase) % (CARATULA_DESTELLO * 2)) + CARATULA_DESTELLO * 2) % (CARATULA_DESTELLO * 2);
+        const destello = f < CARATULA_DESTELLO ? Math.sin((f / CARATULA_DESTELLO) * Math.PI) : 0;
+        naveCaratula(n.x, n.y, 84, n.rot, haloCaratula(n.rgb, 0.6 + 0.4 * destello));
       }
     } else if (c.n === 4) {
       const luz = ctx.createRadialGradient(960, 470, 0, 960, 470, 360);
@@ -4473,7 +4549,7 @@
       naveCaratula(960, 800, 84, 0, haloCaratula(CARATULA_AZUL));
     } else if (c.n === 6) {
       const L = CARATULA_LLEGADA;
-      dibujarAgujero(hueco.x, hueco.y, giroAgujero, hueco.esc);
+      dibujarAgujero(1306, 470, giroAgujero, 1.25, 1);
       ctx.drawImage(c.humo, 0, 0, 1920, 1080);
       naveCaratula(L.x, L.y, L.alto, c.rot, haloCaratula(CARATULA_AZUL, 0.8));
     } else if (c.n === 9) {
@@ -4481,20 +4557,13 @@
       ctx.save();
       avanzarBocanadas(c.humo, dt, true);
       ctx.restore();
-      dibujarAgujero(hueco.x, hueco.y, giroAgujero, hueco.esc);
+      dibujarAgujero(O.x, O.y, giroAgujero, 1.5, 1);
       naveCaratula(c.x, c.y, O.alto, c.rot, haloCaratula(CARATULA_AZUL, 0.8));
     } else if (c.n === 11) {
       const L = CARATULA_LINTERNA;
       // La luz respira apenas.
       const respira = 1 + 0.06 * Math.sin(t * 1.3);
-      const luz = ctx.createRadialGradient(
-        L.x,
-        L.y,
-        0,
-        L.x,
-        L.y,
-        L.radio * respira,
-      );
+      const luz = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.radio * respira);
       luz.addColorStop(0, `rgba(${CARATULA_LUZ}, 0.11)`);
       luz.addColorStop(0.5, `rgba(${CARATULA_LUZ}, 0.05)`);
       luz.addColorStop(1, `rgba(${CARATULA_LUZ}, 0)`);
@@ -6047,7 +6116,6 @@
   // verse hasta que se elija un modo) y queda el menú.
   function terminarPresentacion() {
     presenta = null;
-    limpiarPasajes();
     window.shipLibre = false;
     window.shipZoom = 1;
     particulas = [];
@@ -6254,7 +6322,6 @@
     ganado = true;
     final = { t: 0, fase: 1 };
     cumulos = [];
-    limpiarPasajes();
     particulas = [];
     poligonos = [];
     poligonosRival = [];
@@ -6917,14 +6984,42 @@
     );
   }
 
-  // Un gol de la nave del jugador (ya contado en cumulosTomados): desaparece
-  // por este agujero y aparece por el otro (ambos se cierran con chispas), y
-  // se pinta un poco más.
+  // El temblor del joystick al hacer un gol: cortito y muy suave (ms y fuerza
+  // de 0 a 1 de cada motor: el débil es el que se siente más fino).
+  const VIBRA_GOL = { duracion: 80, fuerte: 0.4, debil: 0.25 };
+
+  // Si quien hizo el gol ("jugador" o "rival") juega con joystick, le tiembla
+  // apenas (ver VIBRA_GOL): el jugador, salvo que con dos jugadores el
+  // joystick lo tenga el 2; el rival, solo si es el jugador 2 con el joystick
+  // (no la PC ni el de online).
+  function vibrarGol(quien) {
+    const deJ2 = modo === "dos" && !!window.j2Joystick;
+    if (quien === "rival" ? !deJ2 : deJ2) return;
+    const gp = primerJoystick();
+    if (!gp) return;
+    const V = VIBRA_GOL;
+    try {
+      if (gp.vibrationActuator && gp.vibrationActuator.playEffect)
+        gp.vibrationActuator
+          .playEffect("dual-rumble", {
+            duration: V.duracion,
+            strongMagnitude: V.fuerte,
+            weakMagnitude: V.debil,
+          })
+          .catch(() => {});
+      else if (gp.hapticActuators && gp.hapticActuators[0])
+        gp.hapticActuators[0].pulse(V.debil, V.duracion); // Firefox
+    } catch (e) {} // (un joystick que no vibra)
+  }
+
+  // Un gol de la nave del jugador (ya contado en cumulosTomados): se mete por
+  // este agujero y sube por el otro (ver pasarAgujero), y se pinta un poco
+  // más.
   function golPropio(entrado) {
     const salida = entrado.par || entrado;
     chispas(entrado.x, entrado.y);
-    pasarAgujero("jugador", entrado, salida);
-    if (window.shipPlace) window.shipPlace(salida.x, salida.y, true);
+    const sale = pasarAgujero("jugador", entrado, salida);
+    if (window.shipPlace) window.shipPlace(sale.x, sale.y, true);
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     if (esTutorial()) {
       // Como en los otros modos: en el de salida las estrellas forman el
@@ -7729,9 +7824,9 @@
     const salida = entrado.par || entrado;
     chispas(entrado.x, entrado.y);
     chispas(salida.x, salida.y);
-    pasarAgujero("rival", entrado, salida);
-    rival.x = salida.x; // sale por el otro, con el rumbo que traía
-    rival.y = salida.y;
+    const sale = pasarAgujero("rival", entrado, salida);
+    rival.x = sale.x; // sale por el otro, con el rumbo que traía
+    rival.y = sale.y;
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     // Igual que el gol propio, pero del color que le tocó al rival (PC o
     // jugador 2: el mismo del halo de esa nave).
@@ -7894,8 +7989,8 @@
     });
     cumulos = cumulos.filter((c) => c !== entrado && c !== salida);
     chispas(entrado.x, entrado.y);
-    pasarAgujero("jugador", entrado, salida);
-    if (window.shipPlace) window.shipPlace(salida.x, salida.y, true);
+    const sale = pasarAgujero("jugador", entrado, salida);
+    if (window.shipPlace) window.shipPlace(sale.x, sale.y, true);
     cumulosTomados++;
     crearNumeroEstrellas(salida.x, salida.y, cumulosTomados, colorPropio());
     sonarCruce();
@@ -8759,6 +8854,10 @@
     // Se cierra el par acá mismo (el próximo estado del anfitrión igual lo saca).
     const cerca = (c, p) => Math.hypot(c.x - p.x, c.y - p.y) < 2;
     const puntos = [m.e, m.s, ...(m.a || [])].filter(Boolean).map(aPx);
+    // Por dónde se pasó: el agujero que estaba ahí, si todavía se ve (ver
+    // pasarAgujero), o si no el punto.
+    const vistos = cumulos.slice();
+    const agujeroEn = (p) => vistos.find((c) => cerca(c, p)) || p;
     cumulos = cumulos.filter((c) => !puntos.some((p) => cerca(c, p)));
     cumulosTomados = m.g[1];
     golesRival = m.g[0];
@@ -8769,8 +8868,8 @@
         const e = aPx(m.e);
         const s = aPx(m.s);
         chispas(e.x, e.y);
-        pasarAgujero("jugador", e, s);
-        if (window.shipPlace) window.shipPlace(s.x, s.y, true);
+        const sale = pasarAgujero("jugador", agujeroEn(e), agujeroEn(s));
+        if (window.shipPlace) window.shipPlace(sale.x, sale.y, true);
         crearNumeroEstrellas(s.x, s.y, cumulosTomados, colorPropio());
         decirGol(cumulosTomados, vozDeHito(true), false); // el final, en revisarFin
         sonarCruce();
@@ -8781,7 +8880,7 @@
       const [e, s] = (m.a || [m.e, m.s]).map(aPx);
       chispas(e.x, e.y);
       chispas(s.x, s.y);
-      pasarAgujero("rival", e, s);
+      pasarAgujero("rival", agujeroEn(e), agujeroEn(s));
       crearNumeroEstrellas(s.x, s.y, golesRival, colorRival());
       sonarCruce();
       if (m.quien === "anfitrion") decirHitoRival();
@@ -8795,11 +8894,34 @@
     if (!rival || ganado) return;
     if (enLinea() && !rival.visto) return; // todavía no llegó dónde está
     if (rival.stun > 0 && rival.t >= DURACION_CHOQUE) return; // fuera de juego: no se ve
+    // Saliendo de un agujero va adentro de él, debajo de las estrellas (ver
+    // dibujarPasajes); online, mientras no llegue al de salida, no se ve.
+    if (rival.sale) return;
+    if (!armarRival()) return;
+    const k = escalaNaveMundo();
+    const lado = cajaNave;
+    const ancho = (lado * lienzoRival.width) / lienzoRival.height;
+    ctx.save();
+    ctx.translate(rival.x, rival.y);
+    ctx.rotate((rival.rot * Math.PI) / 180);
+    ctx.scale(k, k);
+    // Recién vuelta de un golpe parpadea (igual que la del jugador, ver
+    // .invulnerable en styles.css).
+    ctx.globalAlpha =
+      alfaRival() * (rival.invul > 0 ? parpadeo(rival.invul) : 1);
+    ctx.filter = filtroRival();
+    // El sprite va pegado a la izquierda de su caja.
+    ctx.drawImage(lienzoRival, -lado / 2, -lado / 2, ancho, lado);
+    ctx.restore();
+  }
+
+  // Arma la nave del rival en lienzoRival: las tres capas juntas (atrás,
+  // fuego, adelante), como la nave del jugador. false si todavía no cargó.
+  function armarRival() {
     const img = imgDeNave(naveRival, rival); // si es de costado, el lado lo guarda rival.lado
-    if (!img.complete || !img.naturalWidth) return;
+    if (!img.complete || !img.naturalWidth) return false;
     const w = lienzoRival.width;
     const h = lienzoRival.height;
-    // Las tres capas juntas (atrás, fuego, adelante), como la nave del jugador.
     const c = lienzoRival.getContext("2d");
     c.clearRect(0, 0, w, h);
     const fondo = naveRival.fondo;
@@ -8807,44 +8929,19 @@
       c.drawImage(fondo, 0, 0, w, h);
     c.drawImage(lienzoFuegoRival, 0, 0);
     c.drawImage(img, 0, 0, w, h);
-
-    const k = escalaNaveMundo();
-    const lado = cajaNave;
-    const ancho = (lado * lienzoRival.width) / lienzoRival.height;
-    const sale = rival.sale;
-    // Online la nave del rival puede llegar al agujero de salida un poco
-    // después del gol: mientras siga lejos, no se ve (ya se metió su copia).
-    if (
-      sale &&
-      enLinea() &&
-      Math.hypot(rival.x - sale.hueco.x, rival.y - sale.hueco.y) >
-        sale.hueco.radio() * 4
-    )
-      return;
-    ctx.save();
-    ctx.translate(rival.x, rival.y);
-    ctx.rotate((rival.rot * Math.PI) / 180);
-    ctx.scale(k, k);
-    // Recién vuelta de un golpe parpadea (igual que la del jugador, ver
-    // .invulnerable en styles.css).
-    // La de la PC, más transparente que la del jugador para no confundirlas;
-    // la del jugador 2 se ve entera (es de alguien que la está manejando).
-    ctx.globalAlpha =
-      (modo === "dos" ? 1 : RIVAL_OPACIDAD) *
-      (rival.invul > 0 ? parpadeo(rival.invul) : 1);
-    // Igual que la nave del jugador en el juego: en blanco y negro, con el
-    // levantado de brillo de la luz prendida (0,35, el mismo de siempre). Con
-    // dos jugadores lo prende y apaga el jugador 2 y contra la PC lo decide la
-    // IA (luzRival, ver actualizarRival); online la nave del rival queda
-    // siempre "iluminada". Se va tiñendo con sus goles y, encima, su halo: rojo o
-    // azul según le haya tocado (ver esAzul).
-    ctx.filter = filtroRival();
-    // El sprite va pegado a la izquierda de su caja.
-    ctx.drawImage(lienzoRival, -lado / 2, -lado / 2, ancho, lado);
-    ctx.restore();
+    return true;
   }
 
-  // El filtro de la nave del rival (ver dibujarRival).
+  // La de la PC, más transparente que la del jugador para no confundirlas;
+  // la del jugador 2 se ve entera (es de alguien que la está manejando).
+  const alfaRival = () => (modo === "dos" ? 1 : RIVAL_OPACIDAD);
+
+  // Igual que la nave del jugador en el juego: en blanco y negro, con el
+  // levantado de brillo de la luz prendida (0,35, el mismo de siempre). Con
+  // dos jugadores lo prende y apaga el jugador 2 y contra la PC lo decide la
+  // IA (luzRival, ver actualizarRival); online la nave del rival queda
+  // siempre "iluminada". Se va tiñendo con sus goles y, encima, su halo: rojo o
+  // azul según le haya tocado (ver esAzul).
   function filtroRival() {
     const gris = 1 - Math.min(1, tinteNaves);
     const iluminada = modo === "dos" || modo === "pc" ? luzRival : true;
@@ -8980,201 +9077,76 @@
     ctx.globalAlpha = 1;
   }
 
-  // Las estrellas de la esfera (ver ESFERA_...), siempre las mismas: hacia
-  // dónde está cada una (en la superficie del globo), qué tan adentro queda en
-  // el cúmulo (fracción del radio), qué tan prendida, de qué tamaño (px del
-  // mundo, a escala del juego) y su lugar en la fila de los colores (ver
-  // tintarEsfera). En el celular y en calidad baja, menos.
-  function armarEsfera() {
-    const cant =
-      calidadBaja() || tactil
-        ? Math.round(ESFERA_ESTRELLAS * 0.65)
-        : ESFERA_ESTRELLAS;
-    const azar = dados(4211);
-    const normal = () =>
-      Math.sqrt(-2 * Math.log(1 - azar())) * Math.cos(2 * Math.PI * azar());
-    const dir = new Float32Array(cant * 3);
-    const cumulo = new Float32Array(cant);
-    const brillo = new Float32Array(cant);
-    const tam = new Float32Array(cant);
-    const orden = new Float32Array(cant);
-    for (let i = 0; i < cant; i++) {
-      const x = normal();
-      const y = normal();
-      const z = normal();
-      const n = Math.hypot(x, y, z) || 1;
-      dir[i * 3] = x / n;
-      dir[i * 3 + 1] = y / n;
-      dir[i * 3 + 2] = z / n;
-      cumulo[i] = Math.pow(azar(), ESFERA_CUMULO);
-      brillo[i] = 0.35 + 0.65 * azar();
-      tam[i] = 0.8 + 0.5 * azar();
-      orden[i] = azar();
-    }
-    return {
-      cant,
-      dir,
-      cumulo,
-      brillo,
-      tam,
-      orden,
-      tinte: new Uint8Array(cant), // 0 blanca, 1 azul, 2 roja (ver tintarEsfera)
-      cambio: new Float32Array(cant).fill(-10), // s (performance.now) en que cambió de color
-      azul: 0, // la parte azul y la roja que se ven ahora (van hacia las de repartoEquipos)
-      rojo: 0,
-      tintadoEn: 0,
-      atlas: null,
-    };
-  }
-
-  // Qué parte de las estrellas de los agujeros es de cada equipo (azul y
-  // rojo, de 0 a 1): cada gol pinta 1/CUMULOS_PARA_COLOR del color de quien
-  // lo hizo, y el resto queda blanco; si entre los dos pasan del total, se
-  // reparten según el resultado (9 a 9 o 10 a 10: mitad y mitad).
-  function repartoEquipos() {
-    const [azules, rojos] = esAzul()
-      ? [cumulosTomados, golesRival]
-      : [golesRival, cumulosTomados];
-    let azul = azules / CUMULOS_PARA_COLOR;
-    let rojo = rojos / CUMULOS_PARA_COLOR;
-    if (azul + rojo > 1) {
-      const total = azul + rojo;
-      azul /= total;
-      rojo /= total;
-    }
-    return { azul, rojo };
-  }
-
-  // Los colores de las estrellas de los agujeros (todas las esferas iguales),
-  // una vez por cuadro. Cada estrella tiene su lugar en una fila (orden): las
-  // primeras son azules y las últimas rojas, tantas como diga el reparto (que
-  // se acerca de a poco al del resultado), y las del medio blancas. Así, con
-  // un gol solo cambian las blancas que pasan a ser de quien lo hizo (y al
-  // repartir, las del límite), y cada una que cambia brilla un momento (ver
-  // dibujarAgujero). En el tutorial, que no tiene rival, quedan blancas.
-  function tintarEsfera(ahora) {
-    const e = gusanoSprites;
-    const meta = esTutorial() ? { azul: 0, rojo: 0 } : repartoEquipos();
-    const dt = Math.min(0.1, Math.max(0, ahora - e.tintadoEn));
-    e.tintadoEn = ahora;
-    if (!meta.azul && !meta.rojo) {
-      // Partida nueva (o tutorial): todas blancas, de una.
-      if (e.azul || e.rojo) {
-        e.azul = e.rojo = 0;
-        e.tinte.fill(0);
-      }
-      return;
-    }
-    const acerca = Math.min(1, dt * ESFERA_PINTA);
-    e.azul += (meta.azul - e.azul) * acerca;
-    e.rojo += (meta.rojo - e.rojo) * acerca;
-    for (let i = 0; i < e.cant; i++) {
-      const o = e.orden[i];
-      const t = o < e.azul ? 1 : o >= 1 - e.rojo ? 2 : 0;
-      if (t !== e.tinte[i]) {
-        e.tinte[i] = t;
-        e.cambio[i] = ahora;
+  // Un anillo de estrellas con brillo, dibujado en un canvas aparte (una sola
+  // vez): el resplandor (shadowBlur) es lo caro, así no se recalcula por cuadro.
+  function armarAnillo(radio, cantidad, r, color) {
+    const K = SPRITE_ESCALA;
+    const lado = Math.ceil((radio + r + CUMULO_BRILLO * 2) * 2 * K);
+    const lienzo = document.createElement("canvas");
+    lienzo.width = lienzo.height = lado;
+    const c = lienzo.getContext("2d");
+    c.translate(lado / 2, lado / 2);
+    c.fillStyle = color;
+    c.shadowColor = color;
+    c.shadowBlur = CUMULO_BRILLO * K;
+    for (let i = 0; i < cantidad; i++) {
+      const a = (i / cantidad) * Math.PI * 2;
+      // Varias pasadas: el resplandor se refuerza y se nota más, sin correrse
+      // ni un píxel (el sprite mide lo mismo, ver CUMULO_BRILLO_PASADAS).
+      for (let k = 0; k < CUMULO_BRILLO_PASADAS; k++) {
+        c.beginPath();
+        c.arc(
+          Math.cos(a) * radio * K,
+          Math.sin(a) * radio * K,
+          r * K,
+          0,
+          Math.PI * 2,
+        );
+        c.fill();
       }
     }
-  }
-
-  // Las estrellitas ya dibujadas: un punto con un halo suave, en ESFERA_NIVELES
-  // brillos (del apagado al más prendido) y en varios tamaños (así ninguna se
-  // achica mucho al dibujarla: titilaría), para cada color: blanco (en el
-  // tutorial, del blanco al salmón con el color de la partida k), azul y rojo.
-  // Se rehacen solo cuando cambia k (de a 1/32).
-  const ESFERA_NIVELES = 8;
-  const ESFERA_SPRITES = [10, 20, 40, 80]; // px de lado; el punto mide lado / 10 de radio
-  function atlasEstrellas(k) {
-    const e = gusanoSprites;
-    const kq = Math.round(Math.max(0, Math.min(1, k)) * 32) / 32;
-    if (e.atlas && e.atlas.k === kq) return e.atlas;
-    const [a, b] = GUSANO_COLORES;
-    const mezcla = (c) =>
-      [0, 1, 2].map((q) => a[c][q] + (b[c][q] - a[c][q]) * kq);
-    // Los de cada equipo: apagado, prendido y lo más prendido.
-    const equipo = (hex) => {
-      const base = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-      return {
-        tenue: base.map((v) => v * 0.42),
-        luz: base,
-        pico: base.map((v) => v + (255 - v) * 0.55),
-      };
-    };
-    const paletas = [
-      { tenue: mezcla("tenue"), luz: mezcla("luz"), pico: mezcla("pico") },
-      equipo(BORDE_JUGADOR), // el azul
-      equipo(BORDE_RIVAL), // el rojo
-    ];
-    // El color de cada brillo, como en la maqueta: del apagado a la luz y lo
-    // más prendido yendo al pico; y lo prendido (alfa).
-    const colorDe = (p, nv) => {
-      const u = (nv / (ESFERA_NIVELES - 1)) * 1.3;
-      return [0, 1, 2].map((q) =>
-        Math.round(
-          Math.min(
-            255,
-            p.tenue[q] * (1 - Math.min(1, u)) +
-              p.luz[q] * Math.min(1, u) +
-              p.pico[q] * Math.max(0, u - 0.85) * 1.5,
-          ),
-        ),
-      );
-    };
-    const alfas = [];
-    for (let nv = 0; nv < ESFERA_NIVELES; nv++)
-      alfas.push(Math.min(1, 0.4 + 0.8 * (nv / (ESFERA_NIVELES - 1)) * 1.3));
-    const tintes = paletas.map((p) => {
-      const tamanos = ESFERA_SPRITES.map((lado) => {
-        const R = lado / 10;
-        const sigma = 2.4 * R;
-        const niveles = [];
-        for (let nv = 0; nv < ESFERA_NIVELES; nv++) {
-          const col = colorDe(p, nv);
-          const c = document.createElement("canvas");
-          c.width = c.height = lado;
-          const lc = c.getContext("2d");
-          const img = lc.createImageData(lado, lado);
-          for (let j = 0; j < lado; j++) {
-            for (let i = 0; i < lado; i++) {
-              const d = Math.hypot(i + 0.5 - lado / 2, j + 0.5 - lado / 2);
-              const borde = Math.max(0, 1 - (d / (lado / 2)) ** 2); // el halo se apaga antes del borde
-              const v = Math.min(
-                1,
-                Math.max(0, R - d + 0.5) +
-                  0.24 * Math.exp(-(d * d) / (2 * sigma * sigma)) * borde,
-              );
-              const o = (j * lado + i) * 4;
-              img.data[o] = col[0];
-              img.data[o + 1] = col[1];
-              img.data[o + 2] = col[2];
-              img.data[o + 3] = 255 * v;
-            }
-          }
-          lc.putImageData(img, 0, 0);
-          niveles.push(c);
-        }
-        return { lado, R, niveles };
-      });
-      // Para las chicas, que van sin dibujo (ver dibujarAgujero): el color.
-      const colores = [];
-      for (let nv = 0; nv < ESFERA_NIVELES; nv++)
-        colores.push(`rgb(${colorDe(p, nv).join(", ")})`);
-      return { tamanos, colores };
-    });
-    e.atlas = {
-      k: kq,
-      tintes,
-      alfas,
-      luz: paletas[0].luz.map(Math.round).join(", "),
-    };
-    return e.atlas;
+    return lienzo;
   }
 
   // Todo lo caro de dibujar se arma acá, una sola vez (al entrar al escenario).
   function armarSprites() {
-    // Las estrellas de los agujeros (ver dibujarAgujero).
-    gusanoSprites = armarEsfera();
+    // Los dos anillos de los agujeros, cada uno en blanco y en naranja.
+    gusanoSprites = {
+      afuera: [CUMULO_COLOR_INICIO, CUMULO_COLOR_FIN].map((color) =>
+        armarAnillo(CUMULO_ANILLO, CUMULO_ESTRELLAS, CUMULO_ESTRELLA_R, color),
+      ),
+      adentro: [CUMULO_COLOR_INICIO, CUMULO_COLOR_FIN].map((color) =>
+        armarAnillo(
+          CUMULO_ANILLO * CUMULO_INTERIOR_RADIO,
+          CUMULO_INTERIOR,
+          CUMULO_ESTRELLA_R * 0.75,
+          color,
+        ),
+      ),
+    };
+    // Las estrellitas del otro lado: en un cuadrado más grande que el negro
+    // (1,3 radios para cada lado), así al correrse no queda un borde vacío.
+    {
+      const R = CUMULO_ANILLO * CUMULO_DISCO_RADIO;
+      const K = OTRO_CIELO_ESCALA;
+      const lado = Math.ceil(2.6 * R * K);
+      const sprite = document.createElement("canvas");
+      sprite.width = sprite.height = lado;
+      const c = sprite.getContext("2d");
+      for (let i = 0; i < OTRO_CIELO_ESTRELLAS; i++) {
+        c.fillStyle = `rgba(185, 195, 255, ${0.18 + 0.4 * Math.random()})`;
+        c.beginPath();
+        c.arc(
+          Math.random() * lado,
+          Math.random() * lado,
+          (0.35 + 0.45 * Math.random()) * K,
+          0,
+          Math.PI * 2,
+        );
+        c.fill();
+      }
+      otroCieloSprite = sprite;
+    }
     // La luz de la nave: el mismo degradado que el resto de la página (el
     // ::before de .starry-cohete-pair en styles.css). Se arranca en un color
     // según de quién es (blanco en el tutorial, que no tiene equipo; azul o
@@ -9202,6 +9174,23 @@
       rojo: armarLuzSprite(LUZ_RGB_INICIO_RIVAL),
       fin: armarLuzSprite(LUZ_RGB_FIN),
     };
+  }
+
+  // Dibuja un sprite de anillo rotado. Como los anillos de estrellas son
+  // parejos, rotar el sprite se ve igual que mover cada estrella.
+  function dibujarAnilloSprite(sprite, x, y, giro, esc, alfa) {
+    if (alfa <= 0.01) return;
+    const lado = (sprite.width / SPRITE_ESCALA) * esc;
+    ctx.save();
+    // Los anillos son luz: se suman a lo que hay detrás en vez de taparlo
+    // ("lighter"). El agujero se ve bastante más luminoso sin ocupar ni un
+    // píxel más -lo que crece es el brillo, no el tamaño-.
+    ctx.globalCompositeOperation = "lighter";
+    ctx.translate(x, y);
+    ctx.rotate(giro);
+    ctx.globalAlpha = alfa;
+    ctx.drawImage(sprite, -lado / 2, -lado / 2, lado, lado);
+    ctx.restore();
   }
 
   // Color intermedio entre el de inicio y el de fin de los agujeros (para las
@@ -9259,9 +9248,13 @@
     return mezclarColores(CUMULO_COLOR_INICIO, CUMULO_COLOR_FIN, k);
   }
 
-  // Agujeros de gusano: la esfera de estrellas (ver ESFERA_...) y las chispas
+  // Agujeros de gusano: un circulito de estrellas con brillo girando muy rápido,
+  // con otro anillo más chico girando para el otro lado y el centro negro (el
+  // "agujero"), donde se asoma el otro lado (ver OTRO_CIELO_ESTRELLAS).
+  // Empiezan blancos y, a medida que se colorea la nave, pasan a naranja: son
+  // dos sprites (blanco y naranja) que se funden con colorNave. Y las chispas
   // de cuando se entra o se sale.
-  // 0..1: qué tanto se está juntando el agujero con la música. pos = segundos desde el pulso
+  // 0..1: qué tanto se está estirando el agujero. pos = segundos desde el pulso
   // del compás y tiempo = lo que dura un tiempo de la música (los dos en segundos
   // del audio original). Sube rápido (el "estirón", que arranca justo con el
   // bombo) y baja más despacio, los dos con suavizado.
@@ -9275,201 +9268,123 @@
     return s * s * (3 - 2 * s);
   }
 
-  // Para dónde está torcido el eje de giro del agujero en (x, y): cada uno
-  // para otro lado (sale de dónde está, que no cambia).
-  function tuerceAgujero(x, y) {
-    return (
-      ((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1) * Math.PI * 2
-    );
+  // Un agujero en (x, y), girado ang, de tamaño esc (1 = el del juego) y con
+  // el color k (0 = blanco, 1 = naranja); pulso: el de la música (0..1, ver
+  // pulsoCumulo), para la nube del otro lado. paso (opcional): una nave que
+  // está pasando, { oculto, dibujar } (ver "La nave entra al agujero y sale
+  // del otro"). El agujero entero es el piso: la nave va encima. Después, el
+  // techo: la franja del borde que da a oculto (desde donde empiezan las
+  // estrellas del anillo de adentro, que es por donde la nave entra y sale,
+  // hasta donde termina el negro) se vuelve a dibujar igual, encima de la
+  // nave, y la tapa. Como todo eso va sobre el
+  // negro, que es opaco, la franja queda idéntica a la de abajo: no se ve
+  // ningún corte, y la nave desaparece de golpe en su borde, sin
+  // transparentarse.
+  function dibujarAgujero(x, y, ang, esc, k, pulso = 0, paso = null) {
+    dibujarPisoAgujero(x, y, ang, esc, k, pulso);
+    if (!paso) return;
+    const adentro = radioBorde(esc);
+    const negro = CUMULO_ANILLO * CUMULO_DISCO_RADIO * esc;
+    paso.dibujar(adentro);
+    ctx.save();
+    recortarMitad(x, y, paso.oculto, 1, negro * 2);
+    ctx.beginPath();
+    ctx.arc(x, y, negro, 0, Math.PI * 2);
+    ctx.moveTo(x + adentro, y);
+    ctx.arc(x, y, adentro, 0, Math.PI * 2);
+    ctx.clip("evenodd"); // la franja
+    dibujarPisoAgujero(x, y, ang, esc, k, pulso);
+    ctx.restore();
   }
 
-  // El tamaño (esc, 0 a 1) y lo juntas que están las estrellas (junta: 0
-  // globo, 1 cúmulo) de un agujero según lo abierto que esté (0 a 1): se
-  // agranda enseguida y se abre en globo a lo largo de toda la apertura; al
-  // cerrarse, al revés (se junta en cúmulo y se achica al final).
-  function formaAgujero(abierto) {
-    const a = Math.max(0, Math.min(1, abierto));
-    const u = Math.min(1, a / 0.45);
-    return { esc: u * u * (3 - 2 * u), junta: 1 - a * a * (3 - 2 * a) };
-  }
-
-  // Un agujero en (x, y): la esfera de estrellas (ver ESFERA_...). ang avanza
-  // con el tiempo (la hace girar), esc es su tamaño (1 = el del juego), junta
-  // cuánto se juntaron las estrellas (0 globo, 1 cúmulo), k el color de las
-  // blancas (0 blanco, 1 salmón: ver GUSANO_COLORES) y equipos, si van con los
-  // colores del resultado (ver tintarEsfera).
-  function dibujarAgujero(x, y, ang, esc, junta = 0, k = 0, equipos = false) {
-    const e = gusanoSprites;
-    if (esc <= 0.001) return;
-    junta = Math.max(0, Math.min(1, junta));
-    const R = ESFERA_RADIO * esc; // px del mundo
-    const atlas = atlasEstrellas(k);
-    const m = ctx.getTransform();
-    const pantalla = Math.sqrt(m.a * m.a + m.b * m.b); // px de pantalla por px del mundo
-    const ahora = performance.now() / 1000;
-    // El vidrio, que se ve cuando es globo: el cielo apenas más oscuro adentro
-    // y un borde de luz muy suave.
-    const globo = 1 - junta;
-    if (globo > 0.01) {
-      const luz = atlas.luz;
-      const g = ctx.createRadialGradient(x, y, 0, x, y, R * 1.1);
-      g.addColorStop(0, `rgba(0, 0, 0, ${0.1 * globo})`);
-      g.addColorStop(0.72, `rgba(0, 0, 0, ${0.1 * globo})`);
-      g.addColorStop(0.86, `rgba(${luz}, ${0.03 * globo})`);
-      g.addColorStop(0.91, `rgba(${luz}, ${0.12 * globo})`);
-      g.addColorStop(1, `rgba(${luz}, 0)`);
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(x, y, R * 1.1, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Primero, dónde va cada estrella, de qué tamaño, con qué brillo (nivel
-    // del atlas) y de qué color: entre su lugar en el globo y el suyo en el
-    // cúmulo, girada (alrededor del eje, que está inclinado hacia quien mira y
-    // torcido). La que recién cambió de color brilla un momento.
-    const phi = ang * ESFERA_GIRO;
-    const cf = Math.cos(phi);
-    const sf = Math.sin(phi);
-    const ci = Math.cos(ESFERA_INCLINA);
-    const si = Math.sin(ESFERA_INCLINA);
-    const t = tuerceAgujero(x, y);
-    const ct = Math.cos(t);
-    const st = Math.sin(t);
-    const achica = Math.max(0.35, esc); // las estrellas no se achican tanto como la esfera
-    const n = e.cant;
-    const GRUPOS = 2 * 3 * ESFERA_NIVELES; // atrás o adelante, color y brillo
-    const b =
-      e.cuadro ||
-      (e.cuadro = {
-        x: new Float32Array(n),
-        y: new Float32Array(n),
-        r: new Float32Array(n),
-        grupo: new Uint8Array(n),
-        orden: new Uint16Array(n),
-        desde: new Uint16Array(GRUPOS + 1),
-      });
-    b.desde.fill(0);
-    for (let i = 0; i < n; i++) {
-      const rr = 1 - junta + junta * e.cumulo[i];
-      const dx = e.dir[i * 3] * rr;
-      const dy = e.dir[i * 3 + 1] * rr;
-      const dz = e.dir[i * 3 + 2] * rr;
-      const x1 = dx * cf + dz * sf;
-      const z1 = -dx * sf + dz * cf;
-      const y2 = dy * ci - z1 * si;
-      const z2 = dy * si + z1 * ci;
-      const sx = x1 * ct - y2 * st;
-      const sy = x1 * st + y2 * ct;
-      const frente = (z2 + 1) / 2; // 1 la de más adelante
-      const luz =
-        0.75 +
-        0.5 *
-          Math.max(
-            0,
-            (sx * ESFERA_LUZ[0] + sy * ESFERA_LUZ[1] + z2 * ESFERA_LUZ[2]) /
-              Math.max(rr, 1e-3),
-          );
-      const tinte = equipos ? e.tinte[i] : 0;
-      const destello = equipos
-        ? Math.max(0, 1 - (ahora - e.cambio[i]) / ESFERA_DESTELLO)
-        : 0;
-      const B =
-        ESFERA_BRILLO *
-        e.brillo[i] *
-        (0.3 + 0.7 * Math.pow(frente, 1.3)) *
-        luz *
-        (1 + 0.25 * junta) *
-        (1 + 1.3 * destello);
-      const nivel = Math.min(
-        ESFERA_NIVELES - 1,
-        Math.round((Math.min(1.3, B) / 1.3) * (ESFERA_NIVELES - 1)),
+  // El agujero entero, sin nada que pase: el disco negro con el otro lado y
+  // encima las luces que giran (los dos anillos).
+  function dibujarPisoAgujero(x, y, ang, esc, k, pulso) {
+    // El agujero: un disco negro que tapa lo que hay detrás (la luz, las
+    // estrellas del fondo) y deja bien visible el "pozo" del medio.
+    const R = CUMULO_ANILLO * CUMULO_DISCO_RADIO * esc;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.fill();
+    // El otro lado, recortado al negro: el cielo se corre despacio con su
+    // propio reloj (el giro del agujero, que en cada uno arranca distinto) y
+    // la nube violeta se aviva con el pulso.
+    const t = ang / CUMULO_GIRO;
+    const dx = Math.sin(t * 0.3) * R * OTRO_CIELO_DERIVA.x;
+    const dy = Math.cos(t * 0.23) * R * OTRO_CIELO_DERIVA.y;
+    const aviva = 1 + OTRO_CIELO_AVIVA * pulso;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, R * 0.98, 0, Math.PI * 2);
+    ctx.clip();
+    const nx = x + R * 0.25 + dx;
+    const ny = y - R * 0.2 + dy;
+    const nube = ctx.createRadialGradient(nx, ny, 0, nx, ny, R * 1.1);
+    nube.addColorStop(0, `rgba(96, 64, 170, ${0.22 * aviva})`);
+    nube.addColorStop(0.5, `rgba(40, 40, 120, ${0.1 * aviva})`);
+    nube.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = nube;
+    ctx.fillRect(x - R, y - R, 2 * R, 2 * R);
+    const lado = (otroCieloSprite.width / OTRO_CIELO_ESCALA) * esc;
+    ctx.drawImage(otroCieloSprite, x + dx - lado / 2, y + dy - lado / 2, lado, lado);
+    ctx.restore();
+    for (let v = 0; v < 2; v++) {
+      // v = 0: blanco (se apaga con k); v = 1: naranja (aparece con k).
+      const alfa = v === 0 ? 1 - k : k;
+      dibujarAnilloSprite(gusanoSprites.afuera[v], x, y, ang, esc, alfa);
+      dibujarAnilloSprite(
+        gusanoSprites.adentro[v],
+        x,
+        y,
+        -ang * 1.7,
+        esc,
+        alfa,
       );
-      b.x[i] = x + sx * R;
-      b.y[i] = y + sy * R;
-      b.r[i] = e.tam[i] * (0.4 + 0.55 * frente) * achica * (1 + 0.5 * destello); // px del mundo: el radio del punto
-      // Los grupos: primero todos los de atrás (se dibujan antes).
-      b.grupo[i] =
-        (z2 < 0 ? 0 : 3 * ESFERA_NIVELES) + tinte * ESFERA_NIVELES + nivel;
-      b.desde[b.grupo[i] + 1]++;
-    }
-    // Ordenadas por grupo, en una pasada (cuántas hay de cada uno y dónde empieza).
-    for (let g = 0; g < GRUPOS; g++) b.desde[g + 1] += b.desde[g];
-    const lugar = b.desde.slice(0, GRUPOS);
-    for (let i = 0; i < n; i++) b.orden[lugar[b.grupo[i]]++] = i;
-    // Las chicas en pantalla (casi todas, en el juego) van sin dibujo: un
-    // punto, todas las del mismo grupo en un solo trazo (cientos de dibujos
-    // sueltos tardan). Las más prendidas, con un halo apenas. Las grandes (en
-    // la carátula, o de cerca), con su dibujo con halo.
-    const GRANDE = 1.6; // px de pantalla de radio desde el que van con dibujo
-    for (let g = 0; g < GRUPOS; g++) {
-      const i0 = b.desde[g];
-      const i1 = b.desde[g + 1];
-      if (i0 === i1) continue;
-      const nivel = g % ESFERA_NIVELES;
-      const tinte = atlas.tintes[Math.floor(g / ESFERA_NIVELES) % 3];
-      for (let capa = nivel >= 3 ? 0 : 1; capa < 2; capa++) {
-        const halo = capa === 0;
-        const k2 = halo ? 2.2 : 1;
-        ctx.beginPath();
-        let hay = false;
-        for (let j = i0; j < i1; j++) {
-          const i = b.orden[j];
-          if (b.r[i] * pantalla >= GRANDE) continue;
-          const r = b.r[i] * k2;
-          ctx.moveTo(b.x[i] + r, b.y[i]);
-          ctx.arc(b.x[i], b.y[i], r, 0, Math.PI * 2);
-          hay = true;
-        }
-        if (!hay) continue;
-        ctx.globalAlpha = atlas.alfas[nivel] * (halo ? 0.2 : 1);
-        ctx.fillStyle = tinte.colores[nivel];
-        ctx.fill();
-      }
-      ctx.globalAlpha = atlas.alfas[nivel];
-      for (let j = i0; j < i1; j++) {
-        const i = b.orden[j];
-        const rp = b.r[i] * pantalla;
-        if (rp < GRANDE) continue;
-        // El dibujo más chico que no haya que agrandar (o el más grande).
-        let d = tinte.tamanos[tinte.tamanos.length - 1];
-        for (const c of tinte.tamanos)
-          if (c.R >= rp) {
-            d = c;
-            break;
-          }
-        const lado = (b.r[i] * d.lado) / d.R;
-        ctx.drawImage(
-          d.niveles[nivel],
-          b.x[i] - lado / 2,
-          b.y[i] - lado / 2,
-          lado,
-          lado,
-        );
-      }
     }
     ctx.globalAlpha = 1;
   }
 
-  // El color de las chispas y de las flechitas que señalan los agujeros: en
-  // el tutorial, del blanco al naranja con el color de la nave; con rival,
-  // del blanco al color de quien va ganando, más cuanto más gana (ver
-  // repartoEquipos).
-  function colorAgujeros() {
-    if (esTutorial())
-      return mezclaAgujeros(Math.max(0, Math.min(1, colorNave)));
-    const { azul, rojo } = repartoEquipos();
-    const d = azul - rojo;
-    return mezclarColores(
-      "#ffffff",
-      d >= 0 ? BORDE_JUGADOR : BORDE_RIVAL,
-      Math.min(1, Math.abs(d) * 2),
-    );
+  // Recorta a la mitad del plano que da a o (lado 1) o a la otra (lado -1),
+  // partido por la recta que pasa por (x, y) de costado a o; B: hasta dónde
+  // llega (más que lo que se va a dibujar).
+  function recortarMitad(x, y, o, lado, B) {
+    const px = -o.y; // a lo largo del corte
+    const py = o.x;
+    const fx = o.x * lado * B;
+    const fy = o.y * lado * B;
+    ctx.beginPath();
+    ctx.moveTo(x + px * B, y + py * B);
+    ctx.lineTo(x + px * B + fx, y + py * B + fy);
+    ctx.lineTo(x - px * B + fx, y - py * B + fy);
+    ctx.lineTo(x - px * B, y - py * B);
+    ctx.closePath();
+    ctx.clip();
   }
 
-  // Las chispas de entrar y salir de los agujeros, de ese color (ver colorAgujeros).
-  function dibujarChispas(color) {
+  // Recorta a lo que se ve de una nave que pasa por un agujero en (x, y):
+  // todo menos lo que ya se metió (o todavía no salió) por debajo del borde
+  // que da a o, que arranca a R del centro.
+  function recortarNavePasando(x, y, o, R) {
+    const B = 5000; // más que cualquier pantalla
+    const px = -o.y;
+    const py = o.x;
+    const a = Math.atan2(py, px);
+    ctx.beginPath();
+    ctx.moveTo(x + px * B, y + py * B);
+    ctx.lineTo(x + px * R, y + py * R);
+    ctx.arc(x, y, R, a, a - Math.PI, true); // la media vuelta del lado de o
+    ctx.lineTo(x - px * B, y - py * B);
+    ctx.lineTo(x - px * B - o.x * B, y - py * B - o.y * B);
+    ctx.lineTo(x + px * B - o.x * B, y + py * B - o.y * B);
+    ctx.closePath();
+    ctx.clip();
+  }
+
+  // Las chispas de entrar y salir de los agujeros, del color k de los agujeros.
+  function dibujarChispas(k) {
     if (!particulas.length) return;
-    ctx.fillStyle = color;
+    ctx.fillStyle = mezclaAgujeros(k);
     ctx.beginPath();
     for (const p of particulas) {
       const r = 2 * (1 - p.t / 0.7);
@@ -9479,187 +9394,282 @@
     ctx.fill();
   }
 
-  // Cómo está ahora un agujero del juego: abierto (0 a 1), su tamaño (esc) y
-  // qué tan juntas están sus estrellas (junta: 0 globo, 1 cúmulo). Nace como
-  // cúmulo y se abre en globo, y al irse se vuelve a juntar y se achica (ver
-  // formaAgujero). ritmo: dónde va la música en su compás: con cada pulso se
-  // junta un poco (ESFERA_MUSICA), todos a la vez. Laten solo con la música:
-  // si no suena (audio bloqueado o sin cargar), no.
-  function medidaCumulo(c, ritmo) {
-    const abierto = Math.min(
-      1,
-      (c.t - (c.prendeT || 0)) / ESFERA_ABRE,
-      (CUMULO_VIDA - c.t) / 1.5,
-    );
-    const pulso = ritmo
-      ? pulsoCumulo(ritmo.pos, ritmo.compas / MUSICA_TIEMPOS_COMPAS)
-      : 0;
-    const f = formaAgujero(abierto);
-    return {
-      abierto,
-      esc: f.esc,
-      junta: Math.max(f.junta, ESFERA_MUSICA * pulso),
-    };
-  }
-
   // --- La nave entra al agujero y sale del otro -------------------------------
-  // Al entrar, sigue de largo una copia de la nave (un pasaje, dibujada en el
-  // lienzo) derecho al centro de la esfera, achicándose y apagándose, y la
-  // esfera se junta en cúmulo: se la traga. Al salir, la nave aparece entera,
-  // siempre encima del agujero. Es solo lo que se ve: el gol cuenta al tocar
-  // el agujero, como siempre, y la nave de verdad ya sale por el otro. Los dos
-  // agujeros quedan abiertos mientras tanto y después se cierran
-  // (huecosCerrando).
-  const PASAJE_VEL_MIN = 320; // px del mundo por segundo: la copia entra por lo menos así de rápido
-  const PASAJE_MAX = 0.6; // s que tarda como mucho la copia en meterse
-  const PASAJE_SALE = 0.6; // s que se espera a que el rival online llegue al agujero de salida (ver dibujarRival)
-  const PASAJE_CIERRA = 0.5; // s que tarda en cerrarse un agujero después (se junta y se achica)
+  // (Maqueta: agujeros/maqueta-nave-entra-3d.png.) El agujero va en capas (ver
+  // dibujarAgujero): el piso, el agujero entero (el negro con sus estrellas y
+  // las luces que giran), debajo de la nave, y el techo, la franja del borde
+  // del lado por donde la nave se esconde (desde el anillo de adentro hacia
+  // afuera), encima de ella. La nave que pasa
+  // va siempre por encima del negro, de su tamaño y su color de siempre:
+  // - Al entrar sigue de largo una copia de la nave (dibujada en el lienzo),
+  //   derecho a través del agujero: pasa por encima del borde que toca
+  //   primero, se ve entera encima del negro y se mete por debajo del borde de
+  //   enfrente. Lo que pasa más allá de ese borde ya no se ve.
+  // - Al salir, la nave de verdad aparece en el centro del otro agujero
+  //   (apenas adelante, ver pasarAgujero) y sigue con el rumbo que traía y
+  //   el control del jugador. Lo
+  //   que se ve es una copia (en el lienzo) que arranca escondida detrás del
+  //   borde de atrás y en PASAJE_SALE s la alcanza: asoma por debajo de ese
+  //   borde y cruza por encima del negro, se mueva o no el jugador. Cuando ya
+  //   no le queda nada debajo del borde de atrás, vuelve la de verdad, por
+  //   encima de todo.
+  // El gol cuenta al tocar el agujero, como siempre. Los dos agujeros quedan
+  // abiertos mientras la nave pasa (ya no se puede entrar) y después se
+  // cierran achicándose (huecosCerrando). La presentación hace lo mismo (ver
+  // actualizarEntrada y actualizarSalida).
+  const PASAJE_VEL_MIN = 320; // px del mundo por segundo: la copia cruza por lo menos así de rápido
+  const PASAJE_SALE = 0.3; // s que tarda la copia que sale en alcanzar a la nave de verdad
+  const PASAJE_CRUCE_MAX = 0.8; // s que puede tardar en salir del todo: después aparece igual
+  const PASAJE_CIERRA = 0.3; // s que tarda en cerrarse el de entrada, ya adentro la copia
   // El de salida se cierra enseguida: ahí se arma el número del gol (ver
-  // crearNumeroEstrellas) y tiene que leerse cuando lo dice la voz (arranca a
-  // hablar apenas se cruza y dice el número entre los 0,2 y los 0,6 s).
-  // Abierto, sus estrellas tapan las del número.
-  const SALIDA_ABIERTA = 0.08; // s que queda abierto (lo justo para ver salir la nave)
-  const SALIDA_CIERRA = 0.25; // s que tarda en cerrarse
-  // El temblor del joystick al hacer un gol: cortito y muy suave (ms y fuerza
-  // de 0 a 1 de cada motor: el débil es el que se siente más fino).
-  const VIBRA_GOL = { duracion: 80, fuerte: 0.4, debil: 0.25 };
-  let pasajes = []; // las copias que entran (ver copiarNave)
-  let huecosCerrando = []; // los agujeros por los que se pasó: { x, y, ang, esc, t, espera, cierra, traga, radio() }
+  // crearNumeroEstrellas) y tiene que leerse cuando lo dice la voz (lo dice
+  // entre los 0,2 y los 0,6 s del cruce).
+  const SALIDA_CIERRA = 0.2; // s que tarda en cerrarse, ya afuera la nave
+  const PASAJE_ONLINE = 0.6; // s que se espera a que el rival online llegue al de salida
+  // El sprite va pegado a la izquierda de su caja (ver dibujarRival): su
+  // centro queda a esto del de la caja, en px de la caja (de CAJA_NAVE).
+  const NAVE_CORRIDA = (CAJA_NAVE * 203) / 300 / 2 - CAJA_NAVE / 2;
+  let huecosCerrando = []; // los agujeros por los que se pasó (ver huecoPasado)
   const velNave = { x: 0, y: 0 }; // la del jugador, px del mundo por segundo (ver cuadro)
 
-  // Qué tan abierto sigue un agujero por el que se pasó (1 a 0).
-  const aperturaCerrando = (h) =>
-    h.t < h.espera ? 1 : Math.max(0, 1 - (h.t - h.espera) / h.cierra);
+  // Tamaño de un agujero del juego (sin el pulso): aparecen y se van
+  // achicándose, no con transparencia.
+  const tamanoCumulo = (c) =>
+    Math.max(
+      0,
+      Math.min(1, (c.t - (c.prendeT || 0)) / 0.5, (CUMULO_VIDA - c.t) / 1.5),
+    );
 
-  // Pasó una nave, quien ("jugador" o "rival"): entró por entrado y sale por
-  // salida (agujeros del juego, o solo dónde estaban si vienen del online).
-  // Se llama antes de moverla al de salida.
-  function pasarAgujero(quien, entrado, salida) {
-    vibrarGol(quien);
-    const ritmo = compasMusica();
-    const cerrando = (c) => {
-      const h = {
+  // Qué tan abierto sigue un agujero por el que se pasó (1 a 0).
+  const aperturaHueco = (h) =>
+    h.cierraEn === null ? 1 : Math.max(0, 1 - (h.t - h.cierraEn) / h.cierra);
+
+  // El radio del anillo de afuera de un agujero de tamaño esc, en lo más alto
+  // del pulso: hasta ahí tiene que llegar una nave para quedar escondida.
+  const radioMaximo = (esc) =>
+    CUMULO_ANILLO * esc * (1 + CUMULO_PULSO_AMPLITUD);
+
+  // El borde por el que las naves entran y salen, en un agujero de tamaño
+  // esc: donde empiezan las estrellas del anillo de adentro (ver
+  // dibujarAgujero). bordeMaximo: en lo más alto del pulso.
+  const radioBorde = (esc) =>
+    (CUMULO_ANILLO * CUMULO_INTERIOR_RADIO - CUMULO_ESTRELLA_R * 0.75) * esc;
+  const bordeMaximo = (esc) => radioBorde(esc) * (1 + CUMULO_PULSO_AMPLITUD);
+
+  // La mitad del largo de una nave de tamaño k (de la punta a la cola mide
+  // su caja entera).
+  const medioLargo = (k) => (cajaNave / 2) * k;
+
+  // El agujero c (del juego, o solo dónde estaba si viene del online) como
+  // agujero por el que se pasa: queda abierto mientras cruzan las copias que
+  // se meten (entran) y las naves que salen (salen), y después se cierra. Si
+  // ya está (las dos naves en el mismo par), el mismo.
+  function huecoPasado(c) {
+    let h = huecosCerrando.find((o) => Math.hypot(o.x - c.x, o.y - c.y) < 1);
+    if (!h) {
+      h = {
         x: c.x,
         y: c.y,
         ang: c.ang || 0,
-        esc: c.t !== undefined ? medidaCumulo(c, ritmo).esc || 1 : 1,
+        esc: c.t !== undefined ? tamanoCumulo(c) : 1,
         t: 0,
-        espera: SALIDA_ABIERTA,
-        cierra: SALIDA_CIERRA,
+        cierraEn: null, // en qué t empezó a cerrarse
+        cierra: PASAJE_CIERRA,
+        entran: [],
+        salen: [],
       };
-      h.radio = () => GUSANO_RADIO * h.esc * aperturaCerrando(h);
       huecosCerrando.push(h);
-      return h;
-    };
-    const entra = cerrando(entrado);
-    entra.traga = true; // se junta mientras se mete la copia (ver dibujarCumulos)
-    entra.cierra = PASAJE_CIERRA; // el de entrada, sin apuro
-    const sale = salida && salida !== entrado ? cerrando(salida) : entra;
-    const copia = copiarNave(quien, entra);
-    // El de entrada se queda abierto hasta que se mete la copia (si no hay
-    // copia, o si es el mismo agujero que el de salida, lo que dura el pasaje
-    // de siempre).
-    entra.espera = copia && sale !== entra ? copia.dura : PASAJE_SALE;
-    if (copia) pasajes.push(copia);
-    // La de verdad sale por el otro con el rumbo que traía, entera y encima
-    // del agujero. Del rival se anota por dónde (ver dibujarRival).
-    if (quien === "rival" && rival) rival.sale = { hueco: sale, t: 0 };
+    }
+    return h;
   }
 
-  // Si quien hizo el gol juega con joystick, le tiembla apenas (ver
-  // VIBRA_GOL): el jugador, salvo que con dos jugadores el joystick lo tenga el
-  // 2; el rival, solo si es el jugador 2 con el joystick (no la PC ni el de
-  // online).
-  function vibrarGol(quien) {
-    const deJ2 = modo === "dos" && !!window.j2Joystick;
-    if (quien === "rival" ? !deJ2 : deJ2) return;
-    const gp = primerJoystick();
-    if (!gp) return;
-    const V = VIBRA_GOL;
-    try {
-      if (gp.vibrationActuator && gp.vibrationActuator.playEffect)
-        gp.vibrationActuator
-          .playEffect("dual-rumble", {
-            duration: V.duracion,
-            strongMagnitude: V.fuerte,
-            weakMagnitude: V.debil,
-          })
-          .catch(() => {});
-      else if (gp.hapticActuators && gp.hapticActuators[0])
-        gp.hapticActuators[0].pulse(V.debil, V.duracion); // Firefox
-    } catch (e) {} // (un joystick que no vibra)
-  }
-
-  // Una copia de la nave (quien), tal como está, que sigue de largo derecho al
-  // centro del agujero (hueco: { x, y }) y se mete (ver dibujarPasajes). En el
-  // mundo, o en pantalla si pantalla (la presentación).
-  function copiarNave(quien, hueco, pantalla = false) {
-    let x, y, rot, k, vx, vy, capas;
-    if (quien === "jugador") {
-      const p = window.shipPose;
-      if (!p || !p.listo) return null;
-      const mitad = cajaNave / 2;
-      x = pantalla ? p.x + mitad : cam.ox + (p.x + mitad - cam.ox) / cam.z;
-      y = pantalla ? p.y + mitad : cam.oy + (p.y + mitad - cam.oy) / cam.z;
-      rot = p.rot;
-      k = pantalla ? Math.abs(p.escala) : escalaNaveMundo();
-      vx = pantalla ? 0 : velNave.x;
-      vy = pantalla ? 0 : velNave.y;
-      capas = capasJugador();
-    } else {
-      if (!rival) return null;
-      x = rival.x;
-      y = rival.y;
-      rot = rival.rot;
-      k = escalaNaveMundo();
-      vx = (rival.vx || 0) * 60; // px por cuadro -> px/s
-      vy = (rival.vy || 0) * 60;
-      capas = capasRival();
+  // Pasó una nave, quien ("jugador" o "rival"): entró por entrado y sale por
+  // salida (agujeros del juego, o solo dónde estaban si vienen del online).
+  // Se llama antes de moverla al de salida. Devuelve dónde tiene que
+  // aparecer (el centro de su caja): en el centro del de salida, apenas
+  // adelante (lo justo para que, si se queda quieta, la cola no le quede
+  // debajo del borde de atrás) y con el centro del dibujo en la recta del
+  // rumbo.
+  function pasarAgujero(quien, entrado, salida) {
+    vibrarGol(quien);
+    const nave = naveQuePasa(quien, false);
+    const entra = huecoPasado(entrado);
+    if (nave) {
+      const copia = copiarNave(nave, entra, radioMaximo(entra.esc));
+      if (copia) entra.entran.push(copia);
     }
-    if (!capas.length) return null;
-    let dx = hueco.x - x;
-    let dy = hueco.y - y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > 1) {
-      dx /= dist;
-      dy /= dist;
-    } else {
-      dx = Math.sin((rot * Math.PI) / 180);
-      dy = -Math.cos((rot * Math.PI) / 180);
-    }
-    const minima = PASAJE_VEL_MIN * (pantalla ? cam.z : 1);
-    // Llega al centro (a más tardar en PASAJE_MAX), y ahí ya desapareció.
-    const vel = Math.max(
-      minima,
-      Math.min(Math.hypot(vx, vy), minima * 5),
-      dist / PASAJE_MAX,
-    );
-    const dura = dist / vel;
-    const hacia = (Math.atan2(dx, -dy) * 180) / Math.PI;
-    return {
-      x0: x,
-      y0: y,
-      dx,
-      dy,
-      vel,
-      dist,
-      esfera: ESFERA_RADIO * (pantalla ? cam.z : 1), // el radio de la esfera a la que va
-      dura,
+    const sale = huecoPasado(salida);
+    sale.cierra = SALIDA_CIERRA;
+    if (!nave) return { x: salida.x, y: salida.y };
+    const dir = rumboDe(nave); // sigue con el rumbo que traía
+    const atras = bordeMaximo(sale.esc) + medioLargo(nave.k);
+    const cruce = {
+      quien,
+      dir,
+      capas: nave.capas,
       t: 0,
-      rot0: rot,
-      hacia,
-      k,
-      capas,
-      hueco,
+      max: PASAJE_CRUCE_MAX,
+      // De dónde arranca la copia (el centro del dibujo): escondida detrás
+      // del borde de atrás. En desliza s alcanza a la nave de verdad.
+      desde: { x: sale.x - dir.x * atras, y: sale.y - dir.y * atras },
+      desliza: PASAJE_SALE,
+      pantalla: false,
+      // Online el rival llega al de salida un poco después (lo que tarda el
+      // mensaje): hasta que llega no se ve (ver avanzarCruce).
+      llego: quien === "jugador" || !enLinea(),
+      espera: 0,
     };
+    sale.salen.push(cruce);
+    if (quien === "jugador") ship.classList.add("game-en-agujero");
+    else if (rival) rival.sale = cruce;
+    const adelante =
+      Math.max(
+        0,
+        medioLargo(nave.k) - radioBorde(sale.esc),
+      ) +
+      3 * sale.esc;
+    const corrida = centroDibujo(0, 0, nave.rot, nave.k);
+    return {
+      x: sale.x + dir.x * adelante - corrida.x,
+      y: sale.y + dir.y * adelante - corrida.y,
+    };
+  }
+
+  // Dónde tiene que estar (el centro de su caja) una nave girada rot y de
+  // tamaño k para quedar escondida detrás del agujero h, yendo hacia dir: con
+  // el centro del dibujo en la recta que pasa por su centro y la punta justo
+  // en el borde de atrás, así asoma por debajo de él (la presentación).
+  function puntoDeSalida(h, dir, rot, k) {
+    const d = bordeMaximo(h.esc) + medioLargo(k);
+    const corrida = centroDibujo(0, 0, rot, k);
+    return { x: h.x - dir.x * d - corrida.x, y: h.y - dir.y * d - corrida.y };
+  }
+
+  // La nave que pasa (quien): dónde está (el centro de su caja), girada
+  // cuánto, de qué tamaño, a qué velocidad (px por segundo) y sus capas: en
+  // el mundo, o en pantalla si pantalla (la presentación). null si no está.
+  function naveQuePasa(quien, pantalla) {
+    if (quien === "jugador") {
+      const p = centroJugador(pantalla);
+      if (!p) return null;
+      const capas = capasJugador();
+      if (!capas.length) return null;
+      const vx = pantalla ? 0 : velNave.x;
+      const vy = pantalla ? 0 : velNave.y;
+      return { ...p, vx, vy, capas };
+    }
+    if (!rival || !armarRival()) return null;
+    const foto = document.createElement("canvas");
+    foto.width = lienzoRival.width;
+    foto.height = lienzoRival.height;
+    foto.getContext("2d").drawImage(lienzoRival, 0, 0);
+    return {
+      x: rival.x,
+      y: rival.y,
+      rot: rival.rot,
+      k: escalaNaveMundo(),
+      vx: (rival.vx || 0) * 60, // px por cuadro -> px/s
+      vy: (rival.vy || 0) * 60,
+      capas: [{ img: foto, filtro: filtroRival(), alfa: alfaRival() }],
+    };
+  }
+
+  // Hacia dónde va una nave (de largo 1): su velocidad o, si casi no se
+  // mueve, hacia donde mira.
+  function rumboDe(nave) {
+    const v = Math.hypot(nave.vx, nave.vy);
+    if (v > 30) return { x: nave.vx / v, y: nave.vy / v };
+    const a = (nave.rot * Math.PI) / 180;
+    return { x: Math.sin(a), y: -Math.cos(a) };
+  }
+
+  // Dónde está la nave del jugador (el centro de su caja), girada cuánto y de
+  // qué tamaño: en el mundo, o en pantalla si pantalla (la presentación).
+  function centroJugador(pantalla) {
+    const p = window.shipPose;
+    if (!p || !p.listo) return null;
+    const mitad = cajaNave / 2;
+    const x = p.x + mitad;
+    const y = p.y + mitad;
+    if (pantalla) return { x, y, rot: p.rot, k: Math.abs(p.escala) };
+    return {
+      x: cam.ox + (x - cam.ox) / cam.z,
+      y: cam.oy + (y - cam.oy) / cam.z,
+      rot: p.rot,
+      k: escalaNaveMundo(),
+    };
+  }
+
+  // Una copia de la nave (ver naveQuePasa) que sigue de largo a través del
+  // agujero h, cuyo anillo mide como mucho R (ver dibujarCopia): derecho con
+  // el rumbo que traía, si así pasa cerca del centro; si venía muy de
+  // costado, con una curva suave hasta cerca del centro. De ahí sigue derecho
+  // hasta quedar toda escondida más allá del borde de enfrente. o: vel (a qué
+  // velocidad, si no la trae la nave) y escala (px por px del mundo: en la
+  // presentación, el zoom).
+  function copiarNave(nave, h, R, o = {}) {
+    const p0 = centroDibujo(nave.x, nave.y, nave.rot, nave.k);
+    const dist = Math.max(1, Math.hypot(h.x - p0.x, h.y - p0.y));
+    const alCentro = { x: (h.x - p0.x) / dist, y: (h.y - p0.y) / dist };
+    // Arranca hacia donde venía (si iba para cualquier lado, al centro).
+    let v = rumboDe(nave);
+    if (v.x * alCentro.x + v.y * alCentro.y < 0.3) v = alCentro;
+    // Por dónde pasa: lo más cerca del centro que le queda en su rumbo, pero
+    // a no más de medio borde (así se mete por debajo del borde de enfrente y
+    // no por un costado).
+    const s = (h.x - p0.x) * v.x + (h.y - p0.y) * v.y;
+    let ex = p0.x + v.x * s - h.x;
+    let ey = p0.y + v.y * s - h.y;
+    const lejos = Math.hypot(ex, ey);
+    const cerca = radioBorde(R / radioMaximo(1)) * 0.5;
+    if (lejos > cerca) {
+      ex *= cerca / lejos;
+      ey *= cerca / lejos;
+    }
+    const meta = { x: h.x + ex, y: h.y + ey };
+    const hasta = Math.max(1, Math.hypot(meta.x - p0.x, meta.y - p0.y));
+    const p1 = { x: p0.x + v.x * hasta * 0.5, y: p0.y + v.y * hasta * 0.5 };
+    const tramo = Math.max(1, Math.hypot(meta.x - p1.x, meta.y - p1.y));
+    const rapidez = Math.max(
+      PASAJE_VEL_MIN * (o.escala || 1),
+      o.vel || Math.hypot(nave.vx, nave.vy),
+    );
+    const curva = (hasta * 0.5 + tramo + hasta) / 2; // lo que mide, más o menos
+    const recta = R * 2 + medioLargo(nave.k);
+    return {
+      p0,
+      p1,
+      meta,
+      // Con el que cruza el agujero: por ahí se esconde (ver ladoOculto).
+      dir: { x: (meta.x - p1.x) / tramo, y: (meta.y - p1.y) / tramo },
+      curva,
+      vel: rapidez,
+      dura: (curva + recta) / rapidez,
+      t: 0,
+      rot0: nave.rot,
+      k: nave.k,
+      capas: nave.capas,
+    };
+  }
+
+  // El centro del dibujo de una nave cuya caja está centrada en (x, y),
+  // girada rot y de tamaño k.
+  function centroDibujo(x, y, rot, k) {
+    const a = (rot * Math.PI) / 180;
+    const d = NAVE_CORRIDA * (cajaNave / CAJA_NAVE) * k;
+    return { x: x + Math.cos(a) * d, y: y + Math.sin(a) * d };
   }
 
   // Las capas de la nave del jugador como se ven ahora (atrás, fuego y
   // adelante, cada una con su filtro y su opacidad: ver .in-game en
-  // styles.css), sacadas del HTML. Una foto: el fuego después sigue solo.
+  // styles.css), sacadas del HTML. El halo de la caja (el azul o el rojo con
+  // rival, ver .multijugador) va con la de adelante, que tiene la forma de la
+  // nave. Una foto: el fuego después ya no se mueve.
   function capasJugador() {
-    const caja = parseFloat(getComputedStyle(ship).opacity);
+    const estiloCaja = getComputedStyle(ship);
+    const caja = parseFloat(estiloCaja.opacity);
     const alfaCaja = Number.isNaN(caja) ? 1 : caja;
+    const halo = estiloCaja.filter !== "none" ? estiloCaja.filter : "";
     const capas = [];
     for (const sel of [
       ".starry-cohete-fondo",
@@ -9669,7 +9679,7 @@
       const el = ship.querySelector(sel);
       if (!el) continue;
       const estilo = getComputedStyle(el);
-      if (estilo.display === "none" || estilo.visibility === "hidden") continue;
+      if (estilo.display === "none") continue;
       const foto = document.createElement("canvas");
       foto.width = 203;
       foto.height = 300;
@@ -9679,115 +9689,227 @@
         continue; // una imagen que no cargó
       }
       const opacidad = parseFloat(estilo.opacity);
+      const filtro = [
+        estilo.filter !== "none" ? estilo.filter : "",
+        sel === ".starry-cohete-top" ? halo : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
       capas.push({
         img: foto,
-        filtro:
-          estilo.filter && estilo.filter !== "none" ? estilo.filter : "none",
+        filtro: filtro || "none",
         alfa: alfaCaja * (Number.isNaN(opacidad) ? 1 : opacidad),
       });
     }
     return capas;
   }
 
-  // La del rival: el lienzo en el que se arma para dibujarla (ver dibujarRival).
-  function capasRival() {
-    const foto = document.createElement("canvas");
-    foto.width = lienzoRival.width;
-    foto.height = lienzoRival.height;
-    foto.getContext("2d").drawImage(lienzoRival, 0, 0);
-    return [
-      {
-        img: foto,
-        filtro: filtroRival(),
-        alfa: modo === "dos" ? 1 : RIVAL_OPACIDAD,
-      },
-    ];
+  // Una nave (sus capas) con la caja centrada en (x, y), girada rot y de
+  // tamaño k. Si centrada, (x, y) ya es el centro del dibujo.
+  function dibujarNave(capas, x, y, rot, k, centrada = false) {
+    const c = centrada ? { x, y } : centroDibujo(x, y, rot, k);
+    const lado = cajaNave;
+    const ancho = (lado * 203) / 300;
+    const corrida = NAVE_CORRIDA * (cajaNave / CAJA_NAVE);
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.scale(k, k);
+    for (const capa of capas) {
+      ctx.globalAlpha = capa.alfa;
+      ctx.filter = capa.filtro;
+      ctx.drawImage(capa.img, -lado / 2 - corrida, -lado / 2, ancho, lado);
+    }
+    ctx.restore();
   }
 
-  // Las copias que se están metiendo: van al centro de la esfera, achicándose
-  // (desde que les falta un 80 % del radio) y apagándose al final.
-  function dibujarPasajes() {
-    for (const p of pasajes) {
-      const s = Math.min(p.dist, p.vel * p.t);
-      const falta = p.dist - s; // hasta el centro
-      const u = Math.min(1, falta / (0.8 * p.esfera));
-      const achica = u * u * (3 - 2 * u);
-      const apaga = Math.min(1, falta / (0.35 * p.esfera));
-      if (achica <= 0.01 || apaga <= 0.01) continue;
-      // Gira enseguida hacia el agujero.
-      let giro = p.hacia - p.rot0;
-      giro -= 360 * Math.round(giro / 360);
-      const rot = p.rot0 + giro * Math.min(1, p.t / 0.12);
-      const lado = cajaNave;
-      const ancho = (lado * 203) / 300;
+  // La copia que se mete, a la velocidad que traía: hasta cerca del centro
+  // (c.meta) y después derecho. Mira hacia donde va (si venía un poco
+  // girada, se endereza enseguida).
+  function dibujarCopia(c) {
+    const s = c.vel * c.t;
+    const m = c.meta;
+    let x, y, tx, ty;
+    if (s < c.curva) {
+      const u = s / c.curva;
+      const w = 1 - u;
+      x = w * w * c.p0.x + 2 * w * u * c.p1.x + u * u * m.x;
+      y = w * w * c.p0.y + 2 * w * u * c.p1.y + u * u * m.y;
+      tx = w * (c.p1.x - c.p0.x) + u * (m.x - c.p1.x);
+      ty = w * (c.p1.y - c.p0.y) + u * (m.y - c.p1.y);
+    } else {
+      x = m.x + c.dir.x * (s - c.curva);
+      y = m.y + c.dir.y * (s - c.curva);
+      tx = c.dir.x;
+      ty = c.dir.y;
+    }
+    let giro = (Math.atan2(tx, -ty) * 180) / Math.PI - c.rot0;
+    giro -= 360 * Math.round(giro / 360);
+    const rot = c.rot0 + giro * Math.min(1, c.t / 0.12);
+    dibujarNave(c.capas, x, y, rot, c.k, true);
+  }
+
+  // La nave de verdad que sale por s (el centro de su caja, girada y de
+  // tamaño): la del jugador o la del rival. null si no está.
+  function naveDelCruce(s) {
+    if (s.quien === "jugador") return centroJugador(s.pantalla);
+    if (!rival) return null;
+    return { x: rival.x, y: rival.y, rot: rival.rot, k: escalaNaveMundo() };
+  }
+
+  // Dónde se ve (el centro del dibujo) la nave p que sale por s: donde está
+  // o, mientras la copia la alcanza (s.desliza), entre s.desde y ella: arranca
+  // despacio, como asomando, y llega suave.
+  function vistaCruce(s, p) {
+    const c = centroDibujo(p.x, p.y, p.rot, p.k);
+    if (!s.desliza || !s.desde) return c;
+    const u = Math.min(1, s.t / s.desliza);
+    const e = u * u * (3 - 2 * u);
+    return {
+      x: s.desde.x + (c.x - s.desde.x) * e,
+      y: s.desde.y + (c.y - s.desde.y) * e,
+    };
+  }
+
+  // La nave que sale: la del jugador con la foto que se le sacó al entrar; la
+  // del rival, tal cual se ve.
+  function dibujarCruce(s) {
+    const p = naveDelCruce(s);
+    if (!p) return;
+    const v = vistaCruce(s, p);
+    if (s.quien === "jugador") {
+      dibujarNave(s.capas, v.x, v.y, p.rot, p.k, true);
+    } else if (armarRival()) {
+      const capas = [
+        { img: lienzoRival, filtro: filtroRival(), alfa: alfaRival() },
+      ];
+      dibujarNave(capas, v.x, v.y, p.rot, p.k, true);
+    }
+  }
+
+  // Del lado de qué borde se esconde la nave que pasa por el agujero h (de
+  // largo 1): el de enfrente de la que entra, el de atrás de la que sale.
+  // null si no pasa ninguna.
+  function ladoOculto(h) {
+    if (h.entran.length) return h.entran[0].dir;
+    if (h.salen.length) return { x: -h.salen[0].dir.x, y: -h.salen[0].dir.y };
+    return null;
+  }
+
+  // Lo que pasa por el agujero h, cuyo borde (el techo, ver dibujarAgujero)
+  // arranca a R del centro: cada nave, sin lo que está escondido debajo de
+  // él o más allá (ver recortarNavePasando).
+  function dibujarPasajes(h, R) {
+    for (const c of h.entran) {
       ctx.save();
-      ctx.translate(p.x0 + p.dx * s, p.y0 + p.dy * s);
-      ctx.rotate((rot * Math.PI) / 180);
-      ctx.scale(p.k * achica, p.k * achica);
-      // El sprite va pegado a la izquierda de su caja, como la nave de verdad.
-      for (const c of p.capas) {
-        ctx.globalAlpha = c.alfa * apaga;
-        ctx.filter = c.filtro;
-        ctx.drawImage(c.img, -lado / 2, -lado / 2, ancho, lado);
-      }
+      recortarNavePasando(h.x, h.y, c.dir, R);
+      dibujarCopia(c);
+      ctx.restore();
+    }
+    for (const s of h.salen) {
+      if (!s.llego) continue;
+      ctx.save();
+      recortarNavePasando(h.x, h.y, { x: -s.dir.x, y: -s.dir.y }, R);
+      dibujarCruce(s);
       ctx.restore();
     }
   }
 
-  // Cada cuadro, en el juego y en la presentación.
+  // La nave s que sale por el agujero h, de tamaño esc (sin el pulso): sigue
+  // cruzando mientras la copia la alcanza y le quede algo debajo del borde de
+  // atrás (y no más de s.max). false cuando ya salió.
+  function avanzarCruce(s, h, esc, dt) {
+    const p = naveDelCruce(s);
+    if (!p) return false;
+    if (!s.llego) {
+      s.espera += dt;
+      const c = centroDibujo(p.x, p.y, p.rot, p.k);
+      const cerca = (radioMaximo(esc) + medioLargo(p.k)) * 2;
+      if (Math.hypot(c.x - h.x, c.y - h.y) < cerca) s.llego = true;
+      else return s.espera < PASAJE_ONLINE;
+    }
+    s.t += dt;
+    if (s.t >= s.max) return false;
+    if (s.desliza && s.t < s.desliza) return true;
+    // La cola, respecto del borde de atrás (con un poquito de margen: si
+    // se quedó quieta en el medio, le queda justo ahí).
+    const v = vistaCruce(s, p);
+    const cola =
+      (v.x - h.x) * s.dir.x + (v.y - h.y) * s.dir.y - medioLargo(p.k);
+    return cola < -(radioBorde(esc) + 2 * esc);
+  }
+
+  // Ya salió: vuelve la nave de verdad, por encima de todo.
+  function terminarCruce(s) {
+    if (s.quien === "rival") {
+      if (rival && rival.sale === s) rival.sale = null;
+    } else if (s.pantalla) mostrarNave(true);
+    else ship.classList.remove("game-en-agujero");
+    return false;
+  }
+
+  // Los que pasan por el agujero h, de tamaño esc (sin el pulso).
+  function avanzarPasos(h, esc, dt) {
+    h.entran = h.entran.filter((c) => (c.t += dt) < c.dura);
+    h.salen = h.salen.filter(
+      (s) => avanzarCruce(s, h, esc, dt) || terminarCruce(s),
+    );
+  }
+
+  // Cada cuadro del juego.
   function avanzarPasajes(dt) {
-    if (pasajes.length) {
-      for (const p of pasajes) p.t += dt;
-      pasajes = pasajes.filter((p) => p.t < p.dura);
+    if (!huecosCerrando.length) return;
+    for (const h of huecosCerrando) {
+      h.t += dt;
+      h.ang += CUMULO_GIRO * dt;
+      avanzarPasos(h, h.esc * aperturaHueco(h), dt);
+      if (h.cierraEn === null && !h.entran.length && !h.salen.length)
+        h.cierraEn = h.t;
     }
-    if (huecosCerrando.length) {
-      for (const h of huecosCerrando) {
-        h.t += dt;
-        h.ang += CUMULO_GIRO * dt;
-      }
-      huecosCerrando = huecosCerrando.filter((h) => aperturaCerrando(h) > 0);
-    }
-    if (rival && rival.sale && (rival.sale.t += dt) >= PASAJE_SALE)
-      rival.sale = null;
+    huecosCerrando = huecosCerrando.filter((h) => aperturaHueco(h) > 0);
   }
 
   function limpiarPasajes() {
-    pasajes = [];
     huecosCerrando = [];
+    ship.classList.remove("game-en-agujero");
     if (rival) rival.sale = null;
   }
 
   function dibujarCumulos() {
-    // Las estrellas: con rival, blancas y de los colores del resultado (ver
-    // tintarEsfera); en el tutorial, del blanco al salmón con el color de la
-    // nave.
-    tintarEsfera(performance.now() / 1000);
-    const equipos = !esTutorial();
-    const k = equipos ? 0 : Math.max(0, Math.min(1, colorNave));
+    const k = Math.max(0, Math.min(1, colorNave));
+    // Dónde va la música en su compás (todos los agujeros pulsan a la vez, al
+    // compás). Sin música que seguir (audio bloqueado o sin cargar) pulsan con su
+    // propio reloj, a la velocidad normal.
     const ritmo = compasMusica();
+    const compas = ritmo ? ritmo.compas : MUSICA_COMPAS_RESPALDO;
+    const pulsoDe = (t) =>
+      pulsoCumulo(ritmo ? ritmo.pos : t % compas, compas / MUSICA_TIEMPOS_COMPAS);
     for (const c of cumulos) {
       if (!prendido(c)) continue; // todavía no (ver prendeT en crearPar)
-      const m = medidaCumulo(c, ritmo);
-      dibujarAgujero(c.x, c.y, c.ang, m.esc, m.junta, k, equipos);
+      // Aparecen y se van achicándose (no con transparencia); en el medio
+      // pulsan (ver pulsoCumulo).
+      const pulso = pulsoDe(c.t);
+      const esc = tamanoCumulo(c) * (1 + CUMULO_PULSO_AMPLITUD * pulso);
+      dibujarAgujero(c.x, c.y, c.ang, esc, k, pulso);
     }
-    // Los que se están cerrando después de que pasó una nave, y la copia que
-    // se mete (ver "La nave entra al agujero y sale del otro"). El de entrada
-    // se junta en cúmulo mientras se la traga.
+    // Por los que pasó una nave (y se cierran), con la que está pasando entre
+    // sus capas (ver "La nave entra al agujero y sale del otro").
     for (const h of huecosCerrando) {
-      const f = formaAgujero(aperturaCerrando(h));
-      const u = h.traga ? Math.min(1, h.t / Math.max(0.2, h.espera)) : 0;
+      const pulso = pulsoDe(h.t);
+      const esc = h.esc * aperturaHueco(h) * (1 + CUMULO_PULSO_AMPLITUD * pulso);
+      if (esc <= 0.01) continue;
+      const oculto = ladoOculto(h);
       dibujarAgujero(
         h.x,
         h.y,
         h.ang,
-        h.esc * f.esc,
-        Math.max(f.junta, u * u * (3 - 2 * u)),
+        esc,
         k,
-        equipos,
+        pulso,
+        oculto ? { oculto, dibujar: (R) => dibujarPasajes(h, R) } : null,
       );
     }
-    dibujarPasajes();
-    dibujarChispas(colorAgujeros());
+    dibujarChispas(k);
     if (numeroEstrellas.length) {
       // Titilan igual que las estrellas de fondo (ver dibujarEstrellas): por
       // eso no van todas en un solo trazo como las chispas, cada una necesita
@@ -9931,24 +10053,18 @@
     // Y la del jugador. shipPose viene en pantalla y pegada a la izquierda de
     // su caja (ver circulosNave), así que el centro es media caja más allá.
     const p = window.shipPose;
-    const yo =
-      p && p.listo ? { x: p.x + cajaNave / 2, y: p.y + cajaNave / 2 } : null;
+    const yo = p && p.listo ? { x: p.x + cajaNave / 2, y: p.y + cajaNave / 2 } : null;
     if (yo && !ship.classList.contains("fuera-de-juego"))
       puntero(yo.x, yo.y, colorPropio());
     // Los agujeros aparecen en cualquier lugar del mapa (ver crearCumulo):
     // cada uno que quede fuera de la pantalla lleva su flecha en el borde,
     // que se ve como un agujero: negra por dentro y con el borde y el brillo
-    // del color de los agujeros (el de quien va ganando, ver colorAgujeros).
-    // Así siempre se sabe dónde están los dos.
-    const colorAgujero = colorAgujeros();
+    // del color de su anillo (blanco al principio y cada vez más salmón, como
+    // ellos). Así siempre se sabe dónde están los dos.
+    const colorAgujero = mezclaAgujeros(Math.max(0, Math.min(1, colorNave)));
     for (const c of cumulos)
       if (prendido(c))
-        puntero(
-          aPantalla(c.x, cam.ox),
-          aPantalla(c.y, cam.oy),
-          colorAgujero,
-          "#000",
-        );
+        puntero(aPantalla(c.x, cam.ox), aPantalla(c.y, cam.oy), colorAgujero, "#000");
   }
 
   // Del mundo a la pantalla: la inversa de lo que hace circulosNave, y lo mismo
@@ -10184,6 +10300,8 @@
         }
         const centro = circulos[1];
         if (centro && navePrev && dt > 0) {
+          // (La copia que se mete en un agujero sigue a esta velocidad, ver
+          // copiarNave.)
           velNave.x = (centro.x - navePrev.x) / dt;
           velNave.y = (centro.y - navePrev.y) / dt;
           const vel = Math.hypot(velNave.x, velNave.y);
