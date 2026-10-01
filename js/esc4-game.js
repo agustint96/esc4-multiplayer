@@ -9367,20 +9367,68 @@
     const lado = (otroCieloSprite.width / OTRO_CIELO_ESCALA) * esc;
     ctx.drawImage(otroCieloSprite, x + dx - lado / 2, y + dy - lado / 2, lado, lado);
     ctx.restore();
-    for (let v = 0; v < 2; v++) {
-      // v = 0: blanco (se apaga con k); v = 1: naranja (aparece con k).
-      const alfa = v === 0 ? 1 - k : k;
-      dibujarAnilloSprite(gusanoSprites.afuera[v], x, y, ang, esc, alfa);
-      dibujarAnilloSprite(
-        gusanoSprites.adentro[v],
-        x,
-        y,
-        -ang * 1.7,
-        esc,
-        alfa,
-      );
-    }
+    dibujarGrietas(x, y, R, esc, k);
     ctx.globalAlpha = 1;
+  }
+
+  // Las grietas del agujero (agujeros/maqueta-nave-entra-3d.png): finas líneas
+  // quebradas que salen del borde del negro, sin borde rugoso ni nada más. El
+  // dibujo es siempre el mismo (en radios del negro, armado una sola vez con
+  // una semilla fija) y cada agujero lo gira distinto según dónde está.
+  const GRIETAS = { cantidad: 5, largo: [0.35, 1.1], tramos: 6, desvio: 0.35 };
+  let grietasPath = null;
+
+  function armarGrietas() {
+    let semilla = 7;
+    const azar = () => {
+      semilla = (semilla * 16807) % 2147483647;
+      return semilla / 2147483647;
+    };
+    const path = new Path2D();
+    const G = GRIETAS;
+    const trazo = (a, r0, largo, tramos) => {
+      let px = Math.cos(a) * r0;
+      let py = Math.sin(a) * r0;
+      path.moveTo(px, py);
+      for (let i = 0; i < tramos; i++) {
+        a += (azar() - 0.5) * 2 * G.desvio;
+        const paso = largo / tramos;
+        px += Math.cos(a) * paso;
+        py += Math.sin(a) * paso;
+        path.lineTo(px, py);
+        // De vez en cuando se parte en dos: una ramita más corta.
+        if (i > 1 && i < tramos - 2 && azar() < 0.18)
+          trazo(a + (azar() < 0.5 ? -1 : 1) * (0.5 + 0.4 * azar()), Math.hypot(px, py), largo * 0.35, 3);
+        path.moveTo(px, py);
+      }
+    };
+    for (let i = 0; i < G.cantidad; i++) {
+      const a = ((i + 0.3 * azar()) / G.cantidad) * Math.PI * 2;
+      const largo = G.largo[0] + (G.largo[1] - G.largo[0]) * azar();
+      trazo(a, 0.98, largo, G.tramos);
+    }
+    grietasPath = path;
+  }
+
+  function dibujarGrietas(x, y, R, esc, k) {
+    if (!grietasPath) armarGrietas();
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453 % (Math.PI * 2));
+    ctx.scale(R, R);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    // Una luz tenue abajo (tiñéndose como la nave) para que se lean sobre el
+    // fondo oscuro, y el hilo negro arriba.
+    ctx.strokeStyle = mezclaAgujeros(k);
+    ctx.globalAlpha = 0.22;
+    ctx.lineWidth = Math.max(1.2, 1.6 * esc) / R;
+    ctx.stroke(grietasPath);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = Math.max(0.6, 0.8 * esc) / R;
+    ctx.stroke(grietasPath);
+    ctx.restore();
   }
 
   // Recorta a la mitad del plano que da a o (lado 1) o a la otra (lado -1),
@@ -9485,13 +9533,12 @@
   // El radio del anillo de afuera de un agujero de tamaño esc, en lo más alto
   // del pulso: hasta ahí tiene que llegar una nave para quedar escondida.
   const radioMaximo = (esc) =>
-    CUMULO_ANILLO * esc * (1 + CUMULO_PULSO_AMPLITUD);
+    CUMULO_ANILLO * CUMULO_DISCO_RADIO * esc * (1 + CUMULO_PULSO_AMPLITUD);
 
   // El borde por el que las naves entran y salen, en un agujero de tamaño
-  // esc: donde empiezan las estrellas del anillo de adentro (ver
-  // dibujarAgujero). bordeMaximo: en lo más alto del pulso.
-  const radioBorde = (esc) =>
-    (CUMULO_ANILLO * CUMULO_INTERIOR_RADIO - CUMULO_ESTRELLA_R * 0.75) * esc;
+  // esc: justo adentro del borde del negro (ver dibujarAgujero), así la nave
+  // se esconde al llegar a él. bordeMaximo: en lo más alto del pulso.
+  const radioBorde = (esc) => CUMULO_ANILLO * CUMULO_DISCO_RADIO * esc * 0.95;
   const bordeMaximo = (esc) => radioBorde(esc) * (1 + CUMULO_PULSO_AMPLITUD);
 
   // La mitad del largo de una nave de tamaño k (de la punta a la cola mide
