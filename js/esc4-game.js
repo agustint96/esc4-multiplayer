@@ -2592,6 +2592,8 @@
     acumCumulo = 0;
     proxCumulo = CUMULO_PRIMERO;
     cumulosTomados = 0;
+    racha.quien = null;
+    racha.n = 0;
     // Voces de la partida nueva: se corta lo que sonaba y vuelven a tirarse.
     cortarVoz();
     vozPendiente = null;
@@ -9009,6 +9011,42 @@
     }
   }
 
+  // Tres goles seguidos de uno, sin que el otro marque en el medio, también
+  // corren el fondo (y vuelve a pasar a los 6 y a los 9): a la derecha si la
+  // racha es del azul, a la izquierda si es de la roja. Se mira el marcador
+  // cada cuadro, así sirve para todos los caminos de un gol. Online lo decide
+  // el anfitrión y le avisa al invitado ("fondo"), como con las vueltas.
+  const racha = { m: 0, r: 0, quien: null, n: 0 }; // marcador visto y racha en curso
+
+  function revisarRacha() {
+    const dm = cumulosTomados - racha.m;
+    const dr = golesRival - racha.r;
+    racha.m = cumulosTomados;
+    racha.r = golesRival;
+    if (dm < 0 || dr < 0) {
+      // Partida nueva (o un gol del anfitrión que se anuló): vuelve a empezar.
+      racha.quien = null;
+      racha.n = 0;
+      return;
+    }
+    if (!dm && !dr) return;
+    if (dm && dr) {
+      racha.quien = null; // gol de los dos a la vez: se corta la racha
+      racha.n = 0;
+      return;
+    }
+    const quien = dm ? "jugador" : "rival";
+    if (racha.quien !== quien) racha.n = 0;
+    racha.quien = quien;
+    racha.n += dm || dr;
+    if (racha.n < 3) return;
+    racha.n -= 3;
+    if (fin || ganado) return;
+    const lado = (quien === "jugador") === esAzul() ? 1 : -1;
+    correrFondo(lado);
+    if (enLinea()) enviarOnline({ tipo: "fondo", lado });
+  }
+
   // Si ya se estaba girando, la pantalla nueva se suma a la que faltaba.
   function correrFondo(lado) {
     const meta = fondoCorre ? fondoCorre.hasta : cieloCorrido;
@@ -10160,6 +10198,7 @@
     const circulos = circulosNave();
     reloj += dt;
     moverFondo(dt);
+    if (modo && !esTutorial() && !(enLinea() && !soyAnfitrion())) revisarRacha();
     if (!modo) {
       // Eligiendo el modo: todo espera, con la nave quieta en el medio abajo.
       if (window.shipMove) window.shipMove(0, 0);
