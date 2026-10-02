@@ -76,7 +76,8 @@ estrellas blancas y salmón que gira como una esfera -la que antes eran los
 agujeros de gusano: nace junta, se abre en globo y se junta un poco con cada
 compás de la música-, ver `agujeros/maqueta-globo-cumulo.gif`), nunca en el lugar
 de un agujero ni encima de una nave y sin que las piedras lo rompan; si nadie lo
-agarra se achica y se va. La nave que lo toca
+agarra se achica y se va. La nave que lo toca (suena
+`audio/Esc4/game sound/collect.m4a`)
 carga un tercio de su **barra de poder** (una sola barra debajo de la nave, que
 se llena en proporción); con 3 queda llena y se puede usar el poder de la nave. Por ahora el poder de todas es
 un **escudo de 3 segundos** en el que ninguna piedra la golpea; a futuro cada

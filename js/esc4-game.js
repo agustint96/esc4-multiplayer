@@ -238,6 +238,10 @@
   // fuerte que el de apertura).
   const PORTAL_CRUCE_URL = "audio/Esc4/portales/portal++.m4a";
   const PORTAL_CRUCE_VOLUMEN = 0.4;
+  // Y este, cada vez que una nave junta un cúmulo de poder (ver "Cúmulos y
+  // poder"). Está grabado bajito: va al máximo.
+  const JUNTAR_URL = "audio/Esc4/game sound/collect.m4a";
+  const JUNTAR_VOLUMEN = 1;
   // Voces (audio/Esc4, una carpeta por momento: 1- a 4- las instrucciones, conteo,
   // animo, cansancio y 5- final). Todas comparten un solo canal: suena una a la vez, y las
   // de los portales (el conteo y las felicitaciones) tienen prioridad, cortan la
@@ -730,6 +734,10 @@
   let portalCruceBuffer = null; // audio/Esc4/portales/portal++.m4a decodificado
   let portalCruceFuente = null; // fuente sonando ahora (o null)
   let portalCruce = null; // <audio> de respaldo
+  let juntarGain = null;
+  let juntarBuffer = null; // audio/Esc4/game sound/collect.m4a decodificado
+  let juntarFuente = null; // fuente sonando ahora (o null)
+  let juntar = null; // <audio> de respaldo
   // Cada voz es { url, buffer, audio }: el buffer decodificado, o un <audio> de
   // respaldo si falla Web Audio.
   const crearVoz = (url) => ({
@@ -2651,6 +2659,7 @@
       notaGain = conGain(NOTA_VOLUMEN);
       portalGain = conGain(PORTAL_VOLUMEN);
       portalCruceGain = conGain(PORTAL_CRUCE_VOLUMEN);
+      juntarGain = conGain(JUNTAR_VOLUMEN);
       vozGain = conGain(VOZ_VOLUMEN);
       // La de las instrucciones primero: es chica y es la que se necesita antes.
       try {
@@ -2688,6 +2697,11 @@
       } catch (e) {
         portalCruceBuffer = null;
       }
+      try {
+        juntarBuffer = await decodificar(JUNTAR_URL);
+      } catch (e) {
+        juntarBuffer = null;
+      }
     }
     if (!musicaBuffer) {
       const prueba = new Audio();
@@ -2721,6 +2735,10 @@
     if (!portalCruceBuffer) {
       portalCruce = new Audio(PORTAL_CRUCE_URL);
       portalCruce.volume = PORTAL_CRUCE_VOLUMEN;
+    }
+    if (!juntarBuffer) {
+      juntar = new Audio(JUNTAR_URL);
+      juntar.volume = JUNTAR_VOLUMEN;
     }
     const voces = [
       ...conteo.flat(),
@@ -2934,6 +2952,21 @@
     } else if (portalCruce) {
       portalCruce.currentTime = 0;
       portalCruce.play().catch(() => {});
+    }
+  }
+
+  // El sonido de juntar un cúmulo de poder: suena una vez desde el principio.
+  function sonarJuntar() {
+    if (juntarBuffer) {
+      if (sinToque()) return; // todavía no se puede sonar
+      audioCtx.resume().catch(() => {});
+      juntarFuente = audioCtx.createBufferSource();
+      juntarFuente.buffer = juntarBuffer;
+      juntarFuente.connect(juntarGain);
+      juntarFuente.start();
+    } else if (juntar) {
+      juntar.currentTime = 0;
+      juntar.play().catch(() => {});
     }
   }
 
@@ -9271,7 +9304,7 @@
     chispas(e.x, e.y);
     if (quien === "jugador") cargaJugador++;
     else cargaRival++;
-    sonarNota();
+    sonarJuntar();
   }
 
   // Una barra (ver barras), con la carga y el escudo de su nave.
@@ -9327,7 +9360,7 @@
         esferasReclamadas.add(mia.id);
         esferas = esferas.filter((o) => o !== mia);
         chispas(mia.x, mia.y);
-        sonarNota();
+        sonarJuntar();
         enviarOnline({ tipo: "esfera", id: mia.id });
       }
     }
