@@ -69,6 +69,36 @@ también en la pausa y en el cartel de salir del online. Durante el juego, el bo
   MENU o Escape cancelan la búsqueda o te sacan de la partida; salir cuenta
   como irse: al rival le aparece EL RIVAL SE FUE y vuelve a su elección.
 
+## Cúmulos y poder
+
+Cada tanto aparece en un lugar al azar del escenario un **cúmulo** (un globo de
+estrellas blancas y salmón que gira como una esfera -la que antes eran los
+agujeros de gusano: nace junta, se abre en globo y se junta un poco con cada
+compás de la música-, ver `agujeros/maqueta-globo-cumulo.gif`), nunca en el lugar
+de un agujero ni encima de una nave y sin que las piedras lo rompan; si nadie lo
+agarra se achica y se va. La nave que lo toca
+carga un tercio de su **barra de poder** (una sola barra debajo de la nave, que
+se llena en proporción); con 3 queda llena y se puede usar el poder de la nave. Por ahora el poder de todas es
+un **escudo de 3 segundos** en el que ninguna piedra la golpea; a futuro cada
+nave tendrá el suyo. No hay cúmulos en el tutorial.
+
+La barra no está siempre a la vista (ver `naves/maqueta-barra-poder.html`):
+aparece 2 segundos después de juntar un cúmulo y se va. Solo queda fija cuando
+está completa, parpadeando entre el color de la nave y el blanco hasta que se
+usa el poder. Con el escudo puesto no se ve; lo que se junte mientras tanto se
+muestra cuando el escudo termina.
+
+- **Teclado**: E (con dos en el teclado, la E es de quien usa WASD y la K de
+  quien usa las flechas).
+- **Joystick**: el botón A.
+- **Celular**: el botón "poder".
+
+La PC va a buscar el cúmulo cuando no hay agujeros y usa el escudo cuando una
+piedra está por caerle encima. Online el anfitrión los hace aparecer y reparte la
+carga; el invitado le avisa qué cúmulo toca y cuándo usa el poder (mensajes
+`esfera` y `poder`), y el escudo de cada uno viaja en su estado (`esc`). Ver
+"Cúmulos y poder" en `js/esc4-game.js`.
+
 ## El mapa del online
 
 El juego está en `juego.html`; `index.html` es el marco que lo muestra.
@@ -158,7 +188,9 @@ probar el servidor en la PC: `npx wrangler dev` y abrir el juego con
   perseguirla.
 - Los **agujeros de gusano** aparecen de a pares, como siempre: el primero que
   entra a uno suma un gol y sale por el otro: se mete por debajo del borde
-  de enfrente de uno y asoma por debajo del borde de atrás del otro. Aparecen en cualquier lugar del
+  de enfrente de uno y aparece en el otro, ya por encima de él (si asomara de
+  a poco por debajo del borde de atrás, al girar en ese momento quedaría
+  escondida detrás del agujero). Aparecen en cualquier lugar del
   mapa (no solo en lo que ve tu cámara) y nunca pegados a ninguna de las dos
   naves, así no le quedan más cerca a una. Online los crea el anfitrión, pero
   en su pantalla se prenden recién cuando al invitado ya le llegaron: los dos

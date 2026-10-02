@@ -2949,12 +2949,21 @@ function drawStars() {
           )
             window.esc4Game.toggleLuzRival();
           prevLightPressed[idx] = lightPressed;
+          // A: el poder del jugador 2 (ver "Cúmulos y poder" en esc4-game.js).
+          const poderButton = gp.buttons[BTN_ACTION];
+          const poderPressed = !!(poderButton && poderButton.pressed);
+          if (poderPressed && !prevActionPressed[idx] && window.esc4Game)
+            window.esc4Game.usarPoder("rival");
+          prevActionPressed[idx] = poderPressed;
           continue;
         }
 
         const actionButton = gp.buttons[BTN_ACTION];
         const actionPressed = !!(actionButton && actionButton.pressed);
-        if (actionPressed && !prevActionPressed[idx]) triggerAction();
+        if (actionPressed && !prevActionPressed[idx]) {
+          triggerAction();
+          if (window.esc4Game) window.esc4Game.usarPoder("jugador");
+        }
         prevActionPressed[idx] = actionPressed;
 
         const lightButton = gp.buttons[BTN_LIGHT];
@@ -2984,8 +2993,21 @@ function drawStars() {
   // flanco (prevActionPressed/prevLightPressed) del lado del joystick.
   document.addEventListener("keydown", (ev) => {
     if (ev.repeat || window.juegoEnPausa) return;
-    if (ev.code === "KeyE") triggerAction();
-    else if (ev.code === "KeyQ") {
+    if (ev.code === "KeyE") {
+      triggerAction();
+      // El poder de la nave (ver "Cúmulos y poder" en esc4-game.js): de quien
+      // usa WASD, igual que la Q. Con el joystick en el jugador 1 o los lados
+      // dados vuelta, esa E es del jugador 2.
+      if (window.esc4Game)
+        window.esc4Game.usarPoder(
+          window.j1Joystick || window.tecladoAlReves ? "rival" : "jugador",
+        );
+    } else if (ev.code === "KeyK" && window.j2Teclado && !window.j1Joystick) {
+      // Los dos en el teclado: la K es el poder de quien usa las flechas, como
+      // la L es su luz.
+      if (window.esc4Game)
+        window.esc4Game.usarPoder(window.tecladoAlReves ? "jugador" : "rival");
+    } else if (ev.code === "KeyQ") {
       // Con dos jugadores y el joystick en el jugador 1, Q le queda libre
       // (no la usa para moverse): pasa a prender la luz del jugador 2 (ver
       // toggleLuzRival). Lo mismo si los dos están en el teclado con los

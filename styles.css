@@ -2423,6 +2423,12 @@ html.tactil body {
   width: calc(64px * var(--tactil-escala, 1));
   height: calc(64px * var(--tactil-escala, 1));
 }
+.game-tactil-boton--poder {
+  right: calc(108px * var(--tactil-escala, 1));
+  bottom: calc(100px * var(--tactil-escala, 1));
+  width: calc(56px * var(--tactil-escala, 1));
+  height: calc(56px * var(--tactil-escala, 1));
+}
 .game-tactil-boton--luz {
   right: calc(32px * var(--tactil-escala, 1));
   bottom: calc(112px * var(--tactil-escala, 1));
