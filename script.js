@@ -2100,10 +2100,11 @@ function drawStars() {
         // Con dos jugadores sin joystick (escenario 4) las flechas y el Shift
         // derecho son del jugador 2: los lee esc4-game.js y acá no mueven esta
         // nave. Con los lados dados vuelta (tecladoAlReves) es al revés: esta
-        // nave va con las flechas y WASD es del jugador 2.
+        // nave va con las flechas y WASD es del jugador 2. Y si esta nave tiene
+        // el joystick (j1Joystick), todo el teclado es del jugador 2.
         const alReves = !!window.tecladoAlReves;
         const flechas = !window.j2Teclado || alReves;
-        const wasd = !alReves;
+        const wasd = !alReves && !window.j1Joystick;
         if ((wasd && keyLeft) || (flechas && arrowLeft)) gx = -1;
         else if ((wasd && keyRight) || (flechas && arrowRight)) gx = 1;
         if ((wasd && keyUp) || (flechas && arrowUp)) gy = -1;

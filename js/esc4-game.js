@@ -935,7 +935,8 @@
     ShiftRight: "boost",
   };
   // Los dos en el teclado con los lados dados vuelta (window.tecladoAlReves,
-  // ver actualizarControles): el jugador 2 pasa a WASD y Shift izquierdo.
+  // ver actualizarControles): el jugador 2 pasa a WASD y Shift izquierdo. Con
+  // el joystick en el jugador 1 (window.j1Joystick) el 2 usa las dos mitades.
   const teclasJ2Wasd = {
     up: false,
     down: false,
@@ -1736,7 +1737,8 @@
   // - con un joystick conectado, el jugador 1 tiene todo el teclado (como en el
   //   sitio) y el jugador 2 el joystick (window.j2Joystick), o al revés si se
   //   cambiaron los lados en el menú con LB o RB (controlesCambiados): ahí el
-  //   joystick pasa a ser del jugador 1 y el 2 se queda con las flechas;
+  //   joystick pasa a ser del jugador 1 y el 2 se queda con todo el teclado
+  //   (flechas o WASD, y cualquiera de los dos Shift);
   // - sin joystick, el jugador 1 WASD y Shift izquierdo, y el jugador 2 las
   //   flechas y Shift derecho (window.j2Teclado), o al revés si se cambiaron
   //   los lados (window.tecladoAlReves: el 1 las flechas y el 2 WASD).
@@ -7768,11 +7770,16 @@
     } else if (modo === "dos") {
       // La maneja el jugador 2 con las flechas (o WASD, con los lados dados
       // vuelta), igual que las flechas a la nave del jugador 1 en script.js
-      // (cada eje -1/0/1, sin normalizar la diagonal).
-      const t = window.tecladoAlReves ? teclasJ2Wasd : teclasJ2;
-      gx = (t.right ? 1 : 0) - (t.left ? 1 : 0);
-      gy = (t.down ? 1 : 0) - (t.up ? 1 : 0);
-      if (t.boost) empuje = fisica.empujeBoost;
+      // (cada eje -1/0/1, sin normalizar la diagonal). Si el joystick es del
+      // jugador 1, todo el teclado es del 2: flechas o WASD y cualquiera de
+      // los dos Shift.
+      const alReves = !!window.tecladoAlReves;
+      const flechas = !alReves;
+      const wasd = alReves || !!window.j1Joystick;
+      const t = (k) => (flechas && teclasJ2[k]) || (wasd && teclasJ2Wasd[k]);
+      gx = (t("right") ? 1 : 0) - (t("left") ? 1 : 0);
+      gy = (t("down") ? 1 : 0) - (t("up") ? 1 : 0);
+      if (t("boost")) empuje = fisica.empujeBoost;
     } else {
       // A fondo hacia donde quiere ir, como un stick a fondo o las flechas:
       // del círculo al cuadrado (en diagonal, (1, 1) y no (0,7, 0,7)), así en
@@ -9176,7 +9183,7 @@
   const ORBE_PRIMERO = 6; // s hasta el primero
   const ORBE_INTERVALO = [7, 12]; // s entre uno que se va y el que viene (al azar)
   const ORBE_PARA_PODER = 3; // cúmulos para llenar la barra
-  const ESCUDO_DURA = 3; // s
+  const ESCUDO_DURA = 5; // s
   const ESCUDO_AVISO = 0.8; // s finales en los que el escudo parpadea
   const BARRA_VISIBLE = 2; // s que se ve la barra después de juntar un cúmulo
   const BARRA_APARECE = 0.12; // s que tarda en aparecer
@@ -11472,6 +11479,7 @@
         window.vueltaCostados = false;
         window.vueltaMargen = 0;
         window.j2Joystick = false;
+        window.j1Joystick = false;
         window.j2Teclado = false;
         window.tecladoAlReves = false;
         if (modoEl) modoEl.hidden = false;

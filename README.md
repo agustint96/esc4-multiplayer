@@ -53,7 +53,10 @@ también en la pausa y en el cartel de salir del online. Durante el juego, el bo
 - **3 · dos jugadores**: sin tutorial, y la cámara muestra el mapa entero para
   que nadie quede fuera de pantalla.
   - Con un **joystick** conectado: el jugador 1 tiene todo el teclado (como en
-    el sitio) y el jugador 2 el joystick (stick o cruceta, RB acelera).
+    el sitio) y el jugador 2 el joystick (stick o cruceta, RB acelera). Con
+    los lados cambiados es al revés: el jugador 1 el joystick y el 2 todo el
+    teclado. El que juega con el teclado elige: flechas o WASD, y cualquiera
+    de los dos Shift.
   - Sin joystick: el jugador 1 WASD y Shift izquierdo, el jugador 2 las
     flechas y Shift derecho.
   La pantalla de elección muestra cuál de los dos va a ser. Si el navegador
@@ -80,7 +83,7 @@ agarra se achica y se va. La nave que lo toca (suena
 `audio/Esc4/game sound/collect.m4a`)
 carga un tercio de su **barra de poder** (una sola barra debajo de la nave, que
 se llena en proporción); con 3 queda llena y se puede usar el poder de la nave. Por ahora el poder de todas es
-un **escudo de 3 segundos** en el que ninguna piedra la golpea; a futuro cada
+un **escudo de 5 segundos** en el que ninguna piedra la golpea; a futuro cada
 nave tendrá el suyo. No hay cúmulos en el tutorial.
 
 La barra no está siempre a la vista (ver `naves/maqueta-barra-poder.html`):
