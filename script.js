@@ -1962,6 +1962,40 @@ function drawStars() {
     const GAMEPAD_THRUST_BASE = 0.3; // velocidad normal del stick/flechitas
     const GAMEPAD_THRUST_BOOST = 0.6; // velocidad con RB apretado
     const GAMEPAD_DAMPING = 0.9;
+    // El teclado, como un stick: la dirección de las teclas no salta de golpe
+    // sino que se acomoda en TECLAS_SUAVE s, y al soltar una de las dos teclas
+    // de una diagonal se la sigue contando como diagonal TECLAS_GRACIA s. Así
+    // apretar o soltar dos teclas casi juntas (izquierda y arriba, o cualquier
+    // otra diagonal) cuenta como la diagonal y la nave no gira de más hacia la
+    // que se apretó o soltó primero. La nave del jugador 2 con teclado hace lo
+    // mismo (ver teclasComoStick en esc4-game.js).
+    const TECLAS_SUAVE = 0.07;
+    const TECLAS_GRACIA = 0.15;
+    const teclasJ1 = { x: 0, y: 0, diagX: 0, diagY: 0, diagHasta: 0 };
+    let teclasPrevT = 0;
+    // kx, ky: lo que dan las teclas (-1, 0 o 1); devuelve la dirección suave.
+    // t: el estado (teclasJ1 o el del jugador 2), dt en s, ahora en ms.
+    function teclasComoStick(t, kx, ky, dt, ahora) {
+      if (kx && ky) {
+        t.diagX = kx;
+        t.diagY = ky;
+        t.diagHasta = ahora + TECLAS_GRACIA * 1000;
+      } else if (
+        ahora < t.diagHasta &&
+        ((kx && kx === t.diagX && !ky) || (ky && ky === t.diagY && !kx))
+      ) {
+        // Soltó una de las dos hace nada: sigue siendo la diagonal.
+        kx = t.diagX;
+        ky = t.diagY;
+      }
+      const suave = 1 - Math.exp(-dt / TECLAS_SUAVE);
+      t.x += (kx - t.x) * suave;
+      t.y += (ky - t.y) * suave;
+      // Al soltar todo, lo que queda se apaga en la dirección que traía.
+      if (!kx && !ky && Math.hypot(t.x, t.y) < 0.05) t.x = t.y = 0;
+      return t;
+    }
+    window.teclasComoStick = teclasComoStick; // la usa el jugador 2 (esc4-game.js)
     // Mapeo estándar del Gamepad API
     const BTN_RB = 5;
     const BTN_LT = 6;
@@ -2105,10 +2139,21 @@ function drawStars() {
         const alReves = !!window.tecladoAlReves;
         const flechas = !window.j2Teclado || alReves;
         const wasd = !alReves && !window.j1Joystick;
-        if ((wasd && keyLeft) || (flechas && arrowLeft)) gx = -1;
-        else if ((wasd && keyRight) || (flechas && arrowRight)) gx = 1;
-        if ((wasd && keyUp) || (flechas && arrowUp)) gy = -1;
-        else if ((wasd && keyDown) || (flechas && arrowDown)) gy = 1;
+        let kx = 0;
+        let ky = 0;
+        if ((wasd && keyLeft) || (flechas && arrowLeft)) kx = -1;
+        else if ((wasd && keyRight) || (flechas && arrowRight)) kx = 1;
+        if ((wasd && keyUp) || (flechas && arrowUp)) ky = -1;
+        else if ((wasd && keyDown) || (flechas && arrowDown)) ky = 1;
+        // Como un stick (ver teclasComoStick).
+        const ahoraTeclas = performance.now();
+        const dtTeclas = teclasPrevT
+          ? Math.min(0.1, (ahoraTeclas - teclasPrevT) / 1000)
+          : 0;
+        teclasPrevT = ahoraTeclas;
+        teclasComoStick(teclasJ1, kx, ky, dtTeclas, ahoraTeclas);
+        if (teclasJ1.x) gx = teclasJ1.x;
+        if (teclasJ1.y) gy = teclasJ1.y;
         if ((wasd && keyBoost) || (flechas && keyBoostDer)) boosting = true;
         // El stick y el impulso de la pantalla del celular: como el del joystick.
         const toque = window.toque;

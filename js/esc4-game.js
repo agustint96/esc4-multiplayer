@@ -7740,6 +7740,8 @@
     }
   }
 
+  // El teclado del jugador 2, como un stick (ver teclasComoStick en script.js).
+  const teclasJ2Stick = { x: 0, y: 0, diagX: 0, diagY: 0, diagHasta: 0 };
   function moverRival(dt, circulos) {
     if (rival.stun > 0) {
       rival.quieta = 0; // como la del jugador: golpeada no cuenta como quieta
@@ -7796,8 +7798,18 @@
       const flechas = !alReves;
       const wasd = alReves || !!window.j1Joystick;
       const t = (k) => (flechas && teclasJ2[k]) || (wasd && teclasJ2Wasd[k]);
-      gx = (t("right") ? 1 : 0) - (t("left") ? 1 : 0);
-      gy = (t("down") ? 1 : 0) - (t("up") ? 1 : 0);
+      const kx = (t("right") ? 1 : 0) - (t("left") ? 1 : 0);
+      const ky = (t("down") ? 1 : 0) - (t("up") ? 1 : 0);
+      // Como un stick, igual que la del jugador 1 (teclasComoStick, de
+      // script.js): apretar o soltar dos teclas casi juntas es la diagonal.
+      if (window.teclasComoStick) {
+        window.teclasComoStick(teclasJ2Stick, kx, ky, dt, performance.now());
+        gx = teclasJ2Stick.x;
+        gy = teclasJ2Stick.y;
+      } else {
+        gx = kx;
+        gy = ky;
+      }
       if (t("boost")) empuje = fisica.empujeBoost;
     } else {
       // A fondo hacia donde quiere ir, como un stick a fondo o las flechas:
