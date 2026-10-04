@@ -1,0 +1,1519 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poderes de las naves</title>
+<style>
+@font-face { font-family: Spaceport; src: url("../fonts/Spaceport_2006.otf"); }
+@font-face { font-family: "DM Mono"; font-weight: 400; src: url("../fonts/dm-mono-400-latin.woff2") format("woff2"); }
+:root {
+  --fondo: #06080d;
+  --accent: #f19280;
+  --white: #f0ece4;
+  --muted: rgba(240, 236, 228, 0.6);
+  --linea: rgba(240, 236, 228, 0.16);
+  --verde: #6dff8a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--fondo); color: var(--white); }
+body { font: 15px/1.55 "DM Mono", ui-monospace, Consolas, monospace; }
+main { max-width: 1040px; margin: 0 auto; padding: 28px 16px 56px; }
+h1 { font: 34px/1.1 Spaceport, system-ui, sans-serif; margin: 0 0 8px; letter-spacing: 0.02em; }
+h2 { font: 19px/1.2 Spaceport, system-ui, sans-serif; margin: 0 0 4px; color: var(--accent); letter-spacing: 0.04em; }
+h3 { font: 15px/1.2 Spaceport, system-ui, sans-serif; margin: 0; color: var(--accent); letter-spacing: 0.04em; }
+p { margin: 0; }
+.bajada { color: var(--muted); max-width: 72ch; }
+.destacada { margin-top: 36px; }
+.destacada .sub { color: var(--muted); margin-bottom: 12px; }
+.escena { border: 1px solid var(--linea); background: #000; }
+canvas { display: block; width: 100%; height: 400px; }
+.estado { padding: 10px 14px; border-top: 1px solid var(--linea); min-height: 44px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.estado b { color: var(--white); font-weight: 400; }
+.fila { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+button {
+  font: inherit; color: var(--white); background: transparent; cursor: pointer;
+  border: 1px solid var(--accent); border-radius: 999px; padding: 8px 16px;
+}
+button:hover { background: rgba(241, 146, 128, 0.14); }
+button:active { background: rgba(241, 146, 128, 0.28); }
+button:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--accent); color: #1a0d0a; }
+.pasos { margin: 14px 0 0; padding-left: 22px; max-width: 76ch; }
+.pasos li { margin-bottom: 6px; }
+.pasos li::marker { color: var(--accent); }
+.otras { color: var(--muted); margin-top: 10px; max-width: 76ch; }
+.otras b { color: var(--white); font-weight: 400; }
+.resto { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--linea); }
+.grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 16px; }
+.grilla { grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); }
+.carta { display: flex; flex-direction: column; border: 1px solid var(--linea); background: #000; }
+.carta canvas { height: 250px; border-bottom: 1px solid var(--linea); }
+.carta .texto { display: grid; gap: 6px; padding: 12px 14px 14px; background: var(--fondo); flex: 1; align-content: start; }
+.carta .nave { color: var(--muted); font-size: 13px; }
+.carta p { font-size: 14px; }
+.carta button { justify-self: start; margin-top: 4px; padding: 6px 14px; font-size: 14px; }
+.tag { white-space: nowrap; justify-self: start; font-size: 12px; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--linea); color: var(--muted); }
+.tag.rival { border-color: rgba(255, 110, 110, 0.6); color: #ff9a9a; }
+.tag.todos { border-color: rgba(120, 190, 255, 0.6); color: #9ccaff; }
+.charla { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--linea); }
+.charla ol { margin: 10px 0 0; padding-left: 22px; max-width: 76ch; }
+.charla li { margin-bottom: 8px; }
+.charla li::marker { color: var(--accent); }
+@media (max-width: 600px) { h1 { font-size: 26px; } canvas { height: 320px; } .carta canvas { height: 230px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>poderes de las naves</h1>
+  <p class="bajada">Una idea de poder para cada nave, en vez del escudo que tienen todas hoy. Se cargan igual que ahora, con 3 cúmulos, y se usan con E. Están dibujadas como el juego: tu nave con halo azul, el rival con halo rojo, las piedras del color de a quién persiguen y los agujeros de estrellas naranjas. La barra debajo de tu nave parpadea cuando el poder está listo y se vacía mientras dura. Todas corren solas en bucle, o las disparás con el botón.</p>
+
+  <!-- Colapinto -->
+  <section class="destacada">
+    <h2>Colapinto · DRS</h2>
+    <p class="sub">Un Fórmula 1: el poder es abrir el alerón trasero, como en las rectas de una carrera.</p>
+    <div class="escena">
+      <canvas id="c-f1"></canvas>
+      <p class="estado" id="e-f1"></p>
+    </div>
+    <div class="fila">
+      <button type="button" id="b-f1">Usar el poder<kbd> 1</kbd></button>
+      <button type="button" id="a-f1" aria-pressed="true">Que corra sola</button>
+    </div>
+    <ol class="pasos">
+      <li>Durante 5 s abre el alerón de atrás: aparece el cartel verde <b>drs</b> arriba del auto.</li>
+      <li>Va 1,6 veces más rápido y el turbo (Shift) no gasta el tanque: deja la estela azul todo el rato. Saltan chispas de abajo del auto, como en las rectas de verdad.</li>
+      <li><b>Rebufo:</b> si pasa pegado al rival, el aire sucio lo hace patinar un toque (tiembla y se frena medio segundo).</li>
+    </ol>
+    <p class="otras">Otras ideas para el F1: <b>Pit stop</b> (frena 1 s, aparecen los mecánicos y sale con el tanque del turbo lleno y un escudo corto) o <b>Auto de seguridad</b> (todas las piedras van más lento y el rival no lo puede pasar).</p>
+  </section>
+
+  <!-- Estrella de la Muerte -->
+  <section class="destacada">
+    <h2>Estrella de la Muerte · se vuelve la II</h2>
+    <p class="sub">En Star Wars hay dos: la primera y la segunda, que estaba a medio construir pero ya disparaba, y más seguido. Del mismo tamaño, sin crecer.</p>
+    <div class="escena">
+      <canvas id="c-ds"></canvas>
+      <p class="estado" id="e-ds"></p>
+    </div>
+    <div class="fila">
+      <button type="button" id="b-ds">Usar el poder<kbd> 2</kbd></button>
+      <button type="button" id="a-ds" aria-pressed="true">Que corra sola</button>
+    </div>
+    <ol class="pasos">
+      <li><b>El cambio:</b> un destello y pasa a ser la II, del mismo tamaño: igual a la de siempre, pero con el lado de arriba a la derecha sin terminar (el esqueleto de metal a la vista, con lucecitas de obra). El plato se prende verde.</li>
+      <li><b>6 s de ráfagas:</b> dispara un láser verde chico hacia adelante cada medio segundo, solo, sin apretar nada. Los tiros salen para donde mira, así que apuntás moviéndote: en la maqueta va hacia el rival, como haría un jugador.</li>
+      <li>Cada tiro rompe la primera piedra que toca. Si le da al rival, lo deja aturdido 1 s (tiembla y no se puede mover).</li>
+      <li>Otro destello y vuelve a ser la de siempre.</li>
+    </ol>
+  </section>
+
+  <!-- El resto -->
+  <section class="resto">
+    <h2>el resto</h2>
+    <p class="bajada">Cada una con algo de lo que es. La etiqueta dice a quién le pega: solo a la nave que lo usa, al rival o a todo lo que hay en pantalla.</p>
+    <div class="grilla">
+      <article class="carta" id="p-clasico">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">Clásico</span>
+          <h3>Escudo</h3>
+          <p>El de hoy, que queda como el poder de la nave de siempre: 5 s en los que las piedras le pasan por encima sin golpearla. <span class="tag">a mí</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-atomica">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">Atómica</span>
+          <h3>Onda expansiva</h3>
+          <p>Sale un anillo de luz de la nave que hace polvo las piedras cercanas; si agarra al rival, lo empuja lejos. <span class="tag todos">alrededor</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-cuadros">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">X-FLR6 (el cohete de Tintín)</span>
+          <h3>Rumbo a la Luna</h3>
+          <p>Gira hacia el agujero y sale disparada recto, rapidísimo y sin que nada la toque (halo blanco). Se clava en el agujero de una y sale por el otro del par. <span class="tag">a mí</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-saturno">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">Saturno V</span>
+          <h3>Separación de etapas</h3>
+          <p>Suelta la primera etapa, que queda flotando y girando atrás con halo rojo (es un obstáculo para el rival), y la nave queda más chica y rápida 6 s. <span class="tag rival">rival</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-falcon">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">Falcon 9</span>
+          <h3>Reutilizable</h3>
+          <p>Durante 10 s, si una piedra la toca no cae: abre las patas, aterriza parada, se sacude y sigue. Una vida de repuesto. <span class="tag">a mí</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-alax">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">X-Wing</span>
+          <h3>Alas en ataque</h3>
+          <p>Tira láseres rojos para adelante durante 4 s, de una punta de ala y de la otra (en la maqueta va hacia el rival para apuntarle): rompen las piedras que tiene enfrente y, si le dan al rival, lo dejan aturdido 1 s. <span class="tag rival">rival</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-platillo">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">Invasor</span>
+          <h3>Rayo abductor</h3>
+          <p>Un cono de luz que atrapa al rival y lo arrastra hacia el platillo durante 3 s, lejos del agujero al que iba. <span class="tag rival">rival</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-iss">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">ISS</span>
+          <h3>Gravedad cero</h3>
+          <p>Las piedras de toda la pantalla quedan flotando casi quietas por 5 s, girando despacito. Les sirve a las dos naves, pero la ISS lo ve venir. <span class="tag todos">todos</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-tie">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">Caza TIE</span>
+          <h3>Escuadrón imperial</h3>
+          <p>Aparecen dos TIE chiquitos a los costados que la escoltan 6 s; cada uno se come una piedra en su lugar. <span class="tag">a mí</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-van">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">Breaking Bad</span>
+          <h3>Humo azul</h3>
+          <p>Deja una nube de humo azul atrás durante 4 s; el rival que la atraviesa queda con los controles al revés por 3 s. <span class="tag rival">rival</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-delorean">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">DeLorean</span>
+          <h3>88 millas</h3>
+          <p>Acelera hasta 88 entre rayitos, desaparece con un relámpago y reaparece más adelante. Deja dos rastros de fuego que frenan al rival si los pisa. <span class="tag rival">rival</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+      <article class="carta" id="p-colectivo">
+        <canvas></canvas>
+        <div class="texto">
+          <span class="nave">18</span>
+          <h3>Metrobús</h3>
+          <p>Bocinazo y se le abre un carril exclusivo hasta el agujero más cercano: por ahí va a fondo, las piedras se corren del carril, y sale por el otro agujero del par. <span class="tag">a mí</span></p>
+          <button type="button">Usar el poder</button>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="charla">
+    <h2>para charlar</h2>
+    <ol>
+      <li>Los que le pegan al rival (láser, rayo, humo, superláser) cambian mucho el duelo de dos. ¿Van todos, o preferís que los poderes sean solo para uno mismo?</li>
+      <li>¿Cada tiro de la Estrella II que le da al rival lo aturde 1 s (con 12 tiros lo puede tener frenado bastante), o que solo lo empuje un poco?</li>
+      <li>¿La PC usa los poderes de su nave, o sigue con el escudo?</li>
+      <li>¿Cuál querés probar primero en el juego? Cada uno es bastante trabajo (online hay que mandar el efecto al otro), así que conviene ir de a uno.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+// Maqueta de los poderes de cada nave (ver "Cúmulos y poder" en
+// js/esc4-game.js). Solo dibujo: nada de esto está en el juego todavía. Se
+// dibuja como el juego: fondo negro con estrellitas, piedras de contorno fino
+// del color de quien persiguen (azul el jugador, rojo el rival), naves con su
+// halo y su fuego, agujeros de anillos de estrellas naranjas y la barra de
+// poder debajo de la nave.
+
+// --- Colores y dibujos del juego ---------------------------------------------
+const RGB = { azul: "90,169,255", rojo: "255,90,90", blanco: "255,255,255" }; // halos (styles.css)
+const BORDE = { azul: "#5aa9ff", rojo: "#ff5a5a" }; // BORDE_JUGADOR / BORDE_RIVAL
+const LUZ_RGB = { azul: "197,225,255", rojo: "255,197,197", blanco: "255,255,255" }; // LUZ_RGB_INICIO_*
+const AGUJERO = "#cb681a"; // CUMULO_COLOR_FIN
+
+const cargar = (src) => { const i = new Image(); i.src = src; return i; };
+const listo = (i) => i && i.complete && i.naturalWidth > 0;
+// Cada nave prendida (_on), y las de ruedas con sus perfiles para los costados.
+const NAVES = {};
+for (const [id, ruedas] of [
+  ["cohete"], ["atomica"], ["cuadros"], ["saturno"], ["falcon"], ["alax"], ["platillo"],
+  ["iss"], ["tie"], ["estrella"], ["van", 1], ["delorean", 1], ["colectivo", 1], ["colapinto", 1],
+]) {
+  const dir = id === "cohete" ? "../parallax/" : `nuevas/${id}/`;
+  NAVES[id] = {
+    arriba: cargar(`${dir}${id}_on.webp`),
+    der: ruedas ? cargar(`${dir}${id}_der_on.webp`) : null,
+    izq: ruedas ? cargar(`${dir}${id}_izq_on.webp`) : null,
+  };
+}
+NAVES.estrella2 = { arriba: cargar("nuevas/estrella/estrella2.webp") };
+const FUEGO = cargar("../parallax/cohete_fuego.webp");
+// En los dibujos de 203x300: el plato de la Estrella.
+const PLATO = { x: 73, y: 82, r: 20 };
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const suave = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const acercar = (v, meta, vel, dt) => v + (meta - v) * (1 - Math.exp(-vel * dt));
+const adelante = (ang) => ({ x: Math.sin(ang), y: -Math.cos(ang) }); // 0 = para arriba
+// Un punto del dibujo de la nave (en px del dibujo de 203x300) en la pantalla.
+function puntoNave(n, px, py) {
+  const k = n.alto / 300, c = Math.cos(n.ang), s = Math.sin(n.ang);
+  const x = (px - 101.5) * k, y = (py - 150) * k;
+  return { x: n.x + x * c - y * s, y: n.y + x * s + y * c };
+}
+
+// Un lienzo que se adapta a su tamaño y a la pantalla.
+function lienzo(c) {
+  const ctx = c.getContext("2d");
+  const l = { c, ctx, w: 0, h: 0 };
+  const ajustar = () => {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    l.w = c.clientWidth; l.h = c.clientHeight;
+    c.width = Math.round(l.w * dpr); c.height = Math.round(l.h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  new ResizeObserver(ajustar).observe(c);
+  ajustar();
+  return l;
+}
+
+// --- Naves -------------------------------------------------------------------
+// El dibujo con el halo de su color (el drop-shadow de styles.css), armado una
+// sola vez por dibujo, color y tamaño.
+const conHalo = new Map();
+function spriteConHalo(img, color, alto) {
+  if (!listo(img)) return null;
+  const clave = `${img.src}|${color}|${Math.round(alto)}`;
+  let s = conHalo.get(clave);
+  if (s) return s;
+  const k = alto / 300, pad = 26, esc = 2;
+  const c = document.createElement("canvas");
+  c.width = Math.ceil((203 * k + pad * 2) * esc); c.height = Math.ceil((300 * k + pad * 2) * esc);
+  const g = c.getContext("2d");
+  g.scale(esc, esc);
+  // Los dos halos con sombras (como drop-shadow, pero sin filter, que en
+  // algunas máquinas es muy lento): primero el ancho y tenue, después el
+  // cercano, y encima el dibujo limpio.
+  if (color) {
+    for (const [blur, alfa] of [[14, 0.55], [5, 0.95]]) {
+      g.shadowColor = `rgba(${RGB[color]},${alfa})`; g.shadowBlur = blur * esc;
+      g.drawImage(img, pad, pad, 203 * k, 300 * k);
+    }
+    g.shadowColor = "transparent"; g.shadowBlur = 0;
+  }
+  g.drawImage(img, pad, pad, 203 * k, 300 * k);
+  s = { c, pad, k };
+  conHalo.set(clave, s);
+  return s;
+}
+// La luz de la nave: el mismo degradado que el juego (ver armarSprites).
+const LUZ = {};
+for (const [color, rgb] of Object.entries(LUZ_RGB)) {
+  const n = 128, c = document.createElement("canvas");
+  c.width = c.height = n;
+  const g = c.getContext("2d"), gr = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+  gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(0.2, `rgba(${rgb},0.65)`);
+  gr.addColorStop(0.5, `rgba(${rgb},0.25)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, n, n);
+  LUZ[color] = c;
+}
+function nave(id, color, alto) {
+  return { id, color, alto, x: 0, y: 0, ang: 0, alpha: 1, escala: 1, lado: "arriba", nueva: true };
+}
+// Los vehículos con ruedas se ven de costado cuando van para los costados
+// (como ladoDeRumbo en el juego: entran a 35° y vuelven a 25°).
+function imgNave(n) {
+  const s = NAVES[n.id];
+  if (!s.der) return s.arriba;
+  const sen = Math.sin(n.ang), umbral = n.lado === "arriba" ? 0.574 : 0.423;
+  n.lado = sen > umbral ? "der" : sen < -umbral ? "izq" : "arriba";
+  return s[n.lado];
+}
+// La lleva hacia (x, y) y la gira hacia donde va, como en el juego.
+function moverA(n, p, dt) {
+  if (n.nueva) { n.x = p.x; n.y = p.y; n.nueva = false; return; }
+  if (dt <= 0) return;
+  const vx = (p.x - n.x) / dt, vy = (p.y - n.y) / dt;
+  if (Math.hypot(vx, vy) > 12) n.ang = girarA(n.ang, Math.atan2(vx, -vy), 9 * dt);
+  n.x = p.x; n.y = p.y;
+}
+function girarA(a, b, f) {
+  const d = ((((b - a + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) - Math.PI;
+  return a + d * Math.min(1, f);
+}
+// Dibuja la nave: su luz, el fuego (titilando) y el dibujo, con el halo.
+// n.recorte = [desde, hasta]: solo esas filas del dibujo; n.pivote: la fila
+// que queda en (x, y).
+function dibujarNave(ctx, n, t) {
+  const esc = n.escala, alfa = n.alpha;
+  if (esc <= 0.01 || alfa <= 0.01) return;
+  const s = spriteConHalo(imgNave(n), n.color, n.alto);
+  if (!s) return;
+  const k = s.k, piv = n.pivote ?? 150;
+  ctx.save();
+  ctx.translate(n.x, n.y); ctx.rotate(n.ang + (n.giro || 0)); ctx.scale(esc, esc);
+  if (n.color && !n.recorte) {
+    const r = n.alto * 1.6;
+    ctx.globalAlpha = 0.12 * alfa;
+    ctx.drawImage(LUZ[n.color], -r, -r, r * 2, r * 2);
+  }
+  ctx.globalAlpha = alfa;
+  if (n.fuego !== false) {
+    const f = spriteConHalo(FUEGO, n.color, n.alto);
+    if (f) {
+      const dy = (n.fuegoY || 0) * k, y0 = (200 - piv) * k + dy;
+      const largo = 0.88 + 0.08 * Math.sin(t * 37 + n.alto) + 0.05 * Math.sin(t * 61);
+      ctx.save();
+      ctx.translate(0, y0); ctx.scale(1, largo); ctx.translate(0, -y0);
+      ctx.drawImage(f.c, -101.5 * k - f.pad, dy - piv * k - f.pad, 203 * k + f.pad * 2, 300 * k + f.pad * 2);
+      ctx.restore();
+    }
+  }
+  if (n.recorte) {
+    const [desde, hasta] = n.recorte, arriba = desde === 0 ? s.pad : 0, abajo = hasta >= 230 ? s.pad : 0;
+    ctx.beginPath();
+    ctx.rect(-101.5 * k - s.pad, (desde - piv) * k - arriba, 203 * k + s.pad * 2, (hasta - desde) * k + arriba + abajo);
+    ctx.clip();
+  }
+  ctx.drawImage(s.c, -101.5 * k - s.pad, -piv * k - s.pad, 203 * k + s.pad * 2, 300 * k + s.pad * 2);
+  ctx.restore();
+}
+// La barra de poder debajo de la nave (dibujarPoderNave en el juego): llena y
+// parpadeando cuando se puede usar; mientras dura el poder se va vaciando.
+function barraPoder(ctx, n, nivel, llena, t) {
+  const w = n.alto * 0.5, h = 3, x0 = n.x - w / 2, y0 = n.y + n.alto * 0.46;
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fillRect(x0, y0, w, h);
+  if (llena) {
+    // El brillo de la barra llena (en el juego, un shadowBlur que late).
+    ctx.globalAlpha = 0.18 + 0.1 * Math.sin(t * 7);
+    ctx.fillStyle = BORDE[n.color]; ctx.fillRect(x0 - 3, y0 - 3, w + 6, h + 6);
+    ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = BORDE[n.color]; ctx.fillRect(x0, y0, w * clamp(nivel, 0, 1), h);
+  if (llena) {
+    ctx.globalAlpha = 0.5 + 0.5 * Math.cos(t * 2 * Math.PI * 2);
+    ctx.fillStyle = "#fff"; ctx.fillRect(x0, y0, w * nivel, h);
+  }
+  ctx.restore();
+}
+// Un cartelito con la letra del juego, sin caja.
+function cartel(ctx, x, y, texto, rgb = "240,236,228", alfa = 0.9) {
+  ctx.save();
+  ctx.font = "11px Spaceport, system-ui, sans-serif";
+  ctx.letterSpacing = "2px";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = `rgba(${rgb},${alfa})`;
+  ctx.fillText(texto, x, Math.max(12, y)); // que no se corte arriba
+  ctx.restore();
+}
+// La nave golpeada (como cuando cae en el juego): gira y parpadea.
+function golpeada(n, golpe, t) {
+  n.giro = golpe > 0 ? golpe * 7 : 0;
+  n.alpha = golpe > 0 ? 0.55 + 0.45 * Math.sin(t * 30) : 1;
+}
+
+// --- Cielo, piedras, chispas, humo ---------------------------------------------
+function hacerCielo(n) {
+  return Array.from({ length: n }, () => ({
+    x: Math.random(), y: Math.random(), r: 0.35 + Math.random() * 0.75,
+    vel: 0.6 + Math.random() * 1.6, fase: Math.random() * 6, brillo: 0.5 + Math.random() * 0.5,
+  }));
+}
+function dibujarCielo(e, ctx) {
+  const { w, h } = e.l;
+  ctx.fillStyle = "#fff";
+  for (const s of e.cielo) {
+    ctx.globalAlpha = s.brillo * (0.3 + 0.6 * (0.5 + 0.5 * Math.sin(e.t * s.vel + s.fase)));
+    ctx.beginPath(); ctx.arc(s.x * w, s.y * h, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+// Piedras: polígonos irregulares de contorno fino, rellenos de negro, del color
+// de la nave a la que persiguen.
+function piedra(x, y, r, vy, color) {
+  const n = 5 + Math.floor(Math.random() * 3);
+  const pts = Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const rr = r * (0.65 + Math.random() * 0.45);
+    return [Math.cos(a) * rr, Math.sin(a) * rr];
+  });
+  return { x, y, r, vy, vx: 0, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 1.2, pts, color };
+}
+function puntosPiedra(p) {
+  const c = Math.cos(p.rot), s = Math.sin(p.rot);
+  return p.pts.map(([x, y]) => ({ x: p.x + x * c - y * s, y: p.y + x * s + y * c }));
+}
+function dibujarPiedras(ctx, lista) {
+  ctx.lineWidth = 1.4; ctx.lineJoin = "round"; ctx.fillStyle = "#000";
+  for (const p of lista) {
+    const pts = puntosPiedra(p);
+    ctx.beginPath();
+    pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+    ctx.closePath();
+    ctx.globalAlpha = p.alfa ?? 1;
+    ctx.fill();
+    ctx.strokeStyle = BORDE[p.color]; ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+// Una piedra que se rompe: sus lados salen volando, girando, y se apagan.
+function quebrar(e, p) {
+  p.muerta = true;
+  const pts = puntosPiedra(p);
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, d = Math.hypot(mx - p.x, my - p.y) || 1;
+    const v = 60 + Math.random() * 90;
+    e.trozos.push({
+      x: mx, y: my, dx: (b.x - a.x) / 2, dy: (b.y - a.y) / 2, ang: 0,
+      vx: ((mx - p.x) / d) * v, vy: ((my - p.y) / d) * v, va: (Math.random() - 0.5) * 10,
+      vida: 0.8, dura: 0.8, color: p.color,
+    });
+  }
+  estallar(e.chispas, p.x, p.y, 6, BORDE[p.color], 90);
+}
+function dibujarTrozos(ctx, lista) {
+  ctx.lineWidth = 1.4; ctx.lineCap = "round";
+  for (const q of lista) {
+    const c = Math.cos(q.ang), s = Math.sin(q.ang);
+    const dx = q.dx * c - q.dy * s, dy = q.dx * s + q.dy * c;
+    ctx.globalAlpha = clamp(q.vida / q.dura, 0, 1);
+    ctx.strokeStyle = BORDE[q.color];
+    ctx.beginPath(); ctx.moveTo(q.x - dx, q.y - dy); ctx.lineTo(q.x + dx, q.y + dy); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+// Chispas: puntitos con brillo que salen y se apagan.
+function estallar(lista, x, y, n, color, vel) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = vel * (0.3 + Math.random());
+    const dura = 0.35 + Math.random() * 0.45;
+    lista.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 0.7 + Math.random() * 1.1, vida: dura, dura, color });
+  }
+}
+function moverLista(lista, dt) {
+  for (const c of lista) {
+    c.x += c.vx * dt; c.y += c.vy * dt; c.vida -= dt;
+    if (c.va) c.ang += c.va * dt;
+  }
+  return lista.filter((c) => c.vida > 0);
+}
+function dibujarChispas(ctx, lista) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const c of lista) {
+    ctx.globalAlpha = clamp(c.vida / c.dura, 0, 1);
+    ctx.fillStyle = c.color;
+    ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+// Humo en bocanadas (como la estela del turbo en el juego): nace chico en la
+// cola de la nave, crece y se apaga.
+const BOCANADA = {};
+function spriteBocanada(rgb) {
+  if (BOCANADA[rgb]) return BOCANADA[rgb];
+  const n = 64, c = document.createElement("canvas");
+  c.width = c.height = n;
+  const g = c.getContext("2d"), gr = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+  gr.addColorStop(0, `rgba(${rgb},0.9)`); gr.addColorStop(0.5, `rgba(${rgb},0.35)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, n, n);
+  return (BOCANADA[rgb] = c);
+}
+function soplar(e, n, rgb, { r0 = 3, r1 = 16, vida = 1.3, alfa = 0.55 } = {}) {
+  const p = puntoNave(n, 101.5, 228);
+  e.humo.push({ x: p.x + (Math.random() - 0.5) * 3, y: p.y + (Math.random() - 0.5) * 3, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, r0, r1, vida, dura: vida, a0: alfa, rgb });
+}
+function dibujarHumo(ctx, lista) {
+  for (const b of lista) {
+    const t = 1 - b.vida / b.dura, r = b.r0 + (b.r1 - b.r0) * Math.pow(t, 0.55);
+    ctx.globalAlpha = b.a0 * Math.pow(1 - t, 1.6) * Math.min(1, (b.dura - b.vida) / 0.15);
+    ctx.drawImage(spriteBocanada(b.rgb), b.x - r, b.y - r, r * 2, r * 2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// --- Agujeros de gusano ----------------------------------------------------------
+// Como dibujarPisoAgujero: disco negro con el otro lado (nube violeta y
+// estrellitas), un anillo de 28 estrellas con brillo y otro de 14 adentro,
+// girando para el otro lado.
+const ANILLOS = {};
+function spriteAnillo(radio, cantidad, r, color) {
+  const clave = `${radio}|${cantidad}|${color}`;
+  if (ANILLOS[clave]) return ANILLOS[clave];
+  const K = 2, brillo = radio * 0.3;
+  const lado = Math.ceil((radio + r + brillo * 2) * 2 * K);
+  const c = document.createElement("canvas");
+  c.width = c.height = lado;
+  const g = c.getContext("2d");
+  g.translate(lado / 2, lado / 2);
+  g.fillStyle = color; g.shadowColor = color; g.shadowBlur = brillo * K * 0.5;
+  for (let i = 0; i < cantidad; i++) {
+    const a = (i / cantidad) * Math.PI * 2;
+    for (let k = 0; k < 3; k++) { g.beginPath(); g.arc(Math.cos(a) * radio * K, Math.sin(a) * radio * K, r * K, 0, Math.PI * 2); g.fill(); }
+  }
+  return (ANILLOS[clave] = { c, lado: lado / K });
+}
+const OTRO_CIELO = Array.from({ length: 26 }, () => ({ x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, r: 0.35 + Math.random() * 0.45, a: 0.18 + Math.random() * 0.4 }));
+function dibujarAgujero(ctx, x, y, R, t, brillo = 0) {
+  const D = R * 1.15;
+  ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(x, y, D, 0, Math.PI * 2); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, D * 0.98, 0, Math.PI * 2); ctx.clip();
+  const nube = ctx.createRadialGradient(x + D * 0.25, y - D * 0.2, 0, x + D * 0.25, y - D * 0.2, D * 1.1);
+  nube.addColorStop(0, "rgba(96,64,170,0.22)"); nube.addColorStop(0.5, "rgba(40,40,120,0.1)"); nube.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = nube; ctx.fillRect(x - D, y - D, D * 2, D * 2);
+  const dx = Math.sin(t * 0.3) * D * 0.3;
+  for (const s of OTRO_CIELO) {
+    ctx.fillStyle = `rgba(185,195,255,${s.a})`;
+    ctx.beginPath(); ctx.arc(x + s.x * D * 1.3 + dx, y + s.y * D * 1.3, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  const afuera = spriteAnillo(R, 28, R * 0.106, AGUJERO);
+  const adentro = spriteAnillo(R * 0.72, 14, R * 0.08, AGUJERO);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const [s, giro] of [[afuera, t * 1.6], [adentro, -t * 2.7]]) {
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(giro);
+    ctx.globalAlpha = 1;
+    ctx.drawImage(s.c, -s.lado / 2, -s.lado / 2, s.lado, s.lado);
+    if (brillo > 0) { ctx.globalAlpha = brillo * 0.8; ctx.drawImage(s.c, -s.lado / 2, -s.lado / 2, s.lado, s.lado); }
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// Un tiro de láser que va en la dirección (dx, dy): halo, cuerpo y centro
+// blanco, con la cola que se apaga.
+function tiro(ctx, x, y, dx, dy, largo, rgb, ancho = 1) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+  const cx = x - dx * largo, cy = y - dy * largo;
+  for (const [a, alfa, color] of [[10, 0.22, rgb], [4, 0.85, rgb], [1.6, 1, "255,255,255"]]) {
+    const g = ctx.createLinearGradient(x, y, cx, cy);
+    g.addColorStop(0, `rgba(${color},${alfa})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.strokeStyle = g; ctx.lineWidth = a * ancho;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(cx, cy); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// --- Escenas -----------------------------------------------------------------------
+// Cada escena: un lienzo con sus naves, que usan el poder solas cada tanto
+// (ciclo, arranca) o con el botón. e.p: segundos desde que se usó (-1 si no).
+const escenas = [];
+function escena(canvas, def) {
+  const e = Object.assign({
+    l: lienzo(canvas), t: 0, p: -1, dura: 5, ciclo: 9, arranca: 2, auto: true, visible: true,
+    piedras: [], trozos: [], chispas: [], humo: [], acum: 0, lluvia: 0.8, velPiedras: 1, naves: [],
+  }, def);
+  e.cielo = hacerCielo(Math.round((canvas.clientWidth * canvas.clientHeight) / 2600));
+  new IntersectionObserver(([en]) => { e.visible = en.isIntersecting; }).observe(canvas);
+  e.iniciar?.(e);
+  escenas.push(e);
+  return e;
+}
+function usar(e) { if (e.p < 0) { e.p = 0; e.usar?.(e); } }
+function pasoEscena(e, dt) {
+  const { w, h } = e.l;
+  if (!w) return;
+  const antes = e.t % e.ciclo;
+  e.t += dt;
+  if (e.auto && antes < e.arranca && e.t % e.ciclo >= e.arranca) usar(e);
+  if (e.p >= 0) { e.p += dt; if (e.p >= e.dura) { e.p = -1; e.terminar?.(e); } }
+  e.mover(e, dt);
+  // Lluvia: de arriba, lejos de las naves, salvo las que apunta la escena.
+  e.acum += dt;
+  if (e.lluvia && e.acum >= e.lluvia) {
+    e.acum = 0;
+    const a = e.apuntar?.(e) || null;
+    let x = a ? a.x : null;
+    for (let i = 0; x == null && i < 12; i++) {
+      const prueba = Math.random() * w;
+      if (e.naves.every((n) => Math.abs(prueba - n.x) > 55)) x = prueba;
+    }
+    if (x != null) {
+      const color = a?.color || (e.rival && Math.random() < 0.5 ? "rojo" : "azul");
+      const p = piedra(x, -24, 6 + Math.random() * 11, a?.vy || 45 + Math.random() * 40, color);
+      if (a?.seguir) p.seguir = a.seguir;
+      e.piedras.push(p);
+    }
+  }
+  for (const p of e.piedras) {
+    p.y += p.vy * e.velPiedras * dt; p.x += p.vx * dt; p.rot += p.vr * e.velPiedras * dt;
+    if (p.seguir && p.seguir.vivo !== false && p.y < p.seguir.y - 6) p.x = acercar(p.x, p.seguir.x, 3, dt);
+  }
+  e.paso?.(e, dt);
+  e.piedras = e.piedras.filter((p) => !p.muerta && p.y < h + 30 && p.x > -40 && p.x < w + 40);
+  e.trozos = moverLista(e.trozos, dt);
+  e.chispas = moverLista(e.chispas, dt);
+  e.humo = moverLista(e.humo, dt);
+  if (e.estado) {
+    const texto = e.texto(e);
+    if (texto !== e.textoVisto) { e.estado.innerHTML = texto; e.textoVisto = texto; }
+  }
+}
+function dibujarEscena(e) {
+  const { ctx, w, h } = e.l;
+  if (!w) return;
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+  dibujarCielo(e, ctx);
+  e.fondo?.(e, ctx);
+  dibujarHumo(ctx, e.humo);
+  dibujarPiedras(ctx, e.piedras);
+  dibujarTrozos(ctx, e.trozos);
+  e.dibujar(e, ctx);
+  if (e.yo && !e.sinBarra && e.yo.alpha > 0.5 && e.yo.escala > 0.5) barraPoder(ctx, e.yo, e.p >= 0 ? 1 - e.p / e.dura : 1, e.p < 0, e.t);
+  dibujarChispas(ctx, e.chispas);
+  e.encima?.(e, ctx);
+}
+const canvasDe = (id) => document.querySelector(`#${id} canvas`);
+// Recorridos: un 8 (Lissajous 1:2) y un óvalo, en fracciones del lienzo.
+function ocho(e, t, { cx = 0.5, cy = 0.5, ax = 0.3, ay = 0.22, vel = 0.5, fase = 0 } = {}) {
+  return { x: e.l.w * (cx + Math.sin(t * vel + fase) * ax), y: e.l.h * (cy + Math.sin((t * vel + fase) * 2) * ay) };
+}
+function ovalo(e, u, { cx = 0.5, cy = 0.5, ax = 0.34, ay = 0.3 } = {}) {
+  return { x: e.l.w * (cx + Math.sin(u) * ax), y: e.l.h * (cy - Math.cos(u) * ay) };
+}
+const ALTO = 92; // alto del dibujo de las naves (203x300) en las escenas chicas
+const ALTO_GRANDE = 110;
+
+// --- Colapinto: DRS ----------------------------------------------------------------
+// Dan vueltas a un óvalo; Colapinto va detrás del rival. Con DRS va 1,6 veces
+// más rápido, con la estela del turbo (que no gasta el tanque) y chispas de
+// abajo del auto; al pasar pegado al rival, el aire sucio lo hace patinar.
+const F1_VEL = 0.62, F1_ATRAS = -0.5;
+const f1 = escena(document.getElementById("c-f1"), {
+  dura: 5, ciclo: 12, arranca: 2.5, estado: document.getElementById("e-f1"),
+  iniciar(e) {
+    e.yo = nave("colapinto", "azul", ALTO_GRANDE);
+    e.rival = nave("atomica", "rojo", ALTO_GRANDE);
+    e.naves = [e.yo, e.rival];
+    e.ur = 0; e.uy = F1_ATRAS; e.carril = 0; e.patina = 0;
+  },
+  mover(e, dt) {
+    const drs = e.p >= 0;
+    e.ur += F1_VEL * dt;
+    const gap = e.uy - e.ur;
+    e.uy += F1_VEL * dt * (drs ? 1.6 : 1 + clamp((F1_ATRAS - gap) * 0.6, -0.25, 0.25));
+    // Para pasar se abre al carril de adentro.
+    e.carril = acercar(e.carril, Math.abs(gap) < 0.55 ? 1 : 0, 3, dt);
+    const adentro = 0.06 * e.carril;
+    moverA(e.yo, ovalo(e, e.uy, { ax: 0.36 - adentro, ay: 0.3 - adentro * 1.6 }), dt);
+    const pr = ovalo(e, e.ur, { ax: 0.36, ay: 0.3 });
+    if (drs && Math.abs(gap) < 0.14 && e.patina <= 0) e.patina = 0.7;
+    e.patina = Math.max(0, e.patina - dt);
+    if (e.patina > 0) { pr.x += Math.sin(e.t * 45) * 3; pr.y += Math.cos(e.t * 38) * 3; }
+    moverA(e.rival, pr, dt);
+    e.rival.giro = e.patina > 0 ? Math.sin(e.t * 30) * 0.25 : 0;
+  },
+  paso(e) {
+    if (e.p < 0) return;
+    soplar(e, e.yo, RGB.azul, { r1: 18 });
+    const q = puntoNave(e.yo, 101.5, 200);
+    if (Math.random() < 0.8) {
+      const b = adelante(e.yo.ang), dura = 0.25 + Math.random() * 0.25;
+      e.chispas.push({ x: q.x, y: q.y, vx: -b.x * 160 + (Math.random() - 0.5) * 60, vy: -b.y * 160 + (Math.random() - 0.5) * 60, r: 0.8 + Math.random(), vida: dura, dura, color: Math.random() < 0.5 ? "#fff3c4" : "#ffb347" });
+    }
+    if (e.patina > 0 && Math.random() < 0.5) soplar(e, e.yo, "220,225,235", { r0: 2, r1: 10, vida: 0.6, alfa: 0.4 });
+  },
+  dibujar(e, ctx) {
+    dibujarNave(ctx, e.rival, e.t);
+    dibujarNave(ctx, e.yo, e.t);
+    if (e.p >= 0) cartel(ctx, e.yo.x, e.yo.y - ALTO_GRANDE * 0.5, "drs", "110,255,140");
+    if (e.patina > 0) cartel(ctx, e.rival.x, e.rival.y - ALTO_GRANDE * 0.5, "rebufo", "255,140,140");
+  },
+  texto(e) {
+    return e.p >= 0
+      ? `<b>DRS abierto</b> · 1,6× de velocidad, el turbo no gasta · quedan ${(e.dura - e.p).toFixed(1)} s${e.patina > 0 ? " · <b>rebufo:</b> el rival patina" : ""}`
+      : "Colapinto va detrás del rival, a la misma velocidad. La barra llena parpadea: el poder está listo.";
+  },
+});
+
+// --- Estrella de la Muerte: se vuelve la II -----------------------------------------
+// Durante el poder se mueve hacia el rival (apunta moviéndose, como un
+// jugador) y dispara sola un tiro verde cada medio segundo: antes de cada
+// uno, los rayos del borde del plato se juntan adelante.
+const DS_CAMBIO = 0.45, DS_DURA = 6, DS_CADENCIA = 0.5, DS_CARGA = 0.18, DS_FOGONAZO = 0.12;
+const ds = escena(document.getElementById("c-ds"), {
+  dura: DS_CAMBIO * 2 + DS_DURA, ciclo: 12, arranca: 2, estado: document.getElementById("e-ds"),
+  tiros: [], anillos: [], prox: 0, fogonazo: 0,
+  iniciar(e) {
+    e.yo = nave("estrella", "azul", ALTO_GRANDE * 1.1);
+    e.rival = nave("alax", "rojo", ALTO_GRANDE);
+    e.naves = [e.yo, e.rival];
+    e.rival.golpe = 0;
+    e.pos = null;
+  },
+  mezcla(e) {
+    const p = e.p;
+    if (p < 0) return 0;
+    if (p < DS_CAMBIO) return p / DS_CAMBIO;
+    if (p < e.dura - DS_CAMBIO) return 1;
+    return (e.dura - p) / DS_CAMBIO;
+  },
+  usar(e) { e.prox = DS_CAMBIO + DS_CARGA; },
+  mover(e, dt) {
+    const r = e.rival;
+    r.golpe = Math.max(0, r.golpe - dt);
+    const pr = ocho(e, e.t, { cy: 0.3, ax: 0.32, ay: 0.12, vel: 0.35, fase: 1 });
+    if (r.golpe <= 0) moverA(r, pr, dt);
+    golpeada(r, r.golpe, e.t);
+    // La Estrella: da vueltas abajo; con el poder va hacia el rival, sin llegar.
+    const base = ocho(e, e.t, { cy: 0.68, ax: 0.3, ay: 0.12, vel: 0.3 });
+    let meta = base;
+    if (e.p >= 0) {
+      const dx = r.x - e.yo.x, dy = r.y - e.yo.y, d = Math.hypot(dx, dy) || 1;
+      meta = { x: r.x - (dx / d) * 170, y: r.y - (dy / d) * 170 };
+    }
+    if (!e.pos) e.pos = { ...base };
+    const rapidez = e.p >= 0 ? 0.9 : 1.5;
+    e.pos.x = acercar(e.pos.x, meta.x, rapidez, dt); e.pos.y = acercar(e.pos.y, meta.y, rapidez, dt);
+    moverA(e.yo, e.pos, dt);
+    if (e.p >= 0) e.yo.ang = girarA(e.yo.ang, Math.atan2(r.x - e.yo.x, -(r.y - e.yo.y)), 3 * dt);
+    const m = e.mezcla(e);
+    e.yo.id = m >= 0.5 ? "estrella2" : "estrella";
+  },
+  foco(e) {
+    const pl = puntoNave(e.yo, PLATO.x, PLATO.y), f = adelante(e.yo.ang), r = (PLATO.r * e.yo.alto) / 300;
+    return { pl, r, x: pl.x + f.x * r * 2.4, y: pl.y + f.y * r * 2.4, f };
+  },
+  paso(e, dt) {
+    const fo = e.foco(e);
+    if (e.p >= DS_CAMBIO + DS_CARGA && e.p < e.dura - DS_CAMBIO && e.p >= e.prox) {
+      e.prox += DS_CADENCIA;
+      e.tiros.push({ x: fo.x, y: fo.y, dx: fo.f.x, dy: fo.f.y, recorrido: 0 });
+      e.fogonazo = DS_FOGONAZO;
+    }
+    e.fogonazo = Math.max(0, e.fogonazo - dt);
+    for (const a of e.anillos) a.t += dt;
+    e.anillos = e.anillos.filter((a) => a.t < 0.35);
+    const r = e.rival, { w, h } = e.l;
+    e.tiros = e.tiros.filter((t) => {
+      t.x += t.dx * 900 * dt; t.y += t.dy * 900 * dt; t.recorrido += 900 * dt;
+      if (t.x < -60 || t.x > w + 60 || t.y < -60 || t.y > h + 60) return false;
+      const p = e.piedras.find((p) => !p.muerta && Math.hypot(p.x - t.x, p.y - t.y) < p.r + 3);
+      if (p) { quebrar(e, p); e.anillos.push({ x: t.x, y: t.y, t: 0 }); return false; }
+      if (Math.hypot(r.x - t.x, r.y - t.y) < 26) {
+        r.golpe = 1; e.anillos.push({ x: t.x, y: t.y, t: 0 });
+        estallar(e.chispas, t.x, t.y, 12, "#8dff9c", 150);
+        return false;
+      }
+      return true;
+    });
+  },
+  carga(e) {
+    if (e.p < DS_CAMBIO || e.p >= e.dura - DS_CAMBIO) return -1;
+    const falta = e.prox - e.p;
+    return falta <= DS_CARGA ? 1 - falta / DS_CARGA : -1;
+  },
+  dibujar(e, ctx) {
+    dibujarNave(ctx, e.rival, e.t);
+    if (e.rival.golpe > 0) cartel(ctx, e.rival.x, e.rival.y - ALTO_GRANDE * 0.5, "aturdido", "255,140,140");
+    dibujarNave(ctx, e.yo, e.t);
+    const m = e.mezcla(e), p = e.p;
+    // Destello del cambio.
+    if (p >= 0 && (p < DS_CAMBIO || p > e.dura - DS_CAMBIO)) {
+      const f = p < DS_CAMBIO ? p / DS_CAMBIO : (e.dura - p) / DS_CAMBIO;
+      const c = puntoNave(e.yo, 101, 122), R = (77 * e.yo.alto) / 300;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, R * 1.3);
+      g.addColorStop(0, `rgba(255,255,255,${Math.sin(f * Math.PI) * 0.7})`); g.addColorStop(1, "rgba(160,255,180,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y, R * 1.3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    if (m > 0) dsLaser(e, ctx, m);
+  },
+  texto(e) {
+    const p = e.p;
+    return p < 0 ? "La Estrella de siempre. La barra llena parpadea: el poder está listo."
+      : p < DS_CAMBIO ? "<b>Se vuelve la Estrella de la Muerte II…</b>"
+      : p < e.dura - DS_CAMBIO ? `<b>Estrella de la Muerte II</b> · va hacia el rival y dispara cada medio segundo · ${(e.dura - DS_CAMBIO - p).toFixed(1)} s${e.rival.golpe > 0 ? " · <b>¡le dio!</b>" : ""}`
+      : "Vuelve a ser la de siempre.";
+  },
+});
+// El láser de la II: el plato prendido, los rayos que se juntan antes de cada
+// tiro, el fogonazo, los tiros y el anillo donde pegan.
+function dsLaser(e, ctx, m) {
+  const fo = e.foco(e), pl = fo.pl, carga = e.carga(e);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+  const brillo = 0.25 + (carga >= 0 ? carga * 0.5 : 0) + (e.fogonazo / DS_FOGONAZO) * 0.4;
+  const gp = ctx.createRadialGradient(pl.x, pl.y, 0, pl.x, pl.y, fo.r * 1.2);
+  gp.addColorStop(0, `rgba(150,255,160,${brillo * m})`); gp.addColorStop(1, "rgba(60,255,100,0)");
+  ctx.fillStyle = gp; ctx.beginPath(); ctx.arc(pl.x, pl.y, fo.r * 1.2, 0, Math.PI * 2); ctx.fill();
+  const rayos = carga >= 0 ? carga : e.fogonazo > 0 ? 1 : -1;
+  if (rayos >= 0) {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.2;
+      const ox = pl.x + Math.cos(a) * fo.r * 0.9, oy = pl.y + Math.sin(a) * fo.r * 0.9;
+      const fx = ox + (fo.x - ox) * rayos, fy = oy + (fo.y - oy) * rayos;
+      ctx.strokeStyle = "rgba(60,255,100,0.35)"; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(fx, fy); ctx.stroke();
+      ctx.strokeStyle = "rgba(220,255,225,0.9)"; ctx.lineWidth = 1.4; ctx.stroke();
+    }
+  }
+  const f = e.fogonazo / DS_FOGONAZO;
+  if (f > 0 || carga > 0.6) {
+    const rad = f > 0 ? 7 + f * 16 : (carga - 0.6) * 16;
+    const gf = ctx.createRadialGradient(fo.x, fo.y, 0, fo.x, fo.y, rad);
+    gf.addColorStop(0, "rgba(255,255,255,0.95)"); gf.addColorStop(0.35, "rgba(140,255,150,0.8)"); gf.addColorStop(1, "rgba(40,255,90,0)");
+    ctx.fillStyle = gf; ctx.beginPath(); ctx.arc(fo.x, fo.y, rad, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  for (const t of e.tiros) tiro(ctx, t.x, t.y, t.dx, t.dy, Math.min(60, t.recorrido), "60,255,100", 1.3);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const a of e.anillos) {
+    const k = a.t / 0.35;
+    ctx.strokeStyle = `rgba(120,255,140,${1 - k})`; ctx.lineWidth = 2.5 * (1 - k) + 0.5;
+    ctx.beginPath(); ctx.arc(a.x, a.y, 5 + k * 26, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// --- Clásico: escudo ------------------------------------------------------------------
+// El de hoy (dibujarPoderNave): las piedras le pasan por encima sin golpearla.
+escena(canvasDe("p-clasico"), {
+  dura: 5, ciclo: 9,
+  iniciar(e) { e.yo = nave("cohete", "azul", ALTO); e.naves = [e.yo]; },
+  mover(e, dt) { moverA(e.yo, ocho(e, e.t, { ax: 0.3, ay: 0.2, vel: 0.45 }), dt); },
+  apuntar(e) { return e.p >= 0 && e.p < e.dura - 1.5 ? { x: e.yo.x, vy: 90, seguir: e.yo } : null; },
+  dibujar(e, ctx) {
+    dibujarNave(ctx, e.yo, e.t);
+    if (e.p < 0) return;
+    const queda = e.dura - e.p, n = e.yo;
+    const r = n.alto * 0.47 * (1 + 0.03 * Math.sin(e.t * 6));
+    const g = ctx.createRadialGradient(n.x, n.y, r * 0.55, n.x, n.y, r);
+    g.addColorStop(0, `rgba(${RGB.azul},0)`); g.addColorStop(1, `rgba(${RGB.azul},0.14)`);
+    ctx.save();
+    ctx.globalAlpha = queda < 0.8 ? 0.5 + 0.5 * Math.sin(e.t * 28) : 1;
+    ctx.fillStyle = g; ctx.strokeStyle = `rgba(${RGB.azul},0.42)`; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  },
+});
+
+// --- Atómica: onda expansiva --------------------------------------------------------------
+escena(canvasDe("p-atomica"), {
+  dura: 1.4, ciclo: 7, lluvia: 0.35,
+  iniciar(e) {
+    e.yo = nave("atomica", "azul", ALTO);
+    e.rival = nave("cohete", "rojo", ALTO);
+    e.naves = [e.yo, e.rival];
+    e.emp = { x: 0, y: 0, vx: 0, vy: 0, giro: 0, vg: 0 };
+  },
+  onda(e) { return e.p < 0 ? -1 : suave(e.p / 0.7) * e.l.w * 0.6; },
+  usar(e) { e.empujado = false; },
+  mover(e, dt) {
+    moverA(e.yo, ocho(e, e.t, { cx: 0.38, ax: 0.14, ay: 0.2, vel: 0.5 }), dt);
+    const m = e.emp, base = ocho(e, e.t, { cx: 0.68, ax: 0.12, ay: 0.22, vel: 0.55, fase: 2 });
+    m.x += m.vx * dt; m.y += m.vy * dt; m.giro += m.vg * dt;
+    const f = Math.exp(-2.5 * dt); m.vx *= f; m.vy *= f; m.vg *= f;
+    m.x = acercar(m.x, 0, 0.7, dt); m.y = acercar(m.y, 0, 0.7, dt); m.giro = acercar(m.giro, 0, 1.2, dt);
+    moverA(e.rival, { x: base.x + m.x, y: base.y + m.y }, dt);
+    e.rival.giro = m.giro;
+  },
+  paso(e) {
+    const rr = e.onda(e);
+    if (rr < 0) return;
+    const { x: cx, y: cy } = e.yo;
+    for (const p of e.piedras) { const d = Math.hypot(p.x - cx, p.y - cy); if (!p.muerta && d < rr && d > rr - 45) quebrar(e, p); }
+    const r = e.rival, d = Math.hypot(r.x - cx, r.y - cy) || 1;
+    if (!e.empujado && d < rr) { e.empujado = true; e.emp.vx = ((r.x - cx) / d) * 420; e.emp.vy = ((r.y - cy) / d) * 420; e.emp.vg = 10; }
+  },
+  dibujar(e, ctx) {
+    dibujarNave(ctx, e.rival, e.t);
+    dibujarNave(ctx, e.yo, e.t);
+    const rr = e.onda(e);
+    if (rr < 0) return;
+    const { x, y } = e.yo, a = 1 - clamp((e.p - 0.5) / 0.9, 0, 1);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(241,146,128,${0.12 * a})`; ctx.lineWidth = 22; ctx.stroke();
+    ctx.strokeStyle = `rgba(241,146,128,${0.3 * a})`; ctx.lineWidth = 9; ctx.stroke();
+    ctx.strokeStyle = `rgba(255,240,220,${0.9 * a})`; ctx.lineWidth = 1.8; ctx.stroke();
+    if (e.p < 0.3) {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 60);
+      g.addColorStop(0, `rgba(255,250,230,${1 - e.p / 0.3})`); g.addColorStop(1, "rgba(241,146,128,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 60, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  },
+});
+
+// --- X-FLR6: rumbo a la Luna -------------------------------------------------------------------
+// Gira hacia el agujero, sale disparada recto (intocable, con halo blanco y la
+// estela), entra y sale por el otro del par, como en el juego.
+const LUNA = { gira: 0.2, ida: 0.75, entra: 0.95, sale: 1.15, vuelve: 2.1 };
+escena(canvasDe("p-cuadros"), {
+  dura: LUNA.vuelve, ciclo: 7,
+  iniciar(e) { e.yo = nave("cuadros", "azul", ALTO); e.naves = [e.yo]; },
+  hoyos(e) { const { w, h } = e.l; return [{ x: w * 0.8, y: h * 0.26 }, { x: w * 0.16, y: h * 0.74 }]; },
+  usar(e) { e.x0 = e.yo.x; e.y0 = e.yo.y; },
+  mover(e, dt) {
+    const [A, B] = e.hoyos(e), p = e.p, n = e.yo;
+    const base = ocho(e, e.t, { cx: 0.46, ax: 0.2, ay: 0.16, vel: 0.5 });
+    n.escala = 1; n.color = "azul";
+    const angA = Math.atan2(A.x - e.x0, -(A.y - e.y0));
+    if (p < 0) moverA(n, base, dt);
+    else if (p < LUNA.gira) { n.ang = girarA(n.ang, angA, 14 * dt); }
+    else if (p < LUNA.ida) {
+      const f = ((p - LUNA.gira) / (LUNA.ida - LUNA.gira)) ** 2;
+      n.x = e.x0 + (A.x - e.x0) * f; n.y = e.y0 + (A.y - e.y0) * f; n.ang = angA; n.color = "blanco";
+      soplar(e, n, RGB.azul, { r1: 14 });
+    } else if (p < LUNA.entra) { n.x = A.x; n.y = A.y; n.escala = 1 - (p - LUNA.ida) / (LUNA.entra - LUNA.ida); }
+    else if (p < LUNA.sale) { n.x = B.x; n.y = B.y; n.escala = (p - LUNA.entra) / (LUNA.sale - LUNA.entra); }
+    else {
+      const f = suave((p - LUNA.sale) / (LUNA.vuelve - LUNA.sale));
+      moverA(n, { x: B.x + (base.x - B.x) * f, y: B.y + (base.y - B.y) * f }, dt);
+    }
+    if (p >= LUNA.ida && !e.entro) { e.entro = true; estallar(e.chispas, A.x, A.y, 16, AGUJERO, 110); }
+    if (p >= LUNA.entra && !e.salio) { e.salio = true; estallar(e.chispas, B.x, B.y, 16, AGUJERO, 110); }
+    if (p < 0) e.entro = e.salio = false;
+  },
+  fondo(e, ctx) {
+    const [A, B] = e.hoyos(e), p = e.p;
+    dibujarAgujero(ctx, A.x, A.y, 17, e.t, p > LUNA.gira && p < LUNA.entra ? 1 : 0);
+    dibujarAgujero(ctx, B.x, B.y, 17, e.t + 2, p > LUNA.ida && p < LUNA.sale + 0.2 ? 1 : 0);
+  },
+  dibujar(e, ctx) {
+    dibujarNave(ctx, e.yo, e.t);
+    if (e.p >= LUNA.gira && e.p < LUNA.ida) cartel(ctx, e.yo.x, e.yo.y - ALTO * 0.55, "intocable");
+  },
+});
+
+// --- Saturno V: separación de etapas ---------------------------------------------------------------
+// Suelta la primera etapa (queda flotando, con halo rojo: es para el rival) y
+// va más rápido. El rival, que la sigue, se la lleva puesta.
+const SAT_CORTE = 165; // fila del dibujo donde se separa la primera etapa
+const SAT_VEL = 0.55, SAT_ATRAS = -1.1;
+escena(canvasDe("p-saturno"), {
+  dura: 6, ciclo: 11,
+  iniciar(e) {
+    e.yo = nave("saturno", "azul", ALTO);
+    e.rival = nave("cohete", "rojo", ALTO * 0.95);
+    e.naves = [e.yo, e.rival];
+    e.uy = 0; e.ur = SAT_ATRAS; e.etapa = null; e.rival.golpe = 0;
+  },
+  usar(e) {
+    const n = e.yo, q = puntoNave(n, 101.5, 190), b = adelante(n.ang);
+    e.etapa = Object.assign(nave("saturno", "rojo", ALTO), { x: q.x, y: q.y, ang: n.ang, recorte: [SAT_CORTE, 230], pivote: 190, fuego: false, nueva: false, vx: -b.x * 12, vy: -b.y * 12, vg: 0.9 });
+    estallar(e.chispas, q.x, q.y, 14, "#f4efe6", 70);
+  },
+  mover(e, dt) {
+    const gap = e.uy - e.ur;
+    e.ur += SAT_VEL * dt * (e.rival.golpe > 0 ? 0.3 : 1);
+    e.uy += SAT_VEL * dt * (e.p >= 0 ? 1.7 : 1 + clamp((-SAT_ATRAS - gap) * 0.5, -0.4, 0.3));
+    moverA(e.yo, ovalo(e, e.uy, { ax: 0.34, ay: 0.3 }), dt);
+    const r = e.rival;
+    r.golpe = Math.max(0, r.golpe - dt);
+    moverA(r, ovalo(e, e.ur, { ax: 0.34, ay: 0.3 }), dt);
+    golpeada(r, r.golpe, e.t);
+    const s = e.etapa;
+    if (s) {
+      s.x += s.vx * dt; s.y += s.vy * dt; s.ang += s.vg * dt;
+      if (Math.hypot(s.x - r.x, s.y - r.y) < 30) {
+        r.golpe = 1.4; estallar(e.chispas, s.x, s.y, 22, "#ffd0c0", 150); e.etapa = null;
+      }
+    }
+    e.yo.recorte = e.p >= 0 ? [0, SAT_CORTE] : null;
+    e.yo.fuegoY = e.p >= 0 ? -45 : 0;
+  },
+  terminar(e) { if (e.etapa) e.etapa = null; },
+  dibujar(e, ctx) {
+    if (e.etapa) dibujarNave(ctx, e.etapa, e.t);
+    dibujarNave(ctx, e.rival, e.t);
+    if (e.rival.golpe > 0) cartel(ctx, e.rival.x, e.rival.y - ALTO * 0.55, "¡pum!", "255,140,140");
+    dibujarNave(ctx, e.yo, e.t);
+  },
+});
+
+// --- Falcon 9: reutilizable --------------------------------------------------------------------------
+// Con el poder, una piedra que la toca no la tira: abre las patas, aterriza
+// parada (polvo), se sacude y sigue. Se gasta ahí.
+escena(canvasDe("p-falcon"), {
+  dura: 10, ciclo: 9, aterriza: -1,
+  iniciar(e) { e.yo = nave("falcon", "azul", ALTO); e.naves = [e.yo]; e.pos = null; },
+  usar(e) { e.tirada = false; e.aterriza = -1; e.polvo = false; },
+  apuntar(e) {
+    if (e.p > 0.4 && !e.tirada && e.aterriza < 0) { e.tirada = true; return { x: e.yo.x, vy: 130, seguir: e.yo }; }
+    return null;
+  },
+  mover(e, dt) {
+    const base = ocho(e, e.t, { ax: 0.28, ay: 0.16, vel: 0.45 });
+    if (!e.pos) e.pos = { ...base };
+    if (e.aterriza >= 0) {
+      e.aterriza += dt;
+      if (e.aterriza > 0.3 && !e.polvo) { e.polvo = true; const q = puntoNave(e.yo, 101.5, 225); estallar(e.chispas, q.x, q.y, 22, "#b9b4aa", 70); }
+      if (e.aterriza > 1.7) { e.aterriza = -1; e.p = -1; }
+      // Se para y se endereza.
+      e.yo.ang = girarA(e.yo.ang, 0, 6 * dt);
+    } else {
+      e.pos.x = acercar(e.pos.x, base.x, 2.5, dt); e.pos.y = acercar(e.pos.y, base.y, 2.5, dt);
+      moverA(e.yo, e.pos, dt);
+    }
+  },
+  paso(e) {
+    if (e.p < 0 || e.aterriza >= 0) return;
+    for (const p of e.piedras) if (!p.muerta && Math.hypot(p.x - e.yo.x, p.y - e.yo.y) < p.r + 14) { quebrar(e, p); e.aterriza = 0; }
+  },
+  dibujar(e, ctx) {
+    const n = e.yo, a = e.aterriza, k = n.alto / 300;
+    let patas = 0;
+    n.giro = 0;
+    if (a >= 0) {
+      n.giro = Math.sin(a * 14) * 0.2 * Math.max(0, 1 - a * 1.6);
+      patas = a < 1.3 ? suave(a / 0.3) : 1 - suave((a - 1.3) / 0.4);
+    }
+    if (patas > 0) {
+      ctx.save();
+      ctx.translate(n.x, n.y); ctx.rotate(n.ang + n.giro);
+      for (const lado of [-1, 1]) {
+        const x0 = lado * 13 * k, y0 = 52 * k, x1 = lado * (13 + 30 * patas) * k, y1 = (52 + 34 * patas) * k;
+        ctx.strokeStyle = "#1b1814"; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.strokeStyle = "#d8d3c9"; ctx.lineWidth = 1.4; ctx.stroke();
+      }
+      ctx.restore();
+    }
+    dibujarNave(ctx, n, e.t);
+    if (e.p >= 0 && a < 0) {
+      ctx.save();
+      ctx.setLineDash([3, 6]); ctx.lineDashOffset = -e.t * 16;
+      ctx.strokeStyle = `rgba(${RGB.azul},0.55)`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.alto * 0.47, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    if (a >= 0) cartel(ctx, n.x, n.y - ALTO * 0.6, "aterrizó");
+  },
+});
+
+// --- X-Wing: alas en ataque ------------------------------------------------------------------------------
+// Con el poder va hacia el rival y tira rojo de una punta de ala y de la otra.
+escena(canvasDe("p-alax"), {
+  dura: 4, ciclo: 8,
+  iniciar(e) {
+    e.yo = nave("alax", "azul", ALTO);
+    e.rival = nave("tie", "rojo", ALTO * 0.95);
+    e.naves = [e.yo, e.rival];
+    e.tiros = []; e.prox = 0; e.lado = 1; e.rival.golpe = 0; e.pos = null;
+  },
+  usar(e) { e.prox = 0.15; },
+  mover(e, dt) {
+    const r = e.rival;
+    r.golpe = Math.max(0, r.golpe - dt);
+    if (r.golpe <= 0) moverA(r, ocho(e, e.t, { cy: 0.34, ax: 0.3, ay: 0.1, vel: 0.5, fase: 1 }), dt);
+    golpeada(r, r.golpe, e.t);
+    let meta = ocho(e, e.t, { cy: 0.66, ax: 0.3, ay: 0.12, vel: 0.4 });
+    if (e.p >= 0) { const dx = r.x - e.yo.x, dy = r.y - e.yo.y, d = Math.hypot(dx, dy) || 1; meta = { x: r.x - (dx / d) * 130, y: r.y - (dy / d) * 130 }; }
+    if (!e.pos) e.pos = { ...meta };
+    e.pos.x = acercar(e.pos.x, meta.x, 1.6, dt); e.pos.y = acercar(e.pos.y, meta.y, 1.6, dt);
+    moverA(e.yo, e.pos, dt);
+    if (e.p >= 0) e.yo.ang = girarA(e.yo.ang, Math.atan2(r.x - e.yo.x, -(r.y - e.yo.y)), 4 * dt);
+  },
+  paso(e, dt) {
+    if (e.p >= 0 && e.p >= e.prox) {
+      e.prox += 0.16; e.lado = -e.lado;
+      const q = puntoNave(e.yo, 101.5 + e.lado * 57, 72), b = adelante(e.yo.ang);
+      e.tiros.push({ x: q.x, y: q.y, dx: b.x, dy: b.y, recorrido: 0 });
+    }
+    const r = e.rival, { w, h } = e.l;
+    e.tiros = e.tiros.filter((t) => {
+      t.x += t.dx * 650 * dt; t.y += t.dy * 650 * dt; t.recorrido += 650 * dt;
+      if (t.x < -40 || t.x > w + 40 || t.y < -40 || t.y > h + 40) return false;
+      const p = e.piedras.find((p) => !p.muerta && Math.hypot(p.x - t.x, p.y - t.y) < p.r + 2);
+      if (p) { quebrar(e, p); return false; }
+      if (Math.hypot(r.x - t.x, r.y - t.y) < 24) { r.golpe = 1; estallar(e.chispas, t.x, t.y, 10, "#ff8a7a", 130); return false; }
+      return true;
+    });
+  },
+  dibujar(e, ctx) {
+    dibujarNave(ctx, e.rival, e.t);
+    if (e.rival.golpe > 0) cartel(ctx, e.rival.x, e.rival.y - ALTO * 0.55, "aturdido", "255,140,140");
+    for (const t of e.tiros) tiro(ctx, t.x, t.y, t.dx, t.dy, Math.min(26, t.recorrido), "255,60,40", 0.8);
+    dibujarNave(ctx, e.yo, e.t);
+  },
+});
+
+// --- Invasor: rayo abductor -----------------------------------------------------------------------------
+escena(canvasDe("p-platillo"), {
+  dura: 3, ciclo: 8,
+  iniciar(e) {
+    e.yo = nave("platillo", "azul", ALTO);
+    e.rival = nave("cohete", "rojo", ALTO);
+    e.naves = [e.yo, e.rival];
+    e.pos = null;
+  },
+  mover(e, dt) {
+    moverA(e.yo, ocho(e, e.t, { cx: 0.28, cy: 0.62, ax: 0.08, ay: 0.12, vel: 0.5 }), dt);
+    const r = e.rival, atrapado = e.p >= 0;
+    const base = ocho(e, e.t, { cx: 0.7, cy: 0.38, ax: 0.14, ay: 0.16, vel: 0.55, fase: 2 });
+    const meta = atrapado ? { x: e.yo.x + 75, y: e.yo.y - 55 } : base;
+    if (!e.pos) e.pos = { ...base };
+    e.pos.x = acercar(e.pos.x, meta.x, atrapado ? 0.9 : 1.4, dt); e.pos.y = acercar(e.pos.y, meta.y, atrapado ? 0.9 : 1.4, dt);
+    moverA(r, e.pos, dt);
+    r.giro = atrapado ? (r.giro || 0) + dt * 3 : acercar(r.giro || 0, Math.round((r.giro || 0) / (Math.PI * 2)) * Math.PI * 2, 2, dt);
+    r.escala = acercar(r.escala, atrapado ? 0.82 : 1, 3, dt);
+  },
+  dibujar(e, ctx) {
+    const r = e.rival, u = e.yo;
+    if (e.p >= 0) {
+      const a = Math.min(1, e.p / 0.2, (e.dura - e.p) / 0.2);
+      const ang = Math.atan2(r.y - u.y, r.x - u.x), nx = -Math.sin(ang), ny = Math.cos(ang);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createLinearGradient(u.x, u.y, r.x, r.y);
+      g.addColorStop(0, `rgba(170,255,200,${0.4 * a})`); g.addColorStop(1, `rgba(170,255,200,${0.1 * a})`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(u.x + nx * 8, u.y + ny * 8); ctx.lineTo(r.x + nx * 32, r.y + ny * 32);
+      ctx.lineTo(r.x - nx * 32, r.y - ny * 32); ctx.lineTo(u.x - nx * 8, u.y - ny * 8);
+      ctx.closePath(); ctx.fill();
+      for (let i = 0; i < 3; i++) {
+        const f = (e.t * 1.2 + i / 3) % 1;
+        const x = r.x + (u.x - r.x) * f, y = r.y + (u.y - r.y) * f, an = 32 + (8 - 32) * f;
+        ctx.strokeStyle = `rgba(210,255,220,${0.55 * a * (1 - f)})`; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.ellipse(x, y, an, an * 0.3, ang + Math.PI / 2, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    dibujarNave(ctx, r, e.t);
+    dibujarNave(ctx, u, e.t);
+    if (e.p >= 0) cartel(ctx, r.x, r.y - ALTO * 0.55, "atrapado", "255,140,140");
+  },
+});
+
+// --- ISS: gravedad cero --------------------------------------------------------------------------------
+escena(canvasDe("p-iss"), {
+  dura: 5, ciclo: 9, lluvia: 0.3,
+  iniciar(e) {
+    e.yo = nave("iss", "azul", ALTO);
+    e.rival = nave("cohete", "rojo", ALTO * 0.95);
+    e.naves = [e.yo, e.rival];
+  },
+  mover(e, dt) {
+    moverA(e.yo, ocho(e, e.t, { cy: 0.62, ax: 0.26, ay: 0.12, vel: 0.4 }), dt);
+    moverA(e.rival, ocho(e, e.t, { cy: 0.36, ax: 0.3, ay: 0.12, vel: 0.5, fase: 2 }), dt);
+    e.velPiedras = acercar(e.velPiedras, e.p >= 0 && e.p < e.dura - 0.4 ? 0.07 : 1, 5, dt);
+  },
+  dibujar(e, ctx) {
+    const quieto = 1 - e.velPiedras;
+    if (quieto > 0.02) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = `rgba(150,200,255,${0.35 * quieto})`; ctx.lineWidth = 1;
+      for (const p of e.piedras) { ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5 + Math.sin(e.t * 2 + p.rot) * 1.5, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.restore();
+    }
+    dibujarNave(ctx, e.rival, e.t);
+    dibujarNave(ctx, e.yo, e.t);
+  },
+  encima(e, ctx) {
+    const { w, h } = e.l;
+    if (e.p >= 0 && e.p < 0.9) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = `rgba(170,215,255,${0.6 * (1 - e.p / 0.9)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.yo.x, e.yo.y, (e.p / 0.9) * Math.max(w, h), 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+  },
+});
+
+// --- Caza TIE: escuadrón imperial ------------------------------------------------------------------------
+escena(canvasDe("p-tie"), {
+  dura: 6, ciclo: 10,
+  iniciar(e) { e.yo = nave("tie", "azul", ALTO * 0.95); e.naves = [e.yo]; e.escoltas = []; e.prox = 0; },
+  usar(e) {
+    e.escoltas = [-1, 1].map((lado) => Object.assign(nave("tie", "azul", ALTO * 0.45), { lado, vivo: true, x: e.yo.x + lado * e.l.w * 0.6, y: e.yo.y + 30, nueva: false }));
+    e.prox = 0.9;
+  },
+  terminar(e) { e.escoltas = []; },
+  mover(e, dt) {
+    moverA(e.yo, ocho(e, e.t, { cy: 0.6, ax: 0.26, ay: 0.14, vel: 0.45 }), dt);
+    const seVan = e.p > e.dura - 0.6;
+    for (const s of e.escoltas) {
+      const q = puntoNave(e.yo, 101.5 + s.lado * 175, 150);
+      const meta = seVan ? { x: q.x + s.lado * e.l.w * 0.6, y: q.y - 40 } : q;
+      moverA(s, { x: acercar(s.x, meta.x, 5, dt), y: acercar(s.y, meta.y, 5, dt) }, dt);
+    }
+  },
+  apuntar(e) {
+    if (e.p < e.prox || e.p > e.dura - 1.4) return null;
+    const vivos = e.escoltas.filter((s) => s.vivo);
+    if (!vivos.length) return null;
+    e.prox += 1.7;
+    const s = vivos[Math.floor(Math.random() * vivos.length)];
+    return { x: s.x, vy: 110, seguir: s };
+  },
+  paso(e) {
+    for (const s of e.escoltas) {
+      if (!s.vivo) continue;
+      for (const p of e.piedras) {
+        if (!p.muerta && Math.hypot(p.x - s.x, p.y - s.y) < p.r + 12) { quebrar(e, p); s.vivo = false; estallar(e.chispas, s.x, s.y, 22, "#cfe4ff", 140); }
+      }
+    }
+  },
+  dibujar(e, ctx) {
+    for (const s of e.escoltas) if (s.vivo) dibujarNave(ctx, s, e.t);
+    dibujarNave(ctx, e.yo, e.t);
+  },
+});
+
+// --- Breaking Bad: humo azul ---------------------------------------------------------------------------------
+// El rival la sigue y, al pasar por la nube, queda con los controles al revés:
+// se bambolea para cualquier lado.
+const VAN_VEL = 0.5, VAN_ATRAS = -1.2;
+escena(canvasDe("p-van"), {
+  dura: 4, ciclo: 9,
+  iniciar(e) {
+    e.yo = nave("van", "azul", ALTO);
+    e.rival = nave("cohete", "rojo", ALTO * 0.95);
+    e.naves = [e.yo, e.rival];
+    e.uy = 0; e.ur = VAN_ATRAS; e.mareo = 0; e.prox = 0;
+  },
+  usar(e) { e.prox = 0; },
+  mover(e, dt) {
+    e.uy += VAN_VEL * dt; e.ur += VAN_VEL * dt;
+    moverA(e.yo, ovalo(e, e.uy, { ax: 0.34, ay: 0.3 }), dt);
+    e.mareo = Math.max(0, e.mareo - dt);
+    const pr = ovalo(e, e.ur, { ax: 0.34, ay: 0.3 });
+    if (e.mareo > 0) { pr.x += Math.sin(e.t * 3.1) * 22; pr.y += Math.cos(e.t * 2.3) * 16; }
+    moverA(e.rival, pr, dt);
+  },
+  paso(e) {
+    if (e.p >= 0 && e.p >= e.prox) { e.prox += 0.05; soplar(e, e.yo, "110,180,255", { r0: 4, r1: 22, vida: 3.4, alfa: 0.5 }); }
+    const r = e.rival;
+    if (e.humo.some((b) => b.vida > 0.4 && Math.hypot(b.x - r.x, b.y - r.y) < 16)) e.mareo = 3;
+  },
+  dibujar(e, ctx) {
+    dibujarNave(ctx, e.rival, e.t);
+    if (e.mareo > 0) cartel(ctx, e.rival.x, e.rival.y - ALTO * 0.55, "al revés", "140,195,255");
+    dibujarNave(ctx, e.yo, e.t);
+  },
+});
+
+// --- DeLorean: 88 millas ----------------------------------------------------------------------------------------
+// Acelera entre rayitos hasta 88, desaparece con un relámpago dejando dos
+// rastros de fuego y aparece más adelante en su camino. El rival que pisa el
+// fuego se frena.
+const DL = { acelera: 1.1, aparece: 1.7, salto: 1.5 }, DL_VEL = 0.45, DL_ATRAS = -1.3;
+escena(canvasDe("p-delorean"), {
+  dura: 3.4, ciclo: 9,
+  iniciar(e) {
+    e.yo = nave("delorean", "azul", ALTO);
+    e.rival = nave("cohete", "rojo", ALTO * 0.95);
+    e.naves = [e.yo, e.rival];
+    e.uy = 0; e.ur = DL_ATRAS; e.rastros = []; e.flash = 0; e.frenado = 0; e.marcas = [];
+  },
+  usar(e) { e.salto = false; e.llego = false; e.marcas = []; },
+  mover(e, dt) {
+    const p = e.p, gap = e.uy - e.ur;
+    const acelera = p >= 0 && p < DL.acelera;
+    e.uy += DL_VEL * dt * (acelera ? 1 + 1.4 * (p / DL.acelera) : p >= 0 ? 1 : 1 + clamp((-DL_ATRAS - gap) * 0.4, -0.45, 0.3));
+    if (p >= DL.acelera && !e.salto) {
+      e.salto = true; e.flash = 1;
+      estallar(e.chispas, e.yo.x, e.yo.y, 20, "#cfe6ff", 150);
+      // Los rastros: el camino que hizo mientras aceleraba, por las dos ruedas de atrás.
+      for (const lado of [-1, 1]) e.rastros.push({ pts: e.marcas.map((m) => ({ x: m.x + m.nx * lado * 9, y: m.y + m.ny * lado * 9 })), vida: 3.2 });
+      e.uy += DL.salto;
+    }
+    e.yo.alpha = p >= DL.acelera && p < DL.aparece ? 0 : 1;
+    if (p >= DL.aparece && !e.llego) { e.llego = true; e.flash = 0.6; estallar(e.chispas, e.yo.x, e.yo.y, 20, "#cfe6ff", 150); }
+    const antes = { x: e.yo.x, y: e.yo.y };
+    const q = ovalo(e, e.uy, { ax: 0.34, ay: 0.3 });
+    if (p >= DL.acelera && p < DL.aparece + 0.05) { e.yo.x = q.x; e.yo.y = q.y; e.yo.ang = Math.atan2(Math.cos(e.uy) * 0.34 * e.l.w, -Math.sin(e.uy) * 0.3 * e.l.h); }
+    else moverA(e.yo, q, dt);
+    if (acelera && Math.hypot(e.yo.x - antes.x, e.yo.y - antes.y) > 0.5) {
+      const b = adelante(e.yo.ang);
+      e.marcas.push({ x: e.yo.x - b.x * 18, y: e.yo.y - b.y * 18, nx: -b.y, ny: b.x });
+    }
+    e.frenado = Math.max(0, e.frenado - dt);
+    e.ur += DL_VEL * dt * (e.frenado > 0 ? 0.35 : 1);
+    const pr = ovalo(e, e.ur, { ax: 0.34, ay: 0.3 });
+    if (e.frenado > 0) { pr.x += Math.sin(e.t * 50) * 2; pr.y += Math.cos(e.t * 43) * 2; }
+    moverA(e.rival, pr, dt);
+    e.flash = Math.max(0, e.flash - dt * 3);
+    for (const r of e.rastros) r.vida -= dt;
+    e.rastros = e.rastros.filter((r) => r.vida > 0);
+  },
+  paso(e) {
+    const r = e.rival;
+    if (e.rastros.some((ra) => ra.pts.some((q) => Math.hypot(q.x - r.x, q.y - r.y) < 12))) e.frenado = 0.5;
+    for (const ra of e.rastros) {
+      if (ra.pts.length && Math.random() < 0.6) {
+        const q = ra.pts[Math.floor(Math.random() * ra.pts.length)], dura = 0.4;
+        e.chispas.push({ x: q.x, y: q.y, vx: (Math.random() - 0.5) * 20, vy: -20 - Math.random() * 20, r: 0.8 + Math.random(), vida: dura, dura, color: "#ffb347" });
+      }
+    }
+  },
+  fondo(e, ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (const r of e.rastros) {
+      if (r.pts.length < 2) continue;
+      const a = Math.min(1, r.vida) * (0.8 + Math.random() * 0.2);
+      for (const [ancho, color] of [[7, `rgba(255,110,30,${0.3 * a})`], [2, `rgba(255,215,120,${0.9 * a})`]]) {
+        ctx.strokeStyle = color; ctx.lineWidth = ancho;
+        ctx.beginPath(); r.pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  },
+  dibujar(e, ctx) {
+    dibujarNave(ctx, e.rival, e.t);
+    if (e.frenado > 0) cartel(ctx, e.rival.x, e.rival.y - ALTO * 0.55, "frenado", "255,140,140");
+    const p = e.p;
+    if (p >= 0 && p < DL.acelera) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 1 + Math.floor((p / DL.acelera) * 4); i++) {
+        let x = e.yo.x + (Math.random() - 0.5) * 44, y = e.yo.y + (Math.random() - 0.5) * 50;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        for (let j = 0; j < 4; j++) { x += (Math.random() - 0.5) * 16; y += (Math.random() - 0.5) * 16; ctx.lineTo(x, y); }
+        ctx.strokeStyle = "rgba(120,180,255,0.3)"; ctx.lineWidth = 4; ctx.stroke();
+        ctx.strokeStyle = "rgba(200,230,255,0.95)"; ctx.lineWidth = 1.1; ctx.stroke();
+      }
+      ctx.restore();
+      cartel(ctx, e.yo.x, e.yo.y - ALTO * 0.55, `${Math.round(60 + 28 * (p / DL.acelera))} mph`);
+    }
+    dibujarNave(ctx, e.yo, e.t);
+  },
+  encima(e, ctx) {
+    if (e.flash > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = `rgba(150,190,255,${e.flash * 0.35})`; ctx.fillRect(0, 0, e.l.w, e.l.h);
+      ctx.restore();
+    }
+  },
+});
+
+// --- 18: Metrobús -----------------------------------------------------------------------------------------------------
+// Bocinazo, se pinta el carril hasta el agujero, va por ahí a fondo (las
+// piedras se corren) y se mete: sale por el otro agujero del par.
+const MB = { gira: 0.5, viaje: 1.6, entra: 1.85, sale: 2.1, vuelve: 3.0 };
+escena(canvasDe("p-colectivo"), {
+  dura: MB.vuelve, ciclo: 8,
+  iniciar(e) { e.yo = nave("colectivo", "azul", ALTO); e.naves = [e.yo]; },
+  hoyos(e) { const { w, h } = e.l; return [{ x: w * 0.82, y: h * 0.26 }, { x: w * 0.14, y: h * 0.3 }]; },
+  usar(e) { e.x0 = e.yo.x; e.y0 = e.yo.y; e.bocina = 0.7; },
+  mover(e, dt) {
+    const [A, B] = e.hoyos(e), p = e.p, n = e.yo;
+    const base = ocho(e, e.t, { cx: 0.42, cy: 0.62, ax: 0.18, ay: 0.12, vel: 0.5 });
+    n.escala = 1;
+    const angA = Math.atan2(A.x - e.x0, -(A.y - e.y0));
+    if (p < 0) moverA(n, base, dt);
+    else if (p < MB.gira) n.ang = girarA(n.ang, angA, 10 * dt);
+    else if (p < MB.viaje) {
+      const f = suave((p - MB.gira) / (MB.viaje - MB.gira));
+      n.x = e.x0 + (A.x - e.x0) * f; n.y = e.y0 + (A.y - e.y0) * f; n.ang = angA;
+    } else if (p < MB.entra) { n.x = A.x; n.y = A.y; n.escala = 1 - (p - MB.viaje) / (MB.entra - MB.viaje); }
+    else if (p < MB.sale) { n.x = B.x; n.y = B.y; n.escala = (p - MB.entra) / (MB.sale - MB.entra); }
+    else { const f = suave((p - MB.sale) / (MB.vuelve - MB.sale)); moverA(n, { x: B.x + (base.x - B.x) * f, y: B.y + (base.y - B.y) * f }, dt); }
+    if (p >= MB.viaje && !e.entro) { e.entro = true; estallar(e.chispas, A.x, A.y, 16, AGUJERO, 110); }
+    if (p >= MB.entra && !e.salio) { e.salio = true; estallar(e.chispas, B.x, B.y, 16, AGUJERO, 110); }
+    if (p < 0) e.entro = e.salio = false;
+  },
+  paso(e) {
+    if (e.p < 0.2 || e.p > MB.entra) return;
+    const [A] = e.hoyos(e), ax = e.x0, ay = e.y0, bx = A.x - ax, by = A.y - ay, l2 = bx * bx + by * by;
+    for (const p of e.piedras) {
+      const f = clamp(((p.x - ax) * bx + (p.y - ay) * by) / l2, 0, 1);
+      const dx = p.x - (ax + bx * f), dy = p.y - (ay + by * f), d = Math.hypot(dx, dy) || 1;
+      if (d < 24 + p.r) { p.vx = (dx / d) * 220; p.y += (dy / d) * 3; }
+    }
+  },
+  fondo(e, ctx) {
+    const [A, B] = e.hoyos(e), p = e.p;
+    dibujarAgujero(ctx, A.x, A.y, 17, e.t, p > MB.gira && p < MB.entra ? 1 : 0);
+    dibujarAgujero(ctx, B.x, B.y, 17, e.t + 2, p > MB.viaje && p < MB.sale + 0.2 ? 1 : 0);
+    if (p < 0 || p > MB.sale + 0.4) return;
+    const largo = suave(p / 0.4), a = 1 - clamp((p - MB.entra) / 0.6, 0, 1);
+    const dx = A.x - e.x0, dy = A.y - e.y0, L = Math.hypot(dx, dy) * largo;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(e.x0, e.y0); ctx.rotate(Math.atan2(dy, dx));
+    const g = ctx.createLinearGradient(0, -20, 0, 20);
+    g.addColorStop(0, "rgba(241,146,128,0.12)"); g.addColorStop(0.5, "rgba(241,146,128,0.04)"); g.addColorStop(1, "rgba(241,146,128,0.12)");
+    ctx.fillStyle = g; ctx.fillRect(0, -20, L, 40);
+    ctx.globalCompositeOperation = "lighter";
+    for (const [r, color] of [[3, "rgba(241,146,128,0.25)"], [1.1, "rgba(255,210,185,0.95)"]]) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (const y of [-20, 20]) for (let x = 0; x < L; x += 9) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
+      ctx.fill();
+    }
+    if (largo > 0.6) {
+      ctx.font = "10px Spaceport, system-ui, sans-serif"; ctx.letterSpacing = "3px";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "rgba(241,146,128,0.55)";
+      ctx.fillText("solo bus", L * 0.45, 0);
+    }
+    ctx.restore();
+  },
+  dibujar(e, ctx) {
+    dibujarNave(ctx, e.yo, e.t);
+    if (e.p >= 0 && e.p < 0.7) cartel(ctx, e.yo.x, e.yo.y - ALTO * 0.55, "piiip");
+  },
+});
+
+// --- Bucle -------------------------------------------------------------------------------------------------------------
+// ?t=8 adelanta todas las escenas 8 s (para revisarlas en un momento justo);
+// con &quieto quedan congeladas ahí.
+const params = new URLSearchParams(location.search);
+const adelanto = Number(params.get("t")) || 0;
+const quieto = params.has("quieto");
+let adelantado = false;
+let previo = performance.now();
+function cuadro(ahora) {
+  const dt = adelantado && quieto ? 0 : Math.min(0.05, (ahora - previo) / 1000);
+  previo = ahora;
+  if (!adelantado && escenas[0].l.w) {
+    adelantado = true;
+    for (let s = 0; s < adelanto; s += 1 / 60) escenas.forEach((e) => pasoEscena(e, 1 / 60));
+  }
+  for (const e of escenas) if (e.visible) { pasoEscena(e, dt); dibujarEscena(e); }
+  requestAnimationFrame(cuadro);
+}
+requestAnimationFrame(cuadro);
+
+// Botones: usar el poder (y, en las dos grandes, que corra sola o no).
+for (const [id, e] of [["b-f1", f1], ["b-ds", ds]]) document.getElementById(id).addEventListener("click", () => usar(e));
+for (const [id, e] of [["a-f1", f1], ["a-ds", ds]]) {
+  const b = document.getElementById(id);
+  b.addEventListener("click", () => { e.auto = !e.auto; b.setAttribute("aria-pressed", String(e.auto)); });
+}
+for (const e of escenas) {
+  const carta = e.l.c.closest(".carta");
+  carta?.querySelector("button").addEventListener("click", () => usar(e));
+}
+addEventListener("keydown", (ev) => {
+  if (ev.key === "1") usar(f1);
+  if (ev.key === "2") usar(ds);
+});
+</script>
+</body>
+</html>

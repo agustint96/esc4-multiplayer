@@ -2120,10 +2120,11 @@ function drawStars() {
           }
         }
         if (toque && toque.impulso) boosting = true;
-        // Terminó la partida del escenario 4 (window.shipSinControl): ni
-        // teclado, ni joystick, ni mouse; la nave sigue de largo con lo que
-        // traía.
-        if (window.shipSinControl) {
+        // Terminó la partida del escenario 4 (window.shipSinControl) o un tiro
+        // de la Estrella II la dejó aturdida (window.shipAturdida, ver
+        // esc4-game.js): ni teclado, ni joystick, ni mouse; la nave sigue de
+        // largo con lo que traía.
+        if (window.shipSinControl || window.shipAturdida) {
           gx = 0;
           gy = 0;
           boosting = false;
@@ -2138,9 +2139,13 @@ function drawStars() {
         }
 
         // Cada escenario puede pisar su propia velocidad (ver speedMult en
-        // el registro de escenarios); por default todos usan la misma.
+        // el registro de escenarios); por default todos usan la misma. En el
+        // escenario 4, window.shipPotencia la multiplica (el DRS y el rebufo,
+        // ver esc4-game.js).
         let scene = scenes[currentSceneId];
-        const speedMult = scene.speedMult;
+        const speedMult =
+          scene.speedMult *
+          (currentSceneId === "game" ? window.shipPotencia || 1 : 1);
 
         // Los cuadros de 60 Hz que pasaron desde el cuadro anterior (ver
         // SIM_PASO_MS). Se parten en subpasos de ~1 cuadro (en 60 Hz es 1, en 30 Hz

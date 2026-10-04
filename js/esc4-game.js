@@ -2085,7 +2085,11 @@
   // que toque si es de costado y va para un lado.
   function ponerSpritesJugador() {
     const n = naveJugador;
-    const v = (n.costado && n.costado[ladoJ1.lado]) || n;
+    // La Estrella de la Muerte con su poder se ve como la II (ver ESTRELLA2).
+    const v =
+      (spriteIIJugador && { ...ESTRELLA2, fondo: ESTRELLA2.on }) ||
+      (n.costado && n.costado[ladoJ1.lado]) ||
+      n;
     window.naveJ1 = n.id === "cohete" ? null : { off: v.off, on: v.on };
     const top = ship.querySelector(".starry-cohete-top");
     const fondo = ship.querySelector(".starry-cohete-fondo");
@@ -2294,13 +2298,14 @@
 
     // Jugador 1: el mismo cálculo que circulosNave (de la pantalla al mundo).
     const p = window.shipPose;
+    // Con el DRS sale sola y no gasta el tanque (ver DRS_DURA).
+    const drsJ1 = drsJugador > 0;
     if (
       jugando &&
       p &&
       p.listo &&
       !ship.classList.contains("fuera-de-juego") &&
-      !estelaJ1.recargando &&
-      quiereEstela(1)
+      (drsJ1 || (!estelaJ1.recargando && quiereEstela(1)))
     ) {
       const rad = (p.rot * Math.PI) / 180;
       const ma = p.escala * Math.cos(rad);
@@ -2313,18 +2318,18 @@
         cam.oy + (sy - cam.oy) / cam.z,
         esTutorial() ? ESTELA_SALMON : colorPropio(),
         (factor * Math.abs(p.escala)) / cam.z,
-        dt,
+        drsJ1 ? 0 : dt,
       );
     } else estelaJ1.ok = false;
 
-    // Jugador 2 (solo con dos jugadores): el mismo cálculo que circulosRival.
+    // Jugador 2 (con dos jugadores; la PC y el rival online, solo con el DRS):
+    // el mismo cálculo que circulosRival.
+    const drsJ2 = !!rival && rival.drs > 0;
     if (
       jugando &&
-      modo === "dos" &&
       rival &&
       !(rival.stun > 0) &&
-      !estelaJ2.recargando &&
-      quiereEstela(2)
+      (drsJ2 || (modo === "dos" && !estelaJ2.recargando && quiereEstela(2)))
     ) {
       const k = escalaNaveMundo();
       const rad = (rival.rot * Math.PI) / 180;
@@ -2336,7 +2341,7 @@
         rival.y + (px * sin + py * cos) * k,
         colorRival(),
         factor * k,
-        dt,
+        drsJ2 ? 0 : dt,
       );
     } else estelaJ2.ok = false;
   }
@@ -7183,8 +7188,9 @@
       (esTutorial() ? 1 : LLUVIA_MENOS);
     if (tiempo > gracia && !ganado) {
       // Cada nave tiene su lluvia; la de la golpeada se corta mientras está
-      // fuera de juego y mientras parpadea (las que ya venían siguen cayendo).
-      if (stunJugador <= 0 && invulJugador <= 0) {
+      // fuera de juego y mientras parpadea, y la de la Estrella mientras es la
+      // II, así puede apuntar (las que ya venían siguen cayendo).
+      if (stunJugador <= 0 && invulJugador <= 0 && estrellaJugador <= 0) {
         acumSpawn += dt;
         if (acumSpawn >= intervalo) {
           acumSpawn = 0;
@@ -7192,7 +7198,13 @@
         }
       }
       // Online la lluvia del rival la maneja su PC y llega por la red.
-      if (!enLinea() && rival && rival.stun <= 0 && rival.invul <= 0) {
+      if (
+        !enLinea() &&
+        rival &&
+        rival.stun <= 0 &&
+        rival.invul <= 0 &&
+        !(rival.estrella > 0)
+      ) {
         acumSpawnRival += dt;
         if (acumSpawnRival >= intervalo) {
           acumSpawnRival = 0;
@@ -7215,10 +7227,10 @@
     const nuevasJugador = Math.max(0, vueltas - vueltasVistas);
     const nuevasRival = Math.max(0, vueltasRival - vueltasRivalVistas);
     vueltasRivalVistas = vueltasRival;
-    if (circulos[1] && stunJugador <= 0)
+    if (circulos[1] && stunJugador <= 0 && estrellaJugador <= 0)
       for (let i = 0; i < nuevasJugador * VUELTA_PIEDRAS; i++)
         poligonos.push(crearPoligono(circulos[1], true));
-    if (rival && rival.stun <= 0)
+    if (rival && rival.stun <= 0 && !(rival.estrella > 0))
       for (let i = 0; i < nuevasRival * VUELTA_PIEDRAS; i++)
         poligonosRival.push(crearPoligono(rival, true));
     if (vueltas !== vueltasVistas) {
@@ -7470,6 +7482,13 @@
       stun: 0,
       invul: 0,
       escudo: 0, // s de escudo que le quedan (ver "Cúmulos y poder")
+      drs: 0, // s de DRS que le quedan (ver DRS_DURA)
+      rebufo: 0, // s que le quedan patinando (ver REBUFO_DURA)
+      rebufoDado: false, // ya me robó el aire en esta pasada (ver robarAire)
+      estrella: 0, // s de II que le quedan (ver ESTRELLA_DURA)
+      proxTiro: 0, // cuándo sale su próximo tiro (s desde que la usó)
+      fogonazo: 0,
+      aturdido: 0, // s que le quedan aturdida (ver ATURDIDO_DURA)
       t: 0,
       cae: null,
       hx: 0, // donde la golpearon (ahí reaparece)
@@ -7800,6 +7819,14 @@
       if (boost) e += (quiere ? -boost.gasto : boost.recupera) * dt;
       rival.energia = Math.max(0, Math.min(1, e));
       if (quiere) empuje = fisica.empujeBoost;
+    }
+    // El DRS y el rebufo (ver DRS_EMPUJE y REBUFO_EMPUJE).
+    if (rival.drs > 0) empuje *= DRS_EMPUJE;
+    else if (rival.rebufo > 0) empuje *= REBUFO_EMPUJE;
+    // Aturdida por un tiro de la II: no se maneja (sigue con lo que traía).
+    if (rival.aturdido > 0) {
+      gx = 0;
+      gy = 0;
     }
     if (fin) {
       // Terminó la partida: nadie la maneja, sigue con lo que traía.
@@ -8449,6 +8476,14 @@
       if (soyAnfitrion()) recibirEsfera(m.id);
     } else if (m.tipo === "poder") {
       if (soyAnfitrion()) recibirPoder();
+    } else if (m.tipo === "rebufo") {
+      recibirRebufo();
+    } else if (m.tipo === "tiro") {
+      recibirTiro(m);
+    } else if (m.tipo === "romper") {
+      recibirRomper(m.id);
+    } else if (m.tipo === "aturdir") {
+      recibirAturdir();
     } else if (m.tipo === "entre") {
       if (soyAnfitrion()) golInvitado(m.id);
     } else if (m.tipo === "gol") {
@@ -8499,6 +8534,10 @@
       tc: r1(tChoque * 10) / 10,
       inv: r1(invulJugador * 10) / 10,
       esc: r1(escudoJugador * 10) / 10,
+      drs: r1(drsJugador * 10) / 10,
+      rb: r1(rebufoJugador * 10) / 10,
+      e2: r1(estrellaJugador * 100) / 100,
+      atd: r1(aturdidoJugador * 10) / 10,
       p: poligonos.map((p) => [
         p.id,
         r4(p.x / W),
@@ -8735,6 +8774,10 @@
     rival.t = e.tc;
     rival.invul = e.inv;
     rival.escudo = e.esc || 0;
+    rival.drs = e.drs || 0;
+    rival.rebufo = e.rb || 0;
+    rival.estrella = e.e2 || 0;
+    rival.aturdido = e.atd || 0;
     // Lo acaba de golpear una piedra: el mismo ruido y las chispas de siempre.
     if (antes <= 0 && rival.stun > 0) {
       sonarPerder();
@@ -8751,7 +8794,7 @@
     const ultimo = b || a;
     for (const [id, q] of ultimo.p) {
       const piedra = piedrasRival.get(id);
-      if (!piedra) continue;
+      if (!piedra || piedrasRotas.has(id)) continue; // (las que le rompí: ver romperPiedra)
       const r = b && a.p.get(id);
       if (r) {
         piedra.x = r[0] + (q[0] - r[0]) * f;
@@ -9013,19 +9056,29 @@
     ctx.filter = filtroRival();
     // El sprite va pegado a la izquierda de su caja.
     ctx.drawImage(lienzoRival, -lado / 2, -lado / 2, ancho, lado);
+    // Lo de la II encima (en px del dibujo de 203x300).
+    if (rival.estrella > 0) {
+      ctx.filter = "none";
+      ctx.translate(-lado / 2, -lado / 2);
+      ctx.scale(lado / 300, lado / 300);
+      dibujarPlato(ctx, rival.estrella, cargaTiro("rival"), rival.fogonazo || 0);
+    }
     ctx.restore();
   }
 
   // Arma la nave del rival en lienzoRival: las tres capas juntas (atrás,
   // fuego, adelante), como la nave del jugador. false si todavía no cargó.
   function armarRival() {
-    const img = imgDeNave(naveRival, rival); // si es de costado, el lado lo guarda rival.lado
+    // Con la II (ver ESTRELLA2), su dibujo; si es de costado, el lado lo
+    // guarda rival.lado.
+    const ii = enII("rival") && imgEstrella2.complete && imgEstrella2.naturalWidth;
+    const img = ii ? imgEstrella2 : imgDeNave(naveRival, rival);
     if (!img.complete || !img.naturalWidth) return false;
     const w = lienzoRival.width;
     const h = lienzoRival.height;
     const c = lienzoRival.getContext("2d");
     c.clearRect(0, 0, w, h);
-    const fondo = naveRival.fondo;
+    const fondo = ii ? imgEstrella2 : naveRival.fondo;
     if (fondo && fondo.complete && fondo.naturalWidth)
       c.drawImage(fondo, 0, 0, w, h);
     c.drawImage(lienzoFuegoRival, 0, 0);
@@ -9172,9 +9225,10 @@
   // ella y se ve un momento (ver barras); con 3 queda llena, fija y
   // parpadeando, y se puede usar el poder de la nave: E (o K, la que
   // usa las flechas, con dos en el teclado), el botón A del joystick o el
-  // botón "poder" del celular. Por ahora el poder de todas es el mismo: un
-  // escudo de ESCUDO_DURA s en el que ninguna piedra la golpea. No hay en el
-  // tutorial. Online el anfitrión los hace aparecer y reparte la carga; el
+  // botón "poder" del celular. Cada nave tiene el suyo (ver PODER_DE_NAVE y
+  // PODERES): el de Colapinto es el DRS (ver DRS_*), el de la Estrella de la
+  // Muerte, la II (ver ESTRELLA_*), y las demás, por ahora, tienen el escudo:
+  // ESCUDO_DURA s en los que ninguna piedra la golpea. No hay en el tutorial. Online el anfitrión los hace aparecer y reparte la carga; el
   // invitado avisa qué cúmulo toca ("esfera") y cuándo usa el poder ("poder"),
   // y el escudo de cada uno viaja en su estado (esc) para que se vea.
   const ORBE_RADIO = 26; // px del mundo: radio del globo (no depende del tamaño de los agujeros)
@@ -9189,6 +9243,672 @@
   const BARRA_APARECE = 0.12; // s que tarda en aparecer
   const BARRA_SE_VA = 0.35; // s que tarda en irse
   const BARRA_PARPADEO = 2; // veces por segundo que parpadea cuando está completa
+  // DRS (Colapinto, maqueta en naves/maqueta-poderes.html): el alerón trasero
+  // abierto. Más empuje, la estela sale sola y sin gastar el tanque, saltan
+  // chispas de abajo del auto y arriba dice "drs". Pasar pegado al rival le
+  // deja aire sucio (rebufo): patina un momento, con menos empuje. Online cada
+  // uno se mueve en su compu: el DRS y el rebufo viajan en el estado (drs, rb)
+  // para que el otro los vea, y el rebufo que le da uno al otro, en un aviso
+  // ("rebufo").
+  const DRS_DURA = 5; // s
+  const DRS_EMPUJE = 1.6; // por cuánto se multiplica el empuje
+  const DRS_VERDE = "#6dff8a"; // el del cartel, como en la tele
+  const DRS_CHISPAS = 2; // chispas por cuadro de 60 Hz
+  const REBUFO_ALCANCE = 1.4; // largos de nave entre los centros: más cerca, le roba el aire
+  const REBUFO_DURA = 0.7; // s que patina el que lo recibe
+  const REBUFO_EMPUJE = 0.45; // su empuje mientras patina (1 = normal)
+  let drsJugador = 0; // s de DRS que le quedan (el del rival: rival.drs)
+  let rebufoJugador = 0; // s que le quedan patinando (el del rival: rival.rebufo)
+  let rebufoDado = false; // ya le robó el aire al rival en esta pasada (y rival.rebufoDado, al revés)
+  let drsChispas = []; // { x, y, vx, vy, r, vida, dura, color }, en el mundo
+  // Estrella de la Muerte II (maqueta en naves/maqueta-poderes.html): un
+  // destello y pasa a ser la II (naves/nuevas/estrella/estrella2*.webp, del
+  // mismo tamaño, con un lado sin terminar), y mientras dura dispara sola un
+  // tiro verde hacia donde mira cada ESTRELLA_CADENCIA s; antes de cada uno los
+  // rayos del borde del plato se juntan adelante. Mientras es la II no le caen
+  // sus piedras (las que ya venían siguen), así puede apuntar, y si la otra
+  // nave está más o menos adelante (ver ESTRELLA_AYUDA) el tiro sale derecho
+  // hacia ella. Cada tiro rompe la primera piedra que toca y, si le da a la
+  // otra nave, la deja aturdida ATURDIDO_DURA s: sin poder moverse. Online cada uno dispara en su compu y le avisa al
+  // otro: los tiros ("tiro", para que los vea), las piedras suyas que le rompió
+  // ("romper") y que lo aturdió ("aturdir"); la II y el aturdido viajan en el
+  // estado (e2, atd).
+  const ESTRELLA_CAMBIO = 0.45; // s del destello al pasar a la II (y al volver)
+  const ESTRELLA_DISPARA = 6; // s de ráfagas
+  const ESTRELLA_DURA = ESTRELLA_CAMBIO * 2 + ESTRELLA_DISPARA;
+  const ESTRELLA_CADENCIA = 0.5; // s entre tiro y tiro
+  const ESTRELLA_CARGA = 0.18; // s antes de cada tiro en que los rayos se juntan
+  const ESTRELLA_FOGONAZO = 0.12; // s del fogonazo al salir el tiro
+  const ESTRELLA_PC_DISTANCIA = 520; // px del mundo: más cerca que esto, la PC la usa
+  const ESTRELLA_AYUDA = (30 * Math.PI) / 180; // la otra nave a menos de esto de donde mira: el tiro va hacia ella
+  const ESTRELLA_AYUDA_ALCANCE = 900; // px del mundo: más lejos, no ayuda
+  const ESTRELLA2 = {
+    off: "naves/nuevas/estrella/estrella2.webp",
+    on: "naves/nuevas/estrella/estrella2_on.webp",
+  };
+  const imgEstrella2 = cargarImagen(ESTRELLA2.on);
+  // En el dibujo de 203x300: el plato y dónde se juntan sus rayos (adelante).
+  const PLATO = { x: 73, y: 82, r: 20 };
+  const PLATO_FOCO = { x: 73, y: 30 };
+  const TIRO_VEL = 900; // px del mundo por s
+  const TIRO_LARGO = 60; // px del mundo: lo más larga que se ve la cola
+  const TIRO_VIDA = 1.6; // s: después se apaga aunque no haya tocado nada
+  const TIRO_VERDE = "60,255,100";
+  const ATURDIDO_DURA = 1; // s
+  let estrellaJugador = 0; // s que le quedan de II (el del rival: rival.estrella)
+  let proxTiroJugador = 0; // cuándo sale el próximo tiro (s desde que la usó; el del rival: rival.proxTiro)
+  let fogonazoJugador = 0; // s que le quedan al fogonazo (el del rival: rival.fogonazo)
+  let aturdidoJugador = 0; // s que le quedan aturdida (el del rival: rival.aturdido)
+  let spriteIIJugador = false; // la nave del jugador se ve como la II (ver ponerSpritesJugador)
+  let tiros = []; // { x, y, dx, dy, recorrido, vida, de, visto } (visto: uno del rival online, que solo se ve)
+  let trozos = []; // los lados de las piedras rotas: { x, y, dx, dy, ang, vx, vy, va, vida, color }
+  let anillosTiro = []; // donde pegaron los tiros: { x, y, t }
+  const piedrasRotas = new Set(); // online: ids de piedras del rival que le rompí (ya no se dibujan)
+  // El lienzo del plato de la nave del jugador: va encima de su dibujo (en su
+  // caja, así gira con ella) y tiene el tamaño del dibujo, al doble.
+  const lienzoPlato = document.createElement("canvas");
+  lienzoPlato.width = 406;
+  lienzoPlato.height = 600;
+  lienzoPlato.className = "starry-cohete";
+  lienzoPlato.style.zIndex = 3;
+  lienzoPlato.setAttribute("aria-hidden", "true");
+  if (ship) ship.appendChild(lienzoPlato);
+  let platoDibujado = false;
+  // El poder de cada nave (las ideas, en naves/maqueta-poderes.html). Las que
+  // todavía no tienen el suyo tienen el escudo: cada poder nuevo se agrega a
+  // PODERES y se le anota a su nave acá.
+  const PODER_DE_NAVE = {
+    cohete: "escudo",
+    atomica: "escudo",
+    cuadros: "escudo",
+    saturno: "escudo",
+    falcon: "escudo",
+    alax: "escudo",
+    platillo: "escudo",
+    iss: "escudo",
+    tie: "escudo",
+    estrella: "estrella",
+    van: "escudo",
+    delorean: "escudo",
+    colectivo: "escudo",
+    colapinto: "drs",
+  };
+  // Lo que hace cada poder (quien: "jugador" o "rival"). usar: lo arranca (la
+  // barra ya se vació); queda: s que le quedan, 0 si no está en curso (mientras
+  // dura no se ve la barra ni se puede volver a usar); avanzar: lo que pasa en
+  // cada cuadro (circulos: los de la nave del jugador); convienePC: si a la PC
+  // le conviene usarlo ahora; dibujar (si tiene): lo suyo, en el mundo, con el
+  // centro de la nave del jugador.
+  const PODERES = {
+    escudo: {
+      usar(quien) {
+        if (quien === "jugador") escudoJugador = ESCUDO_DURA;
+        else rival.escudo = ESCUDO_DURA;
+      },
+      queda: (quien) =>
+        quien === "jugador" ? escudoJugador : (rival && rival.escudo) || 0,
+      avanzar(dt) {
+        if (escudoJugador > 0) escudoJugador = Math.max(0, escudoJugador - dt);
+        // Online el del rival llega en su estado (esc).
+        if (rival && !enLinea() && rival.escudo > 0)
+          rival.escudo = Math.max(0, rival.escudo - dt);
+      },
+      // Cuando una piedra está por caerle encima.
+      convienePC() {
+        const amenaza = (lista) =>
+          lista.some((p) => {
+            const dy = rival.y - p.y;
+            return (
+              dy > -p.radio &&
+              dy < 220 &&
+              Math.abs(difVuelta(rival.x - p.x)) < p.radio + 90
+            );
+          });
+        return amenaza(poligonos) || amenaza(poligonosRival);
+      },
+    },
+    drs: {
+      usar(quien) {
+        if (quien === "jugador") drsJugador = DRS_DURA;
+        else rival.drs = DRS_DURA;
+      },
+      queda: (quien) =>
+        quien === "jugador" ? drsJugador : (rival && rival.drs) || 0,
+      avanzar(dt, circulos) {
+        drsJugador = Math.max(0, drsJugador - dt);
+        rebufoJugador = Math.max(0, rebufoJugador - dt);
+        // Online el DRS y el rebufo del rival llegan en su estado.
+        if (rival && !enLinea()) {
+          rival.drs = Math.max(0, (rival.drs || 0) - dt);
+          rival.rebufo = Math.max(0, (rival.rebufo || 0) - dt);
+        }
+        // El empuje de la nave del jugador (lo lee script.js); el del rival,
+        // moverRival.
+        window.shipPotencia =
+          drsJugador > 0 ? DRS_EMPUJE : rebufoJugador > 0 ? REBUFO_EMPUJE : 1;
+        robarAire(circulos);
+        const centro = circulos && circulos[1];
+        const pose = window.shipPose;
+        if (drsJugador > 0 && stunJugador <= 0 && centro && pose)
+          echarChispasDrs(centro.x, centro.y, pose.rot, dt);
+        if (rival && rival.drs > 0 && rival.stun <= 0)
+          echarChispasDrs(rival.x, rival.y, rival.rot, dt);
+        for (const c of drsChispas) {
+          c.x += c.vx * dt;
+          c.y += c.vy * dt;
+          c.vida -= dt;
+        }
+        drsChispas = drsChispas.filter((c) => c.vida > 0);
+      },
+      // En plena recta, que es cuando más rinde: yendo casi a la velocidad
+      // tope sin acelerar (la que alcanza el empuje con el freno).
+      convienePC() {
+        const f = window.naveFisica;
+        if (!f) return true;
+        const tope = (f.empuje * f.freno) / (1 - f.freno);
+        return Math.hypot(rival.vx, rival.vy) > tope * 0.8;
+      },
+      dibujar(centro) {
+        if (drsChispas.length) {
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          for (const c of drsChispas) {
+            ctx.globalAlpha = Math.max(0, c.vida / c.dura);
+            ctx.fillStyle = c.color;
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+        const jugador = centro && stunJugador <= 0;
+        const suya = rival && rival.stun <= 0 && !(enLinea() && !rival.visto);
+        if (jugador && drsJugador > 0)
+          cartelNave(centro.x, centro.y, "drs", DRS_VERDE);
+        if (suya && rival.drs > 0)
+          cartelNave(rival.x, rival.y, "drs", DRS_VERDE);
+        if (jugador && rebufoJugador > 0)
+          cartelNave(centro.x, centro.y, "rebufo", "rgba(240,236,228,0.85)");
+        if (suya && rival.rebufo > 0)
+          cartelNave(rival.x, rival.y, "rebufo", "rgba(240,236,228,0.85)");
+      },
+    },
+    estrella: {
+      usar(quien) {
+        if (quien === "jugador") {
+          estrellaJugador = ESTRELLA_DURA;
+          proxTiroJugador = ESTRELLA_CAMBIO + ESTRELLA_CARGA;
+        } else {
+          rival.estrella = ESTRELLA_DURA;
+          rival.proxTiro = ESTRELLA_CAMBIO + ESTRELLA_CARGA;
+        }
+      },
+      queda: (quien) =>
+        quien === "jugador" ? estrellaJugador : (rival && rival.estrella) || 0,
+      avanzar(dt, circulos) {
+        estrellaJugador = Math.max(0, estrellaJugador - dt);
+        fogonazoJugador = Math.max(0, fogonazoJugador - dt);
+        aturdidoJugador = Math.max(0, aturdidoJugador - dt);
+        window.shipAturdida = aturdidoJugador > 0; // script.js no la deja manejar
+        if (rival) {
+          rival.fogonazo = Math.max(0, (rival.fogonazo || 0) - dt);
+          // Online la II y el aturdido del rival llegan en su estado.
+          if (!enLinea()) {
+            rival.estrella = Math.max(0, (rival.estrella || 0) - dt);
+            rival.aturdido = Math.max(0, (rival.aturdido || 0) - dt);
+          }
+        }
+        // El dibujo de la II, a la mitad del destello.
+        if (enII("jugador") !== spriteIIJugador) {
+          spriteIIJugador = !spriteIIJugador;
+          ponerSpritesJugador();
+        }
+        // Los tiros propios (online, los del rival los dispara su compu).
+        if (estrellaJugador > 0 && stunJugador <= 0) {
+          const t = ESTRELLA_DURA - estrellaJugador;
+          if (t >= proxTiroJugador && t < ESTRELLA_DURA - ESTRELLA_CAMBIO) {
+            proxTiroJugador += ESTRELLA_CADENCIA;
+            disparar("jugador");
+          }
+        }
+        if (rival && !enLinea() && rival.estrella > 0 && rival.stun <= 0) {
+          const t = ESTRELLA_DURA - rival.estrella;
+          if (t >= rival.proxTiro && t < ESTRELLA_DURA - ESTRELLA_CAMBIO) {
+            rival.proxTiro += ESTRELLA_CADENCIA;
+            disparar("rival");
+          }
+        }
+        moverTiros(dt, circulos);
+      },
+      // Con la otra nave cerca: los tiros salen para donde mira, y así hay
+      // más chances de que alguno le dé.
+      convienePC() {
+        const c = circulosNave()[1];
+        return (
+          !!c &&
+          Math.hypot(c.x - rival.x, c.y - rival.y) < ESTRELLA_PC_DISTANCIA
+        );
+      },
+      dibujar(centro) {
+        dibujarTiros();
+        const jugador = centro && stunJugador <= 0;
+        const suya = rival && rival.stun <= 0 && !(enLinea() && !rival.visto);
+        if (jugador && aturdidoJugador > 0)
+          cartelNave(centro.x, centro.y, "aturdido", "rgba(255,150,150,0.9)");
+        if (suya && rival.aturdido > 0)
+          cartelNave(rival.x, rival.y, "aturdido", "rgba(255,150,150,0.9)");
+        dibujarPlatoJugador();
+      },
+    },
+  };
+  // ¿Se ve como la II? A partir de la mitad del destello del cambio y hasta
+  // la mitad del de la vuelta.
+  function enII(quien) {
+    const queda = PODERES.estrella.queda(quien);
+    return (
+      queda > ESTRELLA_CAMBIO / 2 && queda < ESTRELLA_DURA - ESTRELLA_CAMBIO / 2
+    );
+  }
+  // Un punto del dibujo de la nave (en px del dibujo de 203x300, que va pegado
+  // a la izquierda de su caja) en el mundo, como circulosNave y circulosRival.
+  function puntoEnNave(quien, sx, sy) {
+    const caja = cajaNave;
+    const mitad = caja / 2;
+    const px = (sx * caja) / 300 - mitad;
+    const py = (sy * caja) / 300 - mitad;
+    if (quien === "jugador") {
+      const p = window.shipPose;
+      const rad = (p.rot * Math.PI) / 180;
+      const ma = p.escala * Math.cos(rad);
+      const mb = p.escala * Math.sin(rad);
+      const x = ma * px - mb * py + p.x + mitad;
+      const y = mb * px + ma * py + p.y + mitad;
+      return { x: cam.ox + (x - cam.ox) / cam.z, y: cam.oy + (y - cam.oy) / cam.z };
+    }
+    const k = escalaNaveMundo();
+    const rad = (rival.rot * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return {
+      x: rival.x + (px * cos - py * sin) * k,
+      y: rival.y + (px * sin + py * cos) * k,
+    };
+  }
+  // Un tiro de la II desde el foco del plato, hacia donde mira la nave.
+  function disparar(quien) {
+    const pose = window.shipPose;
+    if (quien === "jugador" && !(pose && pose.listo)) return;
+    const o = puntoEnNave(quien, PLATO_FOCO.x, PLATO_FOCO.y);
+    // Hacia donde mira, o derecho a la otra nave si está más o menos adelante.
+    let rad = (((quien === "jugador" ? pose.rot : rival.rot) * Math.PI) / 180);
+    const otra = (quien === "jugador" ? circulosRival() : circulosNave())[1];
+    const otraEnJuego =
+      quien === "jugador" ? rival && rival.stun <= 0 : stunJugador <= 0;
+    if (otra && otraEnJuego) {
+      const dx = otra.x - o.x;
+      const dy = otra.y - o.y;
+      const hacia = Math.atan2(dx, -dy);
+      let desvio = hacia - rad;
+      desvio = Math.atan2(Math.sin(desvio), Math.cos(desvio)); // de -pi a pi
+      if (
+        Math.abs(desvio) < ESTRELLA_AYUDA &&
+        Math.hypot(dx, dy) < ESTRELLA_AYUDA_ALCANCE
+      )
+        rad = hacia;
+    }
+    const rot = (rad * 180) / Math.PI;
+    tiros.push({
+      x: o.x,
+      y: o.y,
+      dx: Math.sin(rad),
+      dy: -Math.cos(rad),
+      recorrido: 0,
+      vida: TIRO_VIDA,
+      de: quien,
+      visto: false,
+    });
+    if (quien === "jugador") {
+      fogonazoJugador = ESTRELLA_FOGONAZO;
+      if (enLinea())
+        enviarOnline({
+          tipo: "tiro",
+          x: r4(o.x / window.innerWidth),
+          y: r4(o.y / window.innerHeight),
+          rot: r1(rot),
+        });
+    } else rival.fogonazo = ESTRELLA_FOGONAZO;
+  }
+  // Online: el rival disparó. Acá solo se ve (lo que rompe y a quién aturde lo
+  // decide su compu, que avisa).
+  function recibirTiro(m) {
+    if (!rival) return;
+    const rad = (m.rot * Math.PI) / 180;
+    tiros.push({
+      x: m.x * window.innerWidth,
+      y: m.y * window.innerHeight,
+      dx: Math.sin(rad),
+      dy: -Math.cos(rad),
+      recorrido: 0,
+      vida: TIRO_VIDA,
+      de: "rival",
+      visto: true,
+    });
+    rival.fogonazo = ESTRELLA_FOGONAZO;
+  }
+  // Los tiros avanzan; cada uno rompe la primera piedra que toca (de cualquiera
+  // de las dos lluvias) o aturde a la otra nave.
+  function moverTiros(dt, circulos) {
+    const deRival = rival ? circulosRival() : SIN_CIRCULOS;
+    const toca = (t, lista) =>
+      lista.some((c) => Math.hypot(c.x - t.x, c.y - t.y) < c.r + 3);
+    tiros = tiros.filter((t) => {
+      const paso = TIRO_VEL * dt;
+      t.x += t.dx * paso;
+      t.y += t.dy * paso;
+      t.recorrido += paso;
+      t.vida -= dt;
+      if (t.vida <= 0) return false;
+      for (const [lista, mia] of [
+        [poligonos, true],
+        [poligonosRival, false],
+      ]) {
+        const p = lista.find(
+          (p) =>
+            Math.hypot(p.x - t.x, p.y - t.y) < p.radio &&
+            circuloTocaPoligono(t.x, t.y, 3, p.pts),
+        );
+        if (!p) continue;
+        anillosTiro.push({ x: t.x, y: t.y, t: 0 });
+        if (!t.visto) romperPiedra(p, lista, mia);
+        return false;
+      }
+      // La otra nave (ni golpeada ni parpadeando recién vuelta).
+      if (t.de === "jugador" && rival && rival.stun <= 0 && !(rival.invul > 0)) {
+        if (toca(t, deRival)) {
+          anillosTiro.push({ x: t.x, y: t.y, t: 0 });
+          rival.aturdido = ATURDIDO_DURA;
+          if (enLinea()) enviarOnline({ tipo: "aturdir" });
+          return false;
+        }
+      } else if (
+        t.de === "rival" &&
+        stunJugador <= 0 &&
+        invulJugador <= 0 &&
+        circulos &&
+        toca(t, circulos)
+      ) {
+        anillosTiro.push({ x: t.x, y: t.y, t: 0 });
+        if (!t.visto) aturdidoJugador = ATURDIDO_DURA; // online avisa su compu
+        return false;
+      }
+      return true;
+    });
+    for (const a of anillosTiro) a.t += dt;
+    anillosTiro = anillosTiro.filter((a) => a.t < 0.35);
+    for (const q of trozos) {
+      q.x += q.vx * dt;
+      q.y += q.vy * dt;
+      q.ang += q.va * dt;
+      q.vida -= dt;
+    }
+    trozos = trozos.filter((q) => q.vida > 0);
+  }
+  // Una piedra que rompe un tiro: sus lados salen volando, girando, y se
+  // apagan. Online, si es del rival, se le avisa (él la saca de su lluvia) y
+  // acá no se dibuja más.
+  function romperPiedra(p, lista, mia) {
+    const i = lista.indexOf(p);
+    if (i >= 0) lista.splice(i, 1);
+    if (!mia && enLinea()) {
+      piedrasRotas.add(p.id);
+      enviarOnline({ tipo: "romper", id: p.id });
+    }
+    quebrarPiedra(p, mia ? colorPropio() : colorRival());
+  }
+  // Online: el rival me rompió una piedra.
+  function recibirRomper(id) {
+    const p = poligonos.find((o) => o.id === id);
+    if (!p) return;
+    poligonos.splice(poligonos.indexOf(p), 1);
+    quebrarPiedra(p, colorPropio());
+  }
+  function quebrarPiedra(p, color) {
+    const pts = p.pts;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const d = Math.hypot(mx - p.x, my - p.y) || 1;
+      const v = 60 + Math.random() * 90;
+      trozos.push({
+        x: mx,
+        y: my,
+        dx: (b.x - a.x) / 2,
+        dy: (b.y - a.y) / 2,
+        ang: 0,
+        vx: ((mx - p.x) / d) * v,
+        vy: ((my - p.y) / d) * v,
+        va: (Math.random() - 0.5) * 10,
+        vida: 0.8,
+        color,
+      });
+    }
+  }
+  // Online: el tiro del rival me dio.
+  function recibirAturdir() {
+    if (stunJugador <= 0) aturdidoJugador = ATURDIDO_DURA;
+  }
+  // Los tiros (halo, cuerpo y centro blanco, con la cola que se apaga), los
+  // anillos donde pegaron y los lados de las piedras rotas, en el mundo.
+  function dibujarTiros() {
+    if (trozos.length) {
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.lineWidth = 1.6;
+      for (const q of trozos) {
+        const c = Math.cos(q.ang);
+        const s = Math.sin(q.ang);
+        const dx = q.dx * c - q.dy * s;
+        const dy = q.dx * s + q.dy * c;
+        ctx.globalAlpha = Math.max(0, q.vida / 0.8);
+        ctx.strokeStyle = q.color;
+        ctx.beginPath();
+        ctx.moveTo(q.x - dx, q.y - dy);
+        ctx.lineTo(q.x + dx, q.y + dy);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (!tiros.length && !anillosTiro.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineCap = "round";
+    for (const t of tiros) {
+      const largo = Math.min(TIRO_LARGO, t.recorrido);
+      const cx = t.x - t.dx * largo;
+      const cy = t.y - t.dy * largo;
+      for (const [ancho, alfa, color] of [
+        [13, 0.22, TIRO_VERDE],
+        [5, 0.85, TIRO_VERDE],
+        [2, 1, "255,255,255"],
+      ]) {
+        const g = ctx.createLinearGradient(t.x, t.y, cx, cy);
+        g.addColorStop(0, `rgba(${color},${alfa})`);
+        g.addColorStop(1, `rgba(${TIRO_VERDE},0)`);
+        ctx.strokeStyle = g;
+        ctx.lineWidth = ancho;
+        ctx.beginPath();
+        ctx.moveTo(t.x, t.y);
+        ctx.lineTo(cx, cy);
+        ctx.stroke();
+      }
+    }
+    for (const a of anillosTiro) {
+      const k = a.t / 0.35;
+      ctx.strokeStyle = `rgba(120,255,140,${1 - k})`;
+      ctx.lineWidth = 3 * (1 - k) + 0.5;
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, 6 + k * 30, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Lo de la II en el dibujo de la nave (c ya en px del dibujo de 203x300): el
+  // destello del cambio, el plato prendido, los rayos de su borde que se juntan
+  // adelante antes de cada tiro y el fogonazo.
+  function dibujarPlato(c, queda, carga, fogonazo) {
+    if (queda <= 0) return;
+    const t = ESTRELLA_DURA - queda;
+    c.save();
+    c.globalCompositeOperation = "lighter";
+    c.lineCap = "round";
+    // Destello del cambio (y de la vuelta): tapa el cambio de dibujo.
+    if (t < ESTRELLA_CAMBIO || queda < ESTRELLA_CAMBIO) {
+      const f = t < ESTRELLA_CAMBIO ? t / ESTRELLA_CAMBIO : queda / ESTRELLA_CAMBIO;
+      const g = c.createRadialGradient(101, 122, 0, 101, 122, 100);
+      g.addColorStop(0, `rgba(255,255,255,${Math.sin(f * Math.PI) * 0.9})`);
+      g.addColorStop(1, "rgba(160,255,180,0)");
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(101, 122, 100, 0, Math.PI * 2);
+      c.fill();
+    }
+    const m = Math.min(1, t / ESTRELLA_CAMBIO, queda / ESTRELLA_CAMBIO);
+    const f = fogonazo / ESTRELLA_FOGONAZO;
+    const brillo = 0.25 + (carga >= 0 ? carga * 0.5 : 0) + f * 0.4;
+    const gp = c.createRadialGradient(PLATO.x, PLATO.y, 0, PLATO.x, PLATO.y, PLATO.r * 1.2);
+    gp.addColorStop(0, `rgba(150,255,160,${brillo * m})`);
+    gp.addColorStop(1, "rgba(60,255,100,0)");
+    c.fillStyle = gp;
+    c.beginPath();
+    c.arc(PLATO.x, PLATO.y, PLATO.r * 1.2, 0, Math.PI * 2);
+    c.fill();
+    const rayos = carga >= 0 ? carga : f > 0 ? 1 : -1;
+    if (rayos >= 0) {
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + 0.2;
+        const ox = PLATO.x + Math.cos(a) * PLATO.r * 0.9;
+        const oy = PLATO.y + Math.sin(a) * PLATO.r * 0.9;
+        const fx = ox + (PLATO_FOCO.x - ox) * rayos;
+        const fy = oy + (PLATO_FOCO.y - oy) * rayos;
+        c.strokeStyle = "rgba(60,255,100,0.35)";
+        c.lineWidth = 9;
+        c.beginPath();
+        c.moveTo(ox, oy);
+        c.lineTo(fx, fy);
+        c.stroke();
+        c.strokeStyle = "rgba(220,255,225,0.9)";
+        c.lineWidth = 3;
+        c.stroke();
+      }
+    }
+    if (f > 0 || carga > 0.6) {
+      const rad = f > 0 ? 14 + f * 30 : (carga - 0.6) * 30;
+      const gf = c.createRadialGradient(PLATO_FOCO.x, PLATO_FOCO.y, 0, PLATO_FOCO.x, PLATO_FOCO.y, rad);
+      gf.addColorStop(0, "rgba(255,255,255,0.95)");
+      gf.addColorStop(0.35, "rgba(140,255,150,0.8)");
+      gf.addColorStop(1, "rgba(40,255,90,0)");
+      c.fillStyle = gf;
+      c.beginPath();
+      c.arc(PLATO_FOCO.x, PLATO_FOCO.y, rad, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.restore();
+  }
+  // Cuánto se juntaron los rayos para el próximo tiro (0 a 1), o -1. Online
+  // no se sabe cuándo dispara el rival: se ve el fogonazo cuando llega el tiro.
+  function cargaTiro(quien) {
+    const queda = PODERES.estrella.queda(quien);
+    if (queda <= 0 || (quien === "rival" && enLinea())) return -1;
+    const t = ESTRELLA_DURA - queda;
+    if (t < ESTRELLA_CAMBIO || queda < ESTRELLA_CAMBIO) return -1;
+    const prox = quien === "jugador" ? proxTiroJugador : rival.proxTiro;
+    const falta = prox - t;
+    return falta <= ESTRELLA_CARGA ? 1 - falta / ESTRELLA_CARGA : -1;
+  }
+  function dibujarPlatoJugador() {
+    if (!estrellaJugador && !platoDibujado) return;
+    const c = lienzoPlato.getContext("2d");
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, lienzoPlato.width, lienzoPlato.height);
+    platoDibujado = estrellaJugador > 0;
+    if (!platoDibujado) return;
+    c.setTransform(2, 0, 0, 2, 0, 0);
+    dibujarPlato(c, estrellaJugador, cargaTiro("jugador"), fogonazoJugador);
+  }
+  // Pasar pegado a la otra nave con el DRS le roba el aire: patina (rebufo).
+  // Una vez por pasada: para volver a dárselo hay que alejarse y volver.
+  function robarAire(circulos) {
+    if (!rival || rival.stun > 0 || stunJugador > 0) return;
+    const a = circulos && circulos[1];
+    const b = circulosRival()[1];
+    if (!a || !b) return;
+    const cerca =
+      Math.hypot(b.x - a.x, b.y - a.y) <
+      cajaNave * escalaNaveMundo() * REBUFO_ALCANCE;
+    if (!cerca) {
+      rebufoDado = false;
+      rival.rebufoDado = false;
+      return;
+    }
+    if (drsJugador > 0 && !rebufoDado) {
+      rebufoDado = true;
+      // Online al rival lo hace patinar su propia compu.
+      if (enLinea()) enviarOnline({ tipo: "rebufo" });
+      else rival.rebufo = REBUFO_DURA;
+    }
+    // Online, el rebufo que me da el rival llega en un aviso (ver recibirRebufo).
+    if (!enLinea() && rival.drs > 0 && !rival.rebufoDado) {
+      rival.rebufoDado = true;
+      rebufoJugador = REBUFO_DURA;
+    }
+  }
+  // El rival (online) me pasó pegado con el DRS.
+  function recibirRebufo() {
+    if (stunJugador <= 0) rebufoJugador = REBUFO_DURA;
+  }
+  // Chispas de abajo del auto, que salen para atrás (rot en grados, 0 = para
+  // arriba), como en las rectas de verdad.
+  function echarChispasDrs(x, y, rot, dt) {
+    const a = (rot * Math.PI) / 180;
+    const atrasX = -Math.sin(a);
+    const atrasY = Math.cos(a);
+    const largo = cajaNave * escalaNaveMundo();
+    const n = Math.max(1, Math.round(DRS_CHISPAS * dt * 60));
+    for (let i = 0; i < n; i++) {
+      const v = 120 + Math.random() * 140;
+      const dura = 0.2 + Math.random() * 0.25;
+      drsChispas.push({
+        x: x + atrasX * largo * 0.3 + (Math.random() - 0.5) * largo * 0.1,
+        y: y + atrasY * largo * 0.3 + (Math.random() - 0.5) * largo * 0.1,
+        vx: atrasX * v + (Math.random() - 0.5) * 60,
+        vy: atrasY * v + (Math.random() - 0.5) * 60,
+        r: 0.8 + Math.random() * 1.1,
+        vida: dura,
+        dura,
+        color: Math.random() < 0.5 ? "#fff3c4" : "#ffb347",
+      });
+    }
+  }
+  // Un cartelito con la letra del juego arriba de una nave (en el mundo).
+  function cartelNave(x, y, texto, color) {
+    const caja = cajaNave * escalaNaveMundo();
+    ctx.save();
+    ctx.font = `${Math.round(caja * 0.13)}px Spaceport, ui-monospace, Consolas, monospace`;
+    ctx.letterSpacing = `${Math.round(caja * 0.03)}px`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = color;
+    ctx.fillText(texto, x, y - caja * 0.62);
+    ctx.restore();
+  }
+  // El poder de la nave de cada uno, y los s que le quedan (0 si no está en curso).
+  const poderDe = (quien) =>
+    PODERES[
+      PODER_DE_NAVE[(quien === "jugador" ? naveJugador : naveRival).id]
+    ] || PODERES.escudo;
+  const poderQueda = (quien) => poderDe(quien).queda(quien);
   let esferas = []; // los cúmulos: { id, x, y, t, ang }
   let idEsfera = 0;
   let acumEsfera = 0;
@@ -9232,17 +9952,18 @@
   // Solo queda fija cuando está completa, parpadeando entre el color de la
   // nave y el blanco; si no, aparece BARRA_VISIBLE s después de cada cúmulo y
   // se va. Con el escudo puesto no se ve: lo que se junte mientras tanto se
-  // muestra cuando el escudo termina. nivel: lo llena que se ve (0 a 1), que
-  // sigue a la carga sin saltar; alfa: qué tan visible está (0 a 1); visto: s
-  // desde el último cúmulo; llena: s que lleva completa; carga y escudo: los
-  // del cuadro anterior (ver actualizarBarra).
+  // muestra cuando el escudo termina (lo mismo con cualquier poder en curso).
+  // nivel: lo llena que se ve (0 a 1), que sigue a la carga sin saltar; alfa:
+  // qué tan visible está (0 a 1); visto: s desde el último cúmulo; llena: s
+  // que lleva completa; carga y enCurso: los del cuadro anterior (ver
+  // actualizarBarra).
   const nuevaBarra = () => ({
     nivel: 0,
     alfa: 0,
     visto: Infinity,
     llena: 0,
     carga: 0,
-    escudo: 0,
+    enCurso: 0,
   });
   const barras = { jugador: nuevaBarra(), rival: nuevaBarra() };
 
@@ -9253,6 +9974,24 @@
     cargaJugador = 0;
     cargaRival = 0;
     escudoJugador = 0;
+    drsJugador = 0;
+    rebufoJugador = 0;
+    rebufoDado = false;
+    drsChispas = [];
+    window.shipPotencia = 1;
+    estrellaJugador = 0;
+    fogonazoJugador = 0;
+    aturdidoJugador = 0;
+    window.shipAturdida = false;
+    tiros = [];
+    trozos = [];
+    anillosTiro = [];
+    piedrasRotas.clear();
+    if (spriteIIJugador) {
+      spriteIIJugador = false;
+      ponerSpritesJugador();
+    }
+    dibujarPlatoJugador();
     barras.jugador = nuevaBarra();
     barras.rival = nuevaBarra();
     esperaUsoHasta = 0;
@@ -9314,17 +10053,18 @@
     sonarJuntar();
   }
 
-  // Una barra (ver barras), con la carga y el escudo de su nave.
-  function actualizarBarra(b, carga, escudo, dt) {
+  // Una barra (ver barras), con la carga de su nave y los s que le quedan a su
+  // poder (0 si no está en curso).
+  function actualizarBarra(b, carga, enCurso, dt) {
     b.visto += dt;
-    // Un cúmulo nuevo, o el escudo que termina con algo juntado: se muestra.
-    if (carga > b.carga || (b.escudo > 0 && escudo <= 0 && carga > 0))
+    // Un cúmulo nuevo, o el poder que termina con algo juntado: se muestra.
+    if (carga > b.carga || (b.enCurso > 0 && enCurso <= 0 && carga > 0))
       b.visto = 0;
     b.carga = carga;
-    b.escudo = escudo;
-    const llena = carga >= ORBE_PARA_PODER && escudo <= 0;
+    b.enCurso = enCurso;
+    const llena = carga >= ORBE_PARA_PODER && enCurso <= 0;
     b.llena = llena ? b.llena + dt : 0;
-    const seVe = llena || (b.visto < BARRA_VISIBLE && escudo <= 0);
+    const seVe = llena || (b.visto < BARRA_VISIBLE && enCurso <= 0);
     b.alfa = Math.max(
       0,
       Math.min(1, b.alfa + (seVe ? dt / BARRA_APARECE : -dt / BARRA_SE_VA)),
@@ -9338,12 +10078,19 @@
   }
 
   function actualizarPoder(dt, circulos) {
-    if (esTutorial() || !modo) return;
-    if (escudoJugador > 0) escudoJugador = Math.max(0, escudoJugador - dt);
-    if (rival && !enLinea() && rival.escudo > 0)
-      rival.escudo = Math.max(0, rival.escudo - dt);
-    actualizarBarra(barras.jugador, cargaJugador, escudoJugador, dt);
-    actualizarBarra(barras.rival, cargaRival, rival ? rival.escudo || 0 : 0, dt);
+    if (esTutorial() || !modo) {
+      window.shipPotencia = 1;
+      window.shipAturdida = false;
+      return;
+    }
+    for (const p of Object.values(PODERES)) p.avanzar(dt, circulos);
+    actualizarBarra(barras.jugador, cargaJugador, poderQueda("jugador"), dt);
+    actualizarBarra(
+      barras.rival,
+      cargaRival,
+      rival ? poderQueda("rival") : 0,
+      dt,
+    );
     const manda = !enLinea() || soyAnfitrion();
     if (manda) {
       acumEsfera += ganado || fin ? 0 : dt;
@@ -9381,24 +10128,15 @@
       const suya = esferaTocada(circulosRival());
       if (suya) tomarEsfera(suya, "rival");
     }
-    // La PC usa el poder cuando una piedra está por caerle encima.
+    // La PC usa el poder cuando le conviene (ver convienePC).
     if (
       modo === "pc" &&
       rival &&
       cargaRival >= ORBE_PARA_PODER &&
-      !(rival.escudo > 0)
-    ) {
-      const amenaza = (lista) =>
-        lista.some((p) => {
-          const dy = rival.y - p.y;
-          return (
-            dy > -p.radio &&
-            dy < 220 &&
-            Math.abs(difVuelta(rival.x - p.x)) < p.radio + 90
-          );
-        });
-      if (amenaza(poligonos) || amenaza(poligonosRival)) usarPoder("rival");
-    }
+      poderQueda("rival") <= 0 &&
+      poderDe("rival").convienePC()
+    )
+      usarPoder("rival");
   }
 
   // Anfitrión: el invitado avisa que tocó el cúmulo id.
@@ -9408,22 +10146,23 @@
   }
 
   // quien: "jugador" o "rival" (la PC o el jugador 2; online no se maneja de
-  // acá). Con la barra llena la vacía y levanta el escudo.
+  // acá). Con la barra llena la vacía y arranca el poder de su nave.
   function usarPoder(quien) {
     if (!modo || esTutorial() || ganado || fin || final || introT >= 0) return;
     if (window.juegoEnPausa || pausa) return;
     if (quien === "rival") {
-      if (enLinea() || !rival || rival.stun > 0 || rival.escudo > 0) return;
+      if (enLinea() || !rival || rival.stun > 0 || poderQueda("rival") > 0)
+        return;
       if (cargaRival < ORBE_PARA_PODER) return;
       cargaRival = 0;
-      rival.escudo = ESCUDO_DURA;
+      poderDe("rival").usar("rival");
       sonarCruce();
       return;
     }
-    if (stunJugador > 0 || escudoJugador > 0) return;
+    if (stunJugador > 0 || poderQueda("jugador") > 0) return;
     if (cargaJugador < ORBE_PARA_PODER) return;
     cargaJugador = 0;
-    escudoJugador = ESCUDO_DURA;
+    poderDe("jugador").usar("jugador");
     sonarCruce();
     if (enLinea() && !soyAnfitrion()) {
       usosEnviados++;
@@ -9835,7 +10574,7 @@
         centro.x,
         centro.y,
         barras.jugador,
-        cargaJugador >= ORBE_PARA_PODER && escudoJugador <= 0,
+        cargaJugador >= ORBE_PARA_PODER && poderQueda("jugador") <= 0,
         escudoJugador,
         colorPropio(),
       );
@@ -9844,10 +10583,11 @@
         rival.x,
         rival.y,
         barras.rival,
-        cargaRival >= ORBE_PARA_PODER && !(rival.escudo > 0),
+        cargaRival >= ORBE_PARA_PODER && poderQueda("rival") <= 0,
         rival.escudo || 0,
         colorRival(),
       );
+    for (const p of Object.values(PODERES)) if (p.dibujar) p.dibujar(centro);
   }
 
   // Estrellas del fondo (decoración, no se chocan). Se ven siempre: en el juego,
