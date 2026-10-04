@@ -1,0 +1,143 @@
+diff --git a/agujeros/agujeros-elegidos.html b/agujeros/agujeros-elegidos.html
+index c70b2d4..26277ee 100644
+--- a/agujeros/agujeros-elegidos.html
++++ b/agujeros/agujeros-elegidos.html
+@@ -108,7 +108,7 @@ const PALETAS = {
+ const VISTAS = { cerca: 2, escala: 1 }; // px de pantalla por px del mundo (el tile mide 360 del mundo a escala)
+ 
+ // El latido (pulsoCumulo): una vez por compás, sube rápido y baja despacio.
+-const COMPAS = 2.0604; // MUSICA_COMPAS_RESPALDO
++const COMPAS = 2.11; // MUSICA_COMPAS_RESPALDO
+ const TIEMPO = COMPAS / 5; // MUSICA_TIEMPOS_COMPAS
+ const PULSO_AMPLITUD = 1.4 / 1.15 - 1; // CUMULO_PULSO_AMPLITUD
+ function pulso(t) {
+diff --git a/js/esc4-game.js b/js/esc4-game.js
+index 8b3ba7e..0a3e723 100644
+--- a/js/esc4-game.js
++++ b/js/esc4-game.js
+@@ -62,7 +62,8 @@
+ // putea en un globo de diálogo (*#$%!) y se escapan. Cuando se van, se vuelve al
+ // escenario principal (el nivel está completo).
+ //
+-// Música (game sound/nivel4.ogg, con game sound/nivel4.m4a de respaldo): arranca cuando
++// Música (game sound/perdida.ogg, con game sound/perdida.m4a de respaldo; las
++// dos salen de perdida.wav): arranca cuando
+ // terminan las instrucciones y suena en bucle mientras dura la partida,
+ // acelerando de a muy poquito. Se frena al chocar (queda en silencio lo que
+ // dura la caída de la nave) y arranca de nuevo desde el principio, a
+@@ -119,11 +120,11 @@
+   // viejo), la misma música en AAC. Se usa la primera que se pueda decodificar.
+   const MUSICA_FUENTES = [
+     {
+-      url: "audio/Esc4/game sound/nivel4.ogg",
++      url: "audio/Esc4/game sound/perdida.ogg",
+       tipo: 'audio/ogg; codecs="opus"',
+     },
+     {
+-      url: "audio/Esc4/game sound/nivel4.m4a",
++      url: "audio/Esc4/game sound/perdida.m4a",
+       tipo: 'audio/mp4; codecs="mp4a.40.2"',
+     },
+   ];
+@@ -451,10 +452,13 @@
+   const CUMULO_PULSO_AMPLITUD = CUMULO_PICO_ORIGINAL / CUMULO_DISCO_RADIO - 1;
+   const CUMULO_PULSO_TIEMPOS = 1.25; // lo que dura cada pulso (estirar y volver), en tiempos de la música
+   const CUMULO_PULSO_ATAQUE = 0.25; // fracción del pulso que se dedica a estirar (el resto es volver)
+-  // La música del juego (nivel4.ogg) está en 5 tiempos: 145,6 BPM y el bucle son
+-  // exactamente 60 compases (123,62 s), y el archivo arranca en el primer tiempo
+-  // (ahí entra el bombo). Se midió sobre el audio; si se cambia la canción hay que
+-  // volver a medirlo.
++  // La música del juego (perdida.ogg) va en 4, con los platillos de a 3+3+2
++  // corcheas, a unos 114 BPM, pero el tempo no es parejo (cada compás dura
++  // entre 2,06 y 2,16 s): por eso no alcanza con un largo de compás y se anota
++  // dónde empieza cada uno (MUSICA_COMPASES). Son 4 compases de intro y después
++  // tres veces la misma parte de 25 s (12 compases; el último, más corto: la
++  // parte se copió cortada a los 25 s justos). Se midió sobre el audio; si se
++  // cambia la canción hay que volver a medirlo.
+   // Números de estrellas: al cruzar un agujero, en el de salida las estrellas del
+   // cierre salen en todas direcciones (como las chispas de siempre), se acomodan
+   // formando el número del pasaje (10, 9, 8... 1, como la voz), se quedan un
+@@ -479,14 +483,26 @@
+   const NUMERO_CAE_A = 2.1; // segundos desde el cruce hasta que empiezan a caer (ya formado desde ~0,2 s, a tiempo con la voz)
+   const NUMERO_CAIDA = 0.9; // segundos que tardan en caer y achicarse del todo
+   const NUMERO_GRAVEDAD = 260; // px/s² del mundo
+-  const MUSICA_TIEMPOS_COMPAS = 5;
+-  const MUSICA_COMPASES_BUCLE = 60; // compases que dura el bucle entero
+-  const MUSICA_PULSO_TIEMPO = 0; // en qué tiempo del compás cae el pulso (0 = el primero, 4 = el último): para correrlo si se siente desfasado
+-  const MUSICA_COMPAS_RESPALDO = 2.0604; // segundos del compás a velocidad normal: se usa si no se puede saber dónde va la música
+-  // La batería entra al empezar el compás 7 (12,36 s; medido sobre el audio). En
+-  // el tutorial, cada partida arranca la música ahí, ya con la batería; al dar
+-  // la vuelta el bucle sigue desde el principio, como siempre.
+-  const MUSICA_BATERIA_COMPASES = 6;
++  const MUSICA_TIEMPOS_COMPAS = 4;
++  // Dónde empieza cada compás, en segundos del audio a velocidad normal.
++  const MUSICA_INTRO_COMPASES = [0.313, 2.45, 4.57, 6.714];
++  const MUSICA_PARTE = 25; // s que dura la parte que se repite
++  const MUSICA_PARTE_COMPASES = [
++    8.771, 10.844, 12.971, 15.057, 17.189, 19.317, 21.477, 23.605, 25.745,
++    27.823, 29.892, 31.984,
++  ];
++  const MUSICA_COMPASES = [
++    ...MUSICA_INTRO_COMPASES,
++    ...[0, 1, 2].flatMap((k) =>
++      MUSICA_PARTE_COMPASES.map((c) => c + k * MUSICA_PARTE),
++    ),
++  ];
++  const MUSICA_PULSO_TIEMPO = 0; // en qué tiempo del compás cae el pulso (0 = el primero, 3 = el último): para correrlo si se siente desfasado
++  const MUSICA_COMPAS_RESPALDO = 2.11; // segundos de un compás típico a velocidad normal: se usa si no se puede saber dónde va la música
++  // En el tutorial, cada partida arranca la música donde termina la intro (el
++  // primer compás de la parte); al dar la vuelta el bucle sigue desde el
++  // principio, como siempre.
++  const MUSICA_TUTORIAL_DESDE = MUSICA_PARTE_COMPASES[0];
+   // Final (victoria): la intro otra vez, con los parallax 7 en blanco y negro,
+   // junto a la nave del jugador (que las mira) y con el zoom a la nave. Los
+   // tiempos son los de la intro (INTRO_LLEGADA, INTRO_SALIDA...), salvo la espera.
+@@ -2990,9 +3006,8 @@
+   function iniciarMusica() {
+     frenarMusica();
+     musicaT = 0;
+-    // Compases que se saltea (ver MUSICA_BATERIA_COMPASES): enteros, así los
+-    // agujeros siguen pulsando a tiempo.
+-    const compases = esTutorial() ? MUSICA_BATERIA_COMPASES : 0;
++    // En el tutorial, sin la intro (ver MUSICA_TUTORIAL_DESDE).
++    const desde = esTutorial() ? MUSICA_TUTORIAL_DESDE : 0;
+     if (musicaBuffer) {
+       // El navegador puede tenerla suspendida hasta la primera interacción.
+       audioCtx.resume().catch(() => {});
+@@ -3000,13 +3015,12 @@
+       musicaFuente.buffer = musicaBuffer;
+       musicaFuente.loop = true;
+       musicaFuente.connect(musicaGain);
+-      const desde = (compases * musicaBuffer.duration) / MUSICA_COMPASES_BUCLE;
+       musicaFuente.start(0, desde);
+       musicaPos = desde;
+       musicaRelojPrev = audioCtx.currentTime;
+       musicaLatencia = audioCtx.outputLatency || audioCtx.baseLatency || 0;
+     } else if (musica) {
+-      musica.currentTime = compases * MUSICA_COMPAS_RESPALDO;
++      musica.currentTime = desde;
+       musica.play().catch(() => {}); // puede bloquearla si aún no hubo interacción
+     } else musicaPendiente = true; // todavía cargando: arranca al terminar
+   }
+@@ -3043,11 +3057,16 @@
+       duracion = musica.duration;
+       pos = musica.currentTime;
+     } else return null;
+-    const compas = duracion / MUSICA_COMPASES_BUCLE;
+-    const tiempo = compas / MUSICA_TIEMPOS_COMPAS;
+-    pos -= MUSICA_PULSO_TIEMPO * tiempo;
+-    pos = ((pos % compas) + compas) % compas;
+-    return { pos, compas };
++    pos -= (MUSICA_PULSO_TIEMPO * MUSICA_COMPAS_RESPALDO) / MUSICA_TIEMPOS_COMPAS;
++    pos = ((pos % duracion) + duracion) % duracion;
++    // El último compás que empezó (antes del primero, el último de la vuelta
++    // anterior del bucle) y el que le sigue (ver MUSICA_COMPASES).
++    const c = MUSICA_COMPASES;
++    let i = c.length - 1;
++    while (i >= 0 && c[i] > pos) i--;
++    const desde = i >= 0 ? c[i] : c[c.length - 1] - duracion;
++    const hasta = i + 1 < c.length ? c[i + 1] : c[0] + duracion;
++    return { pos: pos - desde, compas: hasta - desde };
+   }
+ 
+   // La música de las instrucciones, en bucle.
