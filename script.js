@@ -2182,6 +2182,9 @@ function drawStars() {
           o = a + gy * 1000;
           l = true;
         }
+        // Con la mira de la Estrella II (window.shipMira, ver esc4-game.js) el
+        // mouse apunta y no mueve la nave: se maneja con el teclado o el stick.
+        if (window.shipMira && !gamepadActive) l = false;
 
         // Cada escenario puede pisar su propia velocidad (ver speedMult en
         // el registro de escenarios); por default todos usan la misma. En el
@@ -2396,7 +2399,13 @@ function drawStars() {
           if (applyLightFilter) applyLightFilter();
         }
 
-        if (
+        if (typeof window.shipApuntar === "number") {
+          // Apuntando con la mira de la Estrella II: mira a la mira, vaya para
+          // donde vaya (ver esc4-game.js).
+          let angle = window.shipApuntar - s;
+          angle = ((((angle + 180) % 360) + 360) % 360) - 180;
+          s += suavizadoPor(0.25, cuadros) * angle;
+        } else if (
           l &&
           null !== i &&
           performance.now() >= shipCarriedUntil &&

@@ -7489,6 +7489,7 @@
       proxTiro: 0, // cuándo sale su próximo tiro (s desde que la usó)
       fogonazo: 0,
       aturdido: 0, // s que le quedan aturdida (ver ATURDIDO_DURA)
+      mira: null, // dónde apunta el jugador 2 con la II (ver apuntarMiras)
       t: 0,
       cae: null,
       hx: 0, // donde la golpearon (ahí reaparece)
@@ -7898,8 +7899,16 @@
 
     // Gira igual que la nave del jugador con las flechas en script.js: hacia
     // donde se la empuja (0° = nariz arriba), un 25 % de lo que falta por
-    // cuadro de 60 Hz, y sin empuje se queda mirando para donde estaba.
-    if (gx !== 0 || gy !== 0) {
+    // cuadro de 60 Hz, y sin empuje se queda mirando para donde estaba. Con la
+    // mira de la II, hacia la mira (ver apuntarMiras).
+    if (rival.mira) {
+      const meta =
+        (Math.atan2(rival.mira.x - rival.x, -(rival.mira.y - rival.y)) * 180) /
+        Math.PI;
+      let d = meta - rival.rot;
+      d = ((((d + 180) % 360) + 360) % 360) - 180;
+      rival.rot += d * (1 - Math.pow(1 - 0.25, cuadros));
+    } else if (gx !== 0 || gy !== 0) {
       const meta = (Math.atan2(gy, gx) * 180) / Math.PI + 90;
       let d = meta - rival.rot;
       d = ((((d + 180) % 360) + 360) % 360) - 180;
@@ -9278,9 +9287,12 @@
   // mismo tamaño, con un lado sin terminar), y mientras dura dispara sola un
   // tiro verde hacia donde mira cada ESTRELLA_CADENCIA s; antes de cada uno los
   // rayos del borde del plato se juntan adelante. Mientras es la II no le caen
-  // sus piedras (las que ya venían siguen), así puede apuntar, y si la otra
-  // nave está más o menos adelante (ver ESTRELLA_AYUDA) el tiro sale derecho
-  // hacia ella. Cada tiro rompe la primera piedra que toca y, si le da a la
+  // sus piedras (las que ya venían siguen), así puede apuntar con una mira: el
+  // stick derecho del joystick o el mouse (que mientras tanto no mueve la nave;
+  // se maneja con el teclado). La nave gira para mirar a la mira y los tiros
+  // van justo ahí. Sin mira (solo teclado, el celular, la PC) dispara para
+  // donde mira, y si la otra nave está más o menos adelante (ver
+  // ESTRELLA_AYUDA) el tiro sale derecho hacia ella. Cada tiro rompe la primera piedra que toca y, si le da a la
   // otra nave, la deja aturdida ATURDIDO_DURA s: sin poder moverse. Online cada uno dispara en su compu y le avisa al
   // otro: los tiros ("tiro", para que los vea), las piedras suyas que le rompió
   // ("romper") y que lo aturdió ("aturdir"); la II y el aturdido viajan en el
@@ -9294,6 +9306,15 @@
   const ESTRELLA_PC_DISTANCIA = 520; // px del mundo: más cerca que esto, la PC la usa
   const ESTRELLA_AYUDA = (30 * Math.PI) / 180; // la otra nave a menos de esto de donde mira: el tiro va hacia ella
   const ESTRELLA_AYUDA_ALCANCE = 900; // px del mundo: más lejos, no ayuda
+  const MIRA_DISTANCIA = 260; // px del mundo: a cuánto de la nave va la mira del stick
+  const MIRA_ZONA_MUERTA = 0.35; // el stick derecho, menos inclinado que esto, no apunta
+  const MIRA_VERDE = "rgba(110,255,140,0.9)";
+  let miraJugador = null; // { x, y } en el mundo, o null si no apunta (la del rival: rival.mira)
+  let ratonMira = null; // dónde está el mouse (en pantalla) y cuándo se movió: { x, y, t }
+  let inicioEstrella = 0; // performance.now() de cuando la usó (el mouse apunta si se movió después)
+  document.addEventListener("mousemove", (ev) => {
+    ratonMira = { x: ev.clientX, y: ev.clientY, t: performance.now() };
+  });
   const ESTRELLA2 = {
     off: "naves/nuevas/estrella/estrella2.webp",
     on: "naves/nuevas/estrella/estrella2_on.webp",
@@ -9450,6 +9471,7 @@
         if (quien === "jugador") {
           estrellaJugador = ESTRELLA_DURA;
           proxTiroJugador = ESTRELLA_CAMBIO + ESTRELLA_CARGA;
+          inicioEstrella = performance.now();
         } else {
           rival.estrella = ESTRELLA_DURA;
           rival.proxTiro = ESTRELLA_CAMBIO + ESTRELLA_CARGA;
@@ -9470,6 +9492,7 @@
             rival.aturdido = Math.max(0, (rival.aturdido || 0) - dt);
           }
         }
+        apuntarMiras();
         // El dibujo de la II, a la mitad del destello.
         if (enII("jugador") !== spriteIIJugador) {
           spriteIIJugador = !spriteIIJugador;
@@ -9509,6 +9532,8 @@
           cartelNave(centro.x, centro.y, "aturdido", "rgba(255,150,150,0.9)");
         if (suya && rival.aturdido > 0)
           cartelNave(rival.x, rival.y, "aturdido", "rgba(255,150,150,0.9)");
+        if (jugador && miraJugador) dibujarMira(miraJugador);
+        if (suya && rival.mira) dibujarMira(rival.mira);
         dibujarPlatoJugador();
       },
     },
@@ -9546,17 +9571,100 @@
       y: rival.y + (px * sin + py * cos) * k,
     };
   }
+  // Las miras de la II (ver MIRA_*): la del jugador, con el stick derecho de
+  // su joystick o el mouse; la del jugador 2 (en la misma compu), con el stick
+  // derecho del suyo. Mientras es la II el mouse no mueve la nave
+  // (window.shipMira) y la nave gira para mirar a la mira (window.shipApuntar,
+  // en grados, lo leen script.js y, para la del jugador 2, moverRival).
+  function apuntarMiras() {
+    miraJugador = null;
+    if (rival) rival.mira = null;
+    window.shipMira = estrellaJugador > 0;
+    window.shipApuntar = null;
+    const pad = primerJoystick();
+    // La del jugador: el joystick es suyo salvo que lo tenga el jugador 2.
+    if (estrellaJugador > 0 && stunJugador <= 0) {
+      const centro = puntoEnNave("jugador", 150, 150); // el centro de su caja
+      const mia = pad && !window.j2Joystick ? stickMira(pad) : null;
+      if (mia)
+        miraJugador = {
+          x: centro.x + mia.x * MIRA_DISTANCIA,
+          y: centro.y + mia.y * MIRA_DISTANCIA,
+        };
+      else if (
+        ratonMira &&
+        ratonMira.t > inicioEstrella &&
+        !window.toqueControles
+      )
+        miraJugador = {
+          x: cam.ox + (ratonMira.x - cam.ox) / cam.z,
+          y: cam.oy + (ratonMira.y - cam.oy) / cam.z,
+        };
+      if (miraJugador)
+        window.shipApuntar =
+          (Math.atan2(miraJugador.x - centro.x, -(miraJugador.y - centro.y)) *
+            180) /
+          Math.PI;
+    }
+    // La del jugador 2, con su joystick.
+    if (
+      rival &&
+      modo === "dos" &&
+      window.j2Joystick &&
+      pad &&
+      rival.estrella > 0 &&
+      rival.stun <= 0
+    ) {
+      const suya = stickMira(pad);
+      if (suya)
+        rival.mira = {
+          x: rival.x + suya.x * MIRA_DISTANCIA,
+          y: rival.y + suya.y * MIRA_DISTANCIA,
+        };
+    }
+  }
+  // Hacia dónde apunta el stick derecho (de largo 1), o null si está suelto.
+  function stickMira(pad) {
+    const x = pad.axes[2] || 0;
+    const y = pad.axes[3] || 0;
+    const m = Math.hypot(x, y);
+    return m < MIRA_ZONA_MUERTA ? null : { x: x / m, y: y / m };
+  }
+  // La mira: un círculo verde con cuatro rayitas y un punto en el medio.
+  function dibujarMira(m) {
+    const r = cajaNave * escalaNaveMundo() * 0.16;
+    ctx.save();
+    ctx.strokeStyle = MIRA_VERDE;
+    ctx.fillStyle = MIRA_VERDE;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      ctx.moveTo(m.x + dx * r * 0.55, m.y + dy * r * 0.55);
+      ctx.lineTo(m.x + dx * r * 1.45, m.y + dy * r * 1.45);
+    }
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   // Un tiro de la II desde el foco del plato, hacia donde mira la nave.
   function disparar(quien) {
     const pose = window.shipPose;
     if (quien === "jugador" && !(pose && pose.listo)) return;
     const o = puntoEnNave(quien, PLATO_FOCO.x, PLATO_FOCO.y);
-    // Hacia donde mira, o derecho a la otra nave si está más o menos adelante.
+    // Con mira, justo a la mira. Sin mira, hacia donde mira, o derecho a la
+    // otra nave si está más o menos adelante.
     let rad = (((quien === "jugador" ? pose.rot : rival.rot) * Math.PI) / 180);
+    const mira = quien === "jugador" ? miraJugador : rival.mira;
     const otra = (quien === "jugador" ? circulosRival() : circulosNave())[1];
     const otraEnJuego =
       quien === "jugador" ? rival && rival.stun <= 0 : stunJugador <= 0;
-    if (otra && otraEnJuego) {
+    if (mira) rad = Math.atan2(mira.x - o.x, -(mira.y - o.y));
+    else if (otra && otraEnJuego) {
       const dx = otra.x - o.x;
       const dy = otra.y - o.y;
       const hacia = Math.atan2(dx, -dy);
@@ -9995,6 +10103,9 @@
     fogonazoJugador = 0;
     aturdidoJugador = 0;
     window.shipAturdida = false;
+    miraJugador = null;
+    window.shipMira = false;
+    window.shipApuntar = null;
     tiros = [];
     trozos = [];
     anillosTiro = [];
@@ -10093,6 +10204,8 @@
     if (esTutorial() || !modo) {
       window.shipPotencia = 1;
       window.shipAturdida = false;
+      window.shipMira = false;
+      window.shipApuntar = null;
       return;
     }
     for (const p of Object.values(PODERES)) p.avanzar(dt, circulos);
